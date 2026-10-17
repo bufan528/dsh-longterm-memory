@@ -1,0 +1,165 @@
+{
+  "stage": "done",
+  "steps": [
+    "registerAdapter ok",
+    "agents.create ok",
+    "listener on agent.ctx",
+    "trace listeners on agent.ctx",
+    "followup sent",
+    "turn 1: idle, token=false",
+    "turn 2: idle, token=true"
+  ],
+  "agentKeys": [
+    "agent",
+    "dispose"
+  ],
+  "hasFollowup": true,
+  "turnResult": "idle",
+  "assemblies": 2,
+  "streamCalls": 2,
+  "trace": [
+    {
+      "at": "2026-10-17T09:02:50.572Z",
+      "kind": "session/event",
+      "type": "agent/inbox/spliced"
+    },
+    {
+      "at": "2026-10-17T09:02:50.573Z",
+      "kind": "agent/status",
+      "status": "running"
+    },
+    {
+      "at": "2026-10-17T09:02:50.575Z",
+      "kind": "session/event",
+      "type": "turn/start"
+    },
+    {
+      "at": "2026-10-17T09:02:50.581Z",
+      "kind": "session/event",
+      "type": "agent/inbox/spliced"
+    },
+    {
+      "at": "2026-10-17T09:02:50.616Z",
+      "kind": "agent/pre-step",
+      "turn": 1,
+      "step": 1
+    },
+    {
+      "at": "2026-10-17T09:02:50.661Z",
+      "kind": "session/event",
+      "type": "step/start"
+    },
+    {
+      "at": "2026-10-17T09:02:50.665Z",
+      "kind": "session/event",
+      "type": "system/message"
+    },
+    {
+      "at": "2026-10-17T09:02:50.666Z",
+      "kind": "session/event",
+      "type": "user/message"
+    },
+    {
+      "at": "2026-10-17T09:02:50.668Z",
+      "kind": "session/event",
+      "type": "user/message"
+    },
+    {
+      "at": "2026-10-17T09:02:50.671Z",
+      "kind": "session/event",
+      "type": "request/header"
+    },
+    {
+      "at": "2026-10-17T09:02:50.672Z",
+      "kind": "session/event",
+      "type": "request/context"
+    },
+    {
+      "at": "2026-10-17T09:02:50.693Z",
+      "kind": "session/event",
+      "type": "assistant/message"
+    },
+    {
+      "at": "2026-10-17T09:02:50.695Z",
+      "kind": "session/event",
+      "type": "step/end"
+    },
+    {
+      "at": "2026-10-17T09:02:51.427Z",
+      "kind": "session/event",
+      "type": "turn/end"
+    },
+    {
+      "at": "2026-10-17T09:02:51.431Z",
+      "kind": "agent/status",
+      "status": "idle"
+    },
+    {
+      "at": "2026-10-17T09:02:52.655Z",
+      "kind": "session/event",
+      "type": "agent/inbox/spliced"
+    },
+    {
+      "at": "2026-10-17T09:02:52.656Z",
+      "kind": "agent/status",
+      "status": "running"
+    },
+    {
+      "at": "2026-10-17T09:02:52.657Z",
+      "kind": "session/event",
+      "type": "turn/start"
+    },
+    {
+      "at": "2026-10-17T09:02:52.663Z",
+      "kind": "session/event",
+      "type": "agent/inbox/spliced"
+    },
+    {
+      "at": "2026-10-17T09:02:52.703Z",
+      "kind": "agent/pre-step",
+      "turn": 2,
+      "step": 1
+    },
+    {
+      "at": "2026-10-17T09:02:52.710Z",
+      "kind": "session/event",
+      "type": "step/start"
+    },
+    {
+      "at": "2026-10-17T09:02:52.712Z",
+      "kind": "session/event",
+      "type": "system/message"
+    },
+    {
+      "at": "2026-10-17T09:02:52.713Z",
+      "kind": "session/event",
+      "type": "user/message"
+    },
+    {
+      "at": "2026-10-17T09:02:52.714Z",
+      "kind": "session/event",
+      "type": "request/header"
+    },
+    {
+      "at": "2026-10-17T09:02:52.723Z",
+      "kind": "session/event",
+      "type": "assistant/message"
+    },
+    {
+      "at": "2026-10-17T09:02:52.724Z",
+      "kind": "session/event",
+      "type": "step/end"
+    },
+    {
+      "at": "2026-10-17T09:02:53.293Z",
+      "kind": "session/event",
+      "type": "turn/end"
+    },
+    {
+      "at": "2026-10-17T09:02:53.295Z",
+      "kind": "agent/status",
+      "status": "idle"
+    }
+  ],
+  "tokenSeen": true
+}

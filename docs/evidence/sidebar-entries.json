@@ -1,0 +1,200 @@
+{
+  "viewport": {
+    "width": 1600,
+    "height": 1000
+  },
+  "sidebarContainers": [
+    {
+      "tag": "div",
+      "className": "BynINW_sidebarCol",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 280,
+        "height": 1000
+      }
+    },
+    {
+      "tag": "nav",
+      "className": "_2H3hWW_panelList",
+      "rect": {
+        "x": 12,
+        "y": 120,
+        "width": 256,
+        "height": 116
+      }
+    }
+  ],
+  "usedFallback": false,
+  "count": 12,
+  "entries": [
+    {
+      "tag": "button",
+      "className": "_2H3hWW_iconButton _2H3hWW_toggle",
+      "textContent": "",
+      "innerText": "",
+      "ariaLabel": "收起侧边栏",
+      "title": "",
+      "rect": {
+        "x": 240,
+        "y": 22,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "tag": "button",
+      "className": "_2H3hWW_brand _2H3hWW_wide",
+      "textContent": "",
+      "innerText": "",
+      "ariaLabel": "新建会话",
+      "title": "",
+      "rect": {
+        "x": 16,
+        "y": 24,
+        "width": 216,
+        "height": 24
+      }
+    },
+    {
+      "tag": "button",
+      "className": "_2H3hWW_newSession",
+      "textContent": "新会话Ctrl+Alt+N",
+      "innerText": "新会话 Ctrl + Alt + N",
+      "ariaLabel": "新建会话",
+      "title": "",
+      "rect": {
+        "x": 14,
+        "y": 70,
+        "width": 252,
+        "height": 38
+      }
+    },
+    {
+      "tag": "button",
+      "className": "_2H3hWW_panelRow",
+      "textContent": "插件",
+      "innerText": "插件",
+      "ariaLabel": "插件",
+      "title": "",
+      "rect": {
+        "x": 14,
+        "y": 120,
+        "width": 252,
+        "height": 36
+      }
+    },
+    {
+      "tag": "button",
+      "className": "_2H3hWW_panelRow",
+      "textContent": "自动化任务",
+      "innerText": "自动化任务",
+      "ariaLabel": "自动化任务",
+      "title": "",
+      "rect": {
+        "x": 14,
+        "y": 160,
+        "width": 252,
+        "height": 36
+      }
+    },
+    {
+      "tag": "button",
+      "className": "_2H3hWW_panelRow",
+      "textContent": "长期记忆",
+      "innerText": "长期记忆",
+      "ariaLabel": "长期记忆",
+      "title": "",
+      "rect": {
+        "x": 14,
+        "y": 200,
+        "width": 252,
+        "height": 36
+      }
+    },
+    {
+      "tag": "button",
+      "className": "_9lTDKa_searchButton",
+      "textContent": "",
+      "innerText": "",
+      "ariaLabel": "搜索会话",
+      "title": "",
+      "rect": {
+        "x": 176,
+        "y": 250,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "tag": "button",
+      "className": "_9lTDKa_iconButton _9lTDKa_wide",
+      "textContent": "",
+      "innerText": "",
+      "ariaLabel": "视图选项",
+      "title": "",
+      "rect": {
+        "x": 208,
+        "y": 250,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "tag": "button",
+      "className": "_9lTDKa_iconButton",
+      "textContent": "",
+      "innerText": "",
+      "ariaLabel": "添加工作区",
+      "title": "",
+      "rect": {
+        "x": 240,
+        "y": 250,
+        "width": 28,
+        "height": 28
+      }
+    },
+    {
+      "tag": "div",
+      "className": "hIlkoa_projectRow",
+      "textContent": "默认工作区",
+      "innerText": "默认工作区",
+      "ariaLabel": "",
+      "title": "",
+      "rect": {
+        "x": 12,
+        "y": 286,
+        "width": 256,
+        "height": 34
+      }
+    },
+    {
+      "tag": "div",
+      "className": "hIlkoa_sessionRow hIlkoa_selected",
+      "textContent": "新会话",
+      "innerText": "新会话",
+      "ariaLabel": "",
+      "title": "",
+      "rect": {
+        "x": 12,
+        "y": 322,
+        "width": 256,
+        "height": 32
+      }
+    },
+    {
+      "tag": "button",
+      "className": "ET65mq_trigger",
+      "textContent": "更多",
+      "innerText": "更多",
+      "ariaLabel": "账号菜单",
+      "title": "",
+      "rect": {
+        "x": 10,
+        "y": 958,
+        "width": 260,
+        "height": 32
+      }
+    }
+  ]
+}

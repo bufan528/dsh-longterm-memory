@@ -1,0 +1,831 @@
+{
+  "generatedAt": "2026-10-17T09:11:13.872Z",
+  "url": "http://127.0.0.1:<port>/?token=***",
+  "out": "<repo>\\.scratch\\ui3",
+  "seedIds": {
+    "alpha": "mem_20261017t090946_66649da5",
+    "long": "mem_20261017t090946_fea8b42e",
+    "beta": "mem_20261017t090946_40a0a73b"
+  },
+  "scenarios": [
+    {
+      "id": "1",
+      "name": "Five page entries load without an error panel",
+      "result": "PASS",
+      "assertions": [
+        {
+          "ok": true,
+          "label": "tab 记忆总览 is marked active",
+          "detail": "activeNav=记忆总览"
+        },
+        {
+          "ok": true,
+          "label": "tab 记忆总览 rendered content",
+          "detail": "mainTextLength=1868"
+        },
+        {
+          "ok": true,
+          "label": "tab 记忆总览 shows no error panel",
+          "detail": "[]"
+        },
+        {
+          "ok": true,
+          "label": "tab 记忆总览 finished loading",
+          "detail": "hasLoading=false"
+        },
+        {
+          "ok": true,
+          "label": "tab 记忆总览 shows its expected content",
+          "detail": "anchor=存储路径 excerpt=存储路径 手动重建索引 同步索引 打开本地 Vault <repo>\\.scratch\\ui3-home\\vault\\DSH Memory 已启用 Obsidian: 是 当前生效路径 记忆总览 3 记忆总数 0 待确认数量 0 冲突/异常数量 0 置顶数量 0 已过时 0 已归档 0 与磁盘"
+        },
+        {
+          "ok": true,
+          "label": "tab 记忆检索 is marked active",
+          "detail": "activeNav=记忆检索"
+        },
+        {
+          "ok": true,
+          "label": "tab 记忆检索 rendered content",
+          "detail": "mainTextLength=894"
+        },
+        {
+          "ok": true,
+          "label": "tab 记忆检索 shows no error panel",
+          "detail": "[]"
+        },
+        {
+          "ok": true,
+          "label": "tab 记忆检索 finished loading",
+          "detail": "hasLoading=false"
+        },
+        {
+          "ok": true,
+          "label": "tab 记忆检索 shows its expected content",
+          "detail": "anchor=关键词 excerpt=关键词 关键词 (输入后 250 毫秒自动检索) 标签 起始日期 截止日期 结果上限 类别 用户背景 长期偏好 项目 项目进展 决策 知识 经验教训 任务 状态 当前 待确认 已过时 已被取代 冲突 已归档 只看置顶 包含非当前记忆（已归档 / 已过时 / 已取代 / 冲突） 重要性 ≥ 搜索 重置 勾选两条以上即可合"
+        },
+        {
+          "ok": true,
+          "label": "tab 记忆管理 is marked active",
+          "detail": "activeNav=记忆管理"
+        },
+        {
+          "ok": true,
+          "label": "tab 记忆管理 rendered content",
+          "detail": "mainTextLength=8139"
+        },
+        {
+          "ok": true,
+          "label": "tab 记忆管理 shows no error panel",
+          "detail": "[]"
+        },
+        {
+          "ok": true,
+          "label": "tab 记忆管理 finished loading",
+          "detail": "hasLoading=false"
+        },
+        {
+          "ok": true,
+          "label": "tab 记忆管理 shows its expected content",
+          "detail": "anchor=索引维护 excerpt=索引维护 手动重建索引 同步索引 索引构建时间 2026-10-17 17:09 索引条目 3 索引状态 正常 存储位置 打开本地 Vault Vault 路径 <repo>\\.scratch\\ui3-home\\vault\\DSH Memory 索引文件 <repo>"
+        },
+        {
+          "ok": true,
+          "label": "tab 收件箱 is marked active",
+          "detail": "activeNav=收件箱"
+        },
+        {
+          "ok": true,
+          "label": "tab 收件箱 rendered content",
+          "detail": "mainTextLength=160"
+        },
+        {
+          "ok": true,
+          "label": "tab 收件箱 shows no error panel",
+          "detail": "[]"
+        },
+        {
+          "ok": true,
+          "label": "tab 收件箱 finished loading",
+          "detail": "hasLoading=false"
+        },
+        {
+          "ok": true,
+          "label": "tab 收件箱 shows its expected content",
+          "detail": "anchor=候选与收件箱 excerpt=候选与收件箱 刷新 没有待处理的候选记忆 手动添加 选择「候选」会写入收件箱等待确认；选择「正式记忆」会直接创建一条 active 记忆。 写入为候选 类别 用户背景 长期偏好 项目 项目进展 决策 知识 经验教训 任务 置信度 低 中 高 重要性（0-100） 标题 摘要 标签 （逗号分隔） 证据 添加原因 手动添加"
+        },
+        {
+          "ok": true,
+          "label": "tab 设置 is marked active",
+          "detail": "activeNav=设置"
+        },
+        {
+          "ok": true,
+          "label": "tab 设置 rendered content",
+          "detail": "mainTextLength=394"
+        },
+        {
+          "ok": true,
+          "label": "tab 设置 shows no error panel",
+          "detail": "[]"
+        },
+        {
+          "ok": true,
+          "label": "tab 设置 finished loading",
+          "detail": "hasLoading=false"
+        },
+        {
+          "ok": true,
+          "label": "tab 设置 shows its expected content",
+          "detail": "anchor=插件设置 excerpt=插件设置 有未保存的修改 保存 重新读取 界面语言 简体中文 English 向模型注册记忆工具 注入常驻记忆段落 常驻段落 token 预算 常驻段落最大条数 单次召回 token 预算 单次召回最大条数 每回合最多候选数 每一步都注入召回结果 回合结束时自动提取候选 使用模型进行提取 ! 隐私提示：开启后插件会在你"
+        }
+      ],
+      "defects": [],
+      "observations": [],
+      "notes": [
+        "Each tab was clicked through the real .lmv-nav buttons and captured individually."
+      ],
+      "screenshots": [
+        {
+          "name": "s1-1-overview.png",
+          "path": "<repo>\\.scratch\\ui3\\s1-1-overview.png",
+          "bytes": 97313
+        },
+        {
+          "name": "s1-2-search.png",
+          "path": "<repo>\\.scratch\\ui3\\s1-2-search.png",
+          "bytes": 100125
+        },
+        {
+          "name": "s1-3-manage.png",
+          "path": "<repo>\\.scratch\\ui3\\s1-3-manage.png",
+          "bytes": 74726
+        },
+        {
+          "name": "s1-4-inbox.png",
+          "path": "<repo>\\.scratch\\ui3\\s1-4-inbox.png",
+          "bytes": 52962
+        },
+        {
+          "name": "s1-5-settings.png",
+          "path": "<repo>\\.scratch\\ui3\\s1-5-settings.png",
+          "bytes": 79254
+        }
+      ]
+    },
+    {
+      "id": "2",
+      "name": "Search with no results shows an explicit empty state",
+      "result": "PASS",
+      "assertions": [
+        {
+          "ok": true,
+          "label": "explicit no-results text is visible",
+          "detail": "[\"没有匹配的记忆\"]"
+        },
+        {
+          "ok": true,
+          "label": "result count reports 0",
+          "detail": "共 0 条结果，用时 0 ms"
+        },
+        {
+          "ok": true,
+          "label": "no memory rows are rendered",
+          "detail": "rowCount=0"
+        },
+        {
+          "ok": true,
+          "label": "the empty state is not an error panel",
+          "detail": "[]"
+        }
+      ],
+      "defects": [],
+      "observations": [],
+      "notes": [],
+      "screenshots": [
+        {
+          "name": "s2-search-no-results.png",
+          "path": "<repo>\\.scratch\\ui3\\s2-search-no-results.png",
+          "bytes": 65754
+        }
+      ]
+    },
+    {
+      "id": "3",
+      "name": "Very long (~8000 CJK chars) memory content renders safely",
+      "result": "PASS",
+      "assertions": [
+        {
+          "ok": true,
+          "label": "long memory appears in search results",
+          "detail": "row found"
+        },
+        {
+          "ok": true,
+          "label": "detail view opened for the long memory",
+          "detail": "超长内容验收记忆"
+        },
+        {
+          "ok": true,
+          "label": "full ~8000-char summary is rendered",
+          "detail": "summaryLength=8000"
+        },
+        {
+          "ok": true,
+          "label": "document has no horizontal overflow",
+          "detail": "docScrollWidth=1600 innerWidth=1600"
+        },
+        {
+          "ok": true,
+          "label": "main column has no horizontal overflow",
+          "detail": "{\"clientWidth\":1320,\"scrollWidth\":1320,\"clientHeight\":890,\"scrollHeight\":3336,\"overflowY\":\"auto\",\"right\":1600}"
+        },
+        {
+          "ok": true,
+          "label": "no element extends past the viewport right edge",
+          "detail": "[]"
+        },
+        {
+          "ok": true,
+          "label": "detail content is vertically scrollable",
+          "detail": "{\"clientWidth\":1320,\"scrollWidth\":1320,\"clientHeight\":890,\"scrollHeight\":3336,\"overflowY\":\"auto\",\"right\":1600}"
+        },
+        {
+          "ok": true,
+          "label": "main column owns the scroll",
+          "detail": "overflowY=auto"
+        },
+        {
+          "ok": true,
+          "label": "the long paragraph wraps inside its card",
+          "detail": "[{\"length\":8000,\"clientWidth\":1262,\"scrollWidth\":1262,\"right\":1571,\"overflowWrap\":\"anywhere\"}]"
+        },
+        {
+          "ok": true,
+          "label": "scrolled to the 核心内容 card",
+          "detail": "{\"ok\":true,\"scrollTop\":457}"
+        }
+      ],
+      "defects": [],
+      "observations": [],
+      "notes": [],
+      "screenshots": [
+        {
+          "name": "s3-long-detail-top.png",
+          "path": "<repo>\\.scratch\\ui3\\s3-long-detail-top.png",
+          "bytes": 155787
+        },
+        {
+          "name": "s3-long-detail-summary.png",
+          "path": "<repo>\\.scratch\\ui3\\s3-long-detail-summary.png",
+          "bytes": 223327
+        }
+      ]
+    },
+    {
+      "id": "4",
+      "name": "Empty inbox shows an explicit empty state",
+      "result": "PASS",
+      "assertions": [
+        {
+          "ok": true,
+          "label": "host reports zero pending candidates",
+          "detail": "count=0"
+        },
+        {
+          "ok": true,
+          "label": "explicit empty-inbox text is visible",
+          "detail": "[\"没有待处理的候选记忆\"]"
+        },
+        {
+          "ok": true,
+          "label": "inbox empty state is not an error panel",
+          "detail": "[]"
+        },
+        {
+          "ok": true,
+          "label": "no candidate rows are rendered",
+          "detail": "rowCount=0"
+        }
+      ],
+      "defects": [],
+      "observations": [],
+      "notes": [],
+      "screenshots": [
+        {
+          "name": "s4-inbox-empty.png",
+          "path": "<repo>\\.scratch\\ui3\\s4-inbox-empty.png",
+          "bytes": 52962
+        }
+      ]
+    },
+    {
+      "id": "5",
+      "name": "Write failure (write-conflict) surfaces error + retry path",
+      "result": "PASS",
+      "assertions": [
+        {
+          "ok": true,
+          "label": "raw Markdown editor is open",
+          "detail": "length=389"
+        },
+        {
+          "ok": true,
+          "label": "UI checksum matches the host checksum",
+          "detail": "74aa442b vs 74aa442b"
+        },
+        {
+          "ok": true,
+          "label": "write-conflict error text is visible",
+          "detail": "[\"! 写入冲突：该文件已在磁盘上被其他程序修改，为避免覆盖，插件拒绝写入。请先重新读取。 重新读取\"]"
+        },
+        {
+          "ok": true,
+          "label": "a retry (重新读取) path is offered",
+          "detail": "[\"重新读取\"]"
+        },
+        {
+          "ok": true,
+          "label": "editor content is preserved after the failure",
+          "detail": "length=389"
+        },
+        {
+          "ok": true,
+          "label": "host returns write-conflict for the stale checksum",
+          "detail": "{\"code\":\"write-conflict\",\"message\":\"文件已被其他程序修改，为避免覆盖您的编辑，本次写入被拒绝。请重新载入后再保存。\",\"detail\":\"<repo>\\\\.scratch\\\\ui3-home\\\\vault\\\\DSH Memory\\\\Knowledge\\\\种子记忆 Alpha-mem_20261017t090946_66649da5.md\"}"
+        },
+        {
+          "ok": true,
+          "label": "重新读取 refreshes the editor from disk",
+          "detail": "includesMarker=true"
+        },
+        {
+          "ok": true,
+          "label": "checksum refreshes after an index sync",
+          "detail": "74aa442b -> c554b4cc"
+        },
+        {
+          "ok": true,
+          "label": "write succeeds after the index is synced",
+          "detail": "{\"errors\":[],\"toasts\":[\"原文已写入\"]}"
+        },
+        {
+          "ok": true,
+          "label": "host checksum matches the UI checksum after the write",
+          "detail": "c554b4cc vs c554b4cc"
+        },
+        {
+          "ok": true,
+          "label": "the in-section raw edit is preserved exactly once",
+          "detail": "occurrences=1"
+        }
+      ],
+      "defects": [
+        {
+          "id": "D1",
+          "severity": "medium",
+          "summary": "After an external disk edit, the UI retry path (重新读取) cannot resolve a write-conflict: readRaw returns the stale index checksum, so the next 写入文件 fails again. Only syncIndex/rebuildIndex updates the checksum, and the conflict message only tells the user to reload.",
+          "evidence": {
+            "reloadKeptStaleChecksum": true,
+            "checksumBefore": "74aa442b",
+            "checksumAfterReload": "74aa442b",
+            "errorsAfterSecondWrite": [
+              "! 写入冲突：该文件已在磁盘上被其他程序修改，为避免覆盖，插件拒绝写入。请先重新读取。 重新读取"
+            ]
+          }
+        }
+      ],
+      "observations": [
+        {
+          "id": "D2",
+          "severity": "low",
+          "summary": "Raw Markdown saves are parsed and re-rendered: text a user adds outside the recognised sections is silently dropped, although the tab is labelled 原文 Markdown and its hint says it edits the file on disk directly. No warning is shown.",
+          "evidence": {
+            "appended": "尾部附加内容（原文保真性探针）。",
+            "survivedWrite": false,
+            "writeAccepted": true,
+            "checksumBefore": "c554b4cc",
+            "checksumAfter": "c554b4cc"
+          }
+        }
+      ],
+      "notes": [
+        "D1: reload refreshes content but not the checksum; the retry fails until the index is synced."
+      ],
+      "screenshots": [
+        {
+          "name": "s5-write-conflict.png",
+          "path": "<repo>\\.scratch\\ui3\\s5-write-conflict.png",
+          "bytes": 99671
+        },
+        {
+          "name": "s5-conflict-again.png",
+          "path": "<repo>\\.scratch\\ui3\\s5-conflict-again.png",
+          "bytes": 99671
+        },
+        {
+          "name": "s5-write-recovered.png",
+          "path": "<repo>\\.scratch\\ui3\\s5-write-recovered.png",
+          "bytes": 111899
+        }
+      ]
+    },
+    {
+      "id": "6",
+      "name": "Archive and restore from the UI, verified through /api/search",
+      "result": "PASS",
+      "assertions": [
+        {
+          "ok": true,
+          "label": "memory starts in the active state",
+          "detail": "[\"知识\",\"当前\",\"中\",\"知识\",\"当前\",\"high\",\"知识\",\"当前\",\"medium\",\"create\"]"
+        },
+        {
+          "ok": true,
+          "label": "detail badge switches to 已归档",
+          "detail": "[\"知识\",\"已归档\",\"中\",\"知识\",\"当前\",\"high\",\"知识\",\"当前\",\"medium\",\"archive\",\"create\"]"
+        },
+        {
+          "ok": true,
+          "label": "archive toast is shown",
+          "detail": "[\"已归档：mem_20261017t090946_40a0a73b\"]"
+        },
+        {
+          "ok": true,
+          "label": "host memory status is archived",
+          "detail": "archived"
+        },
+        {
+          "ok": true,
+          "label": "/api/search (active only) no longer returns it",
+          "detail": "total=0"
+        },
+        {
+          "ok": true,
+          "label": "/api/search (include non-current) still returns it",
+          "detail": "total=1"
+        },
+        {
+          "ok": true,
+          "label": "archived memory is listed when non-current memories are included",
+          "detail": "[\"可归档记忆 Beta\"]"
+        },
+        {
+          "ok": true,
+          "label": "archived row is labelled 已归档",
+          "detail": "关键词 关键词 (输入后 250 毫秒自动检索) 标签 起始日期 截止日期 结果上限 类别 用户背景 长期偏好 项目 项目进展 决策 知识 经验教训 任务 状态 当前 待确认 已过时 已被取代 冲突 已归档 只看置顶 包含非当前记忆（已归档 / 已过时 / 已取代 / 冲突） 重要性 ≥ 搜索 重置 勾选两条以上即可合并 记忆检索 已选 0 项 合并重复记忆 清除选择 共 1 条结果，用时 0 m"
+        },
+        {
+          "ok": true,
+          "label": "non-current inclusion starts enabled",
+          "detail": "{\"found\":true,\"x\":390.5,\"y\":591,\"checked\":true,\"label\":\"包含非当前记忆（已归档 / 已过时 / 已取代 / 冲突）\"}"
+        },
+        {
+          "ok": true,
+          "label": "archived memory disappears from the active-only listing",
+          "detail": "[\"没有匹配的记忆\"]"
+        },
+        {
+          "ok": true,
+          "label": "active-only listing has no rows",
+          "detail": "[]"
+        },
+        {
+          "ok": true,
+          "label": "detail badge returns to 当前",
+          "detail": "[\"知识\",\"当前\",\"中\",\"知识\",\"当前\",\"high\",\"知识\",\"当前\",\"medium\",\"confirm\",\"archive\",\"create\"]"
+        },
+        {
+          "ok": true,
+          "label": "restore toast is shown",
+          "detail": "[\"已恢复：mem_20261017t090946_40a0a73b\"]"
+        },
+        {
+          "ok": true,
+          "label": "host memory status is active again",
+          "detail": "active"
+        },
+        {
+          "ok": true,
+          "label": "/api/search (active only) returns it again",
+          "detail": "total=1"
+        },
+        {
+          "ok": true,
+          "label": "restored memory is back in the active-only listing",
+          "detail": "[\"可归档记忆 Beta\"]"
+        }
+      ],
+      "defects": [],
+      "observations": [],
+      "notes": [],
+      "screenshots": [
+        {
+          "name": "s6-archived-detail.png",
+          "path": "<repo>\\.scratch\\ui3\\s6-archived-detail.png",
+          "bytes": 117533
+        },
+        {
+          "name": "s6-archived-search.png",
+          "path": "<repo>\\.scratch\\ui3\\s6-archived-search.png",
+          "bytes": 76893
+        },
+        {
+          "name": "s6-active-listing-empty.png",
+          "path": "<repo>\\.scratch\\ui3\\s6-active-listing-empty.png",
+          "bytes": 63991
+        },
+        {
+          "name": "s6-restored-detail.png",
+          "path": "<repo>\\.scratch\\ui3\\s6-restored-detail.png",
+          "bytes": 117795
+        },
+        {
+          "name": "s6-restored-search.png",
+          "path": "<repo>\\.scratch\\ui3\\s6-restored-search.png",
+          "bytes": 75998
+        }
+      ]
+    },
+    {
+      "id": "7",
+      "name": "Chinese interface and light/dark host theme",
+      "result": "PASS",
+      "assertions": [
+        {
+          "ok": true,
+          "label": "plugin setting language is zh",
+          "detail": "zh"
+        },
+        {
+          "ok": true,
+          "label": "all five navigation labels are Chinese",
+          "detail": "[\"记忆总览\",\"记忆检索\",\"记忆管理\",\"收件箱\",\"设置\"]"
+        },
+        {
+          "ok": true,
+          "label": "document language is zh-CN",
+          "detail": "zh-CN"
+        },
+        {
+          "ok": true,
+          "label": "host theme source is light",
+          "detail": "\"light\""
+        },
+        {
+          "ok": true,
+          "label": "color-scheme is light",
+          "detail": "light"
+        },
+        {
+          "ok": true,
+          "label": "plugin page is present in light mode",
+          "detail": "true"
+        },
+        {
+          "ok": true,
+          "label": "host theme source is dark",
+          "detail": "\"dark\""
+        },
+        {
+          "ok": true,
+          "label": "color-scheme is dark",
+          "detail": "dark"
+        },
+        {
+          "ok": true,
+          "label": "plugin page background follows the host theme",
+          "detail": "rgb(255, 255, 255) -> rgb(21, 21, 23)"
+        },
+        {
+          "ok": true,
+          "label": "dark page background is a concrete colour",
+          "detail": "rgb(21, 21, 23)"
+        },
+        {
+          "ok": true,
+          "label": "navigation stays Chinese in dark mode",
+          "detail": "[\"记忆总览\",\"记忆检索\",\"记忆管理\",\"收件箱\",\"设置\"]"
+        },
+        {
+          "ok": true,
+          "label": "dark background is actually dark",
+          "detail": "luminance=21.144399999999997"
+        }
+      ],
+      "defects": [],
+      "observations": [],
+      "notes": [],
+      "screenshots": [
+        {
+          "name": "s7-theme-light.png",
+          "path": "<repo>\\.scratch\\ui3\\s7-theme-light.png",
+          "bytes": 97124
+        },
+        {
+          "name": "s7-theme-dark.png",
+          "path": "<repo>\\.scratch\\ui3\\s7-theme-dark.png",
+          "bytes": 96976
+        }
+      ],
+      "data": {
+        "light": {
+          "source": "light",
+          "colorScheme": "light",
+          "htmlStyle": "color-scheme: light;",
+          "bodyBg": "rgb(255, 255, 255)",
+          "pageBg": "rgb(255, 255, 255)",
+          "pageColor": "rgb(15, 17, 21)",
+          "lang": "zh-CN",
+          "nav": [
+            "记忆总览",
+            "记忆检索",
+            "记忆管理",
+            "收件箱",
+            "设置"
+          ],
+          "title": "长期记忆",
+          "hasPage": true
+        },
+        "dark": {
+          "source": "dark",
+          "colorScheme": "dark",
+          "htmlStyle": "color-scheme: dark;",
+          "bodyBg": "rgb(21, 21, 23)",
+          "pageBg": "rgb(21, 21, 23)",
+          "pageColor": "rgb(249, 250, 251)",
+          "lang": "zh-CN",
+          "nav": [
+            "记忆总览",
+            "记忆检索",
+            "记忆管理",
+            "收件箱",
+            "设置"
+          ],
+          "title": "长期记忆",
+          "hasPage": true
+        }
+      }
+    },
+    {
+      "id": "8",
+      "name": "Page load failure display when the plugin API is unreachable",
+      "result": "PASS",
+      "assertions": [
+        {
+          "ok": true,
+          "label": "an error panel is displayed when the API is unreachable",
+          "detail": "panel appeared"
+        },
+        {
+          "ok": true,
+          "label": "error text names the failed operation",
+          "detail": "! 操作失败: status — Failed to fetch 错误码: internal 重试"
+        },
+        {
+          "ok": true,
+          "label": "error code is rendered (internal)",
+          "detail": "! 操作失败: status — Failed to fetch 错误码: internal 重试"
+        },
+        {
+          "ok": true,
+          "label": "the failure is not a blank area",
+          "detail": "errors=1"
+        },
+        {
+          "ok": true,
+          "label": "a 重试 button is offered",
+          "detail": "{\"found\":true,\"count\":1,\"x\":1550,\"y\":37,\"width\":46,\"height\":28,\"text\":\"重试\",\"tag\":\"button\",\"className\":\"lmv-btn lmv-btn-ghost\"}"
+        },
+        {
+          "ok": true,
+          "label": "failed load does not pretend the page succeeded",
+          "detail": "navCount=0"
+        },
+        {
+          "ok": true,
+          "label": "the failure was produced by failing only the plugin API route",
+          "detail": "intercepted=1 /dsh-longterm-memory/api/status"
+        },
+        {
+          "ok": true,
+          "label": "重试 recovers the page once the API is reachable again",
+          "detail": "navCount=5"
+        },
+        {
+          "ok": true,
+          "label": "no error panel after recovery",
+          "detail": "[]"
+        }
+      ],
+      "defects": [],
+      "observations": [],
+      "notes": [
+        "The plugin API was made unreachable with CDP Fetch.failRequest scoped to */dsh-longterm-memory/api/*, so the shell stayed up and only the plugin RPC failed."
+      ],
+      "screenshots": [
+        {
+          "name": "s8-api-unreachable.png",
+          "path": "<repo>\\.scratch\\ui3\\s8-api-unreachable.png",
+          "bytes": 25343
+        },
+        {
+          "name": "s8-recovered.png",
+          "path": "<repo>\\.scratch\\ui3\\s8-recovered.png",
+          "bytes": 97400
+        }
+      ]
+    },
+    {
+      "id": "9",
+      "name": "Plugin duplicate load and cleanup",
+      "result": "PASS",
+      "assertions": [
+        {
+          "ok": true,
+          "label": "exactly one 长期记忆 sidebar entry",
+          "detail": "{\"count\":1,\"entries\":[{\"tag\":\"button\",\"text\":\"长期记忆\",\"aria\":\"长期记忆\",\"x\":14,\"y\":200,\"w\":252,\"h\":36}],\"lmvPages\":0,\"dataPanelIds\":[]}"
+        },
+        {
+          "ok": true,
+          "label": "still exactly one 长期记忆 sidebar entry while open",
+          "detail": "{\"count\":1,\"entries\":[{\"tag\":\"button\",\"text\":\"长期记忆\",\"aria\":\"长期记忆\",\"x\":13,\"y\":200,\"w\":252,\"h\":36}],\"lmvPages\":1,\"dataPanelIds\":[]}"
+        },
+        {
+          "ok": true,
+          "label": "exactly one .lmv-page panel mounted",
+          "detail": "pageCount=1"
+        },
+        {
+          "ok": true,
+          "label": "exactly one five-tab navigation",
+          "detail": "navCount=5"
+        },
+        {
+          "ok": true,
+          "label": "only one plugin page instance in the DOM",
+          "detail": "lmvPages=1"
+        }
+      ],
+      "defects": [],
+      "observations": [],
+      "notes": [],
+      "screenshots": [
+        {
+          "name": "s9-sidebar-single.png",
+          "path": "<repo>\\.scratch\\ui3\\s9-sidebar-single.png",
+          "bytes": 41420
+        },
+        {
+          "name": "s9-panel-single.png",
+          "path": "<repo>\\.scratch\\ui3\\s9-panel-single.png",
+          "bytes": 97307
+        }
+      ]
+    }
+  ],
+  "defects": [
+    {
+      "id": "D1",
+      "severity": "medium",
+      "summary": "After an external disk edit, the UI retry path (重新读取) cannot resolve a write-conflict: readRaw returns the stale index checksum, so the next 写入文件 fails again. Only syncIndex/rebuildIndex updates the checksum, and the conflict message only tells the user to reload.",
+      "evidence": {
+        "reloadKeptStaleChecksum": true,
+        "checksumBefore": "74aa442b",
+        "checksumAfterReload": "74aa442b",
+        "errorsAfterSecondWrite": [
+          "! 写入冲突：该文件已在磁盘上被其他程序修改，为避免覆盖，插件拒绝写入。请先重新读取。 重新读取"
+        ]
+      }
+    }
+  ],
+  "observations": [
+    {
+      "id": "D2",
+      "severity": "low",
+      "summary": "Raw Markdown saves are parsed and re-rendered: text a user adds outside the recognised sections is silently dropped, although the tab is labelled 原文 Markdown and its hint says it edits the file on disk directly. No warning is shown.",
+      "evidence": {
+        "appended": "尾部附加内容（原文保真性探针）。",
+        "survivedWrite": false,
+        "writeAccepted": true,
+        "checksumBefore": "c554b4cc",
+        "checksumAfter": "c554b4cc"
+      }
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+  ],
+  "exceptions": [],
+  "totals": {
+    "scenarios": 9,
+    "passed": 9,
+    "failed": 0,
+    "assertions": 96,
+    "failedAssertions": 0
+  },
+  "browser": {
+    "name": "chrome.exe",
+    "headless": "new",
+    "userDataDir": "<repo>\\.scratch\\ui3-chrome-profile"
+  }
+}

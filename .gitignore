@@ -1,0 +1,9 @@
+node_modules/
+lib/
+.scratch/
+coverage/
+*.tgz
+*.log
+.DS_Store
+Thumbs.db
+.recon/

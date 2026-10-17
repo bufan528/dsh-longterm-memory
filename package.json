@@ -1,0 +1,83 @@
+{
+  "name": "dsh-longterm-memory",
+  "version": "0.1.0",
+  "description": "DSH Memory Vault (长期记忆) — durable local long-term memory for DeepSeek Harness, stored as an Obsidian-compatible Markdown vault with a rebuildable index, an in-sidebar management page, and real per-turn recall.",
+  "private": false,
+  "type": "module",
+  "license": "MIT",
+  "author": "DSH Memory Vault contributors",
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.2.1-rc.2 <0.2.2"
+  },
+  "icon": "./icon.svg",
+  "meta": {
+    "title": "长期记忆",
+    "description": "DSH Memory Vault：把长期记忆保存为本机 Obsidian 兼容的 Markdown 仓库，提供侧边栏管理页面，并在后续会话中按预算检索与注入。"
+  },
+  "main": "./lib/host/index.js",
+  "types": "./lib/host/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/host/index.d.ts",
+      "default": "./lib/host/index.js"
+    },
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    },
+    "manifestVersion": 1,
+    "compatibility": {
+      "dshReleases": {
+        "0.2.1-rc.2": "compatible"
+      }
+    }
+  },
+  "files": [
+    "lib/**/*.js",
+    "lib/**/*.d.ts",
+    "cordis.patch.yml",
+    "icon.svg",
+    "locale/*.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('lib',{recursive:true,force:true})\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build:host": "tsc -p tsconfig.build.json",
+    "build:client": "node scripts/build-client.mjs",
+    "build": "npm run clean && npm run build:host && npm run build:client",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "node scripts/lint.mjs && node scripts/check-version-consistency.mjs",
+    "check": "npm run build && npm run typecheck && npm run lint && npm run test",
+    "pack:plugin": "npm run build && npm pack",
+    "verify:ui": "node scripts/ui-acceptance.mjs"
+  },
+  "dependencies": {
+    "yaml": "^2.8.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "esbuild": "^0.28.2",
+    "react": "^18.3.1",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

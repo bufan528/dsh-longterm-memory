@@ -1,0 +1,48 @@
+# Bundle patch layer for DSH Memory Vault (长期记忆).
+#
+# Each bundle in the profile's `dsh.profile.bundles` contributes its own patch
+# files; this one inserts the Host row. The `name` resolves to this package,
+# which the loader imports as a plain Cordis plugin (`lib/host/index.js`).
+#
+# The matching browser half is declared by `dsh.client` in package.json; the
+# loader turns that into a `/plugins` bundle and the web shell loads it lazily.
+#
+# Config values below are the plugin's tunables. Every one is optional; the
+# defaults are in `src/host/config.ts` and are documented in
+# `docs/compatibility.md`. The user's own `cordis.patch.yml` layer is applied
+# after this one, so any value here can be overridden without editing this file.
+- insert:
+    - id: longterm-memory
+      name: dsh-longterm-memory
+      config:
+        # Absolute path of the Obsidian-compatible memory vault. Leave unset to
+        # let the plugin discover an existing vault or initialise one.
+        # vaultPath: 'C:\Users\you\Documents\DSH Memory'
+        language: zh
+        # Model-facing `memory_search` / `memory_get` / `memory_save` / `memory_forget`.
+        enableTools: true
+        # The standing profile/preference block in the system prompt.
+        enablePromptSection: true
+        # Token ceiling and entry cap for that standing block. Kept small because
+        # any change to the system prompt invalidates the provider prefix cache.
+        standingBudgetTokens: 700
+        standingMaxItems: 12
+        # Token ceiling and entry cap for a single recall answer.
+        recallBudgetTokens: 600
+        recallMaxItems: 8
+        # Splice retrieved memory into each step as a durable user message.
+        # Off by default: that message is replayed for the rest of the session.
+        enablePerStepRecall: false
+        # Extract candidate memories when a turn ends (rule-based, fully local).
+        enableAutoExtraction: true
+        # Optional model-assisted extraction. Off by default: when enabled, each
+        # finished turn sends that turn's text (plus a bounded list of existing
+        # memory titles) to YOUR configured model provider, which costs money.
+        # The answer is treated as untrusted and passes the same secret /
+        # sensitive / grounding policy as the rule extractor.
+        enableLlmExtraction: false
+        # Refuse candidates that look like credentials.
+        redactSecrets: true
+        # Health/finance/identity content always waits for confirmation.
+        sensitiveNeedsConfirmation: true
+        maxCandidatesPerTurn: 5
