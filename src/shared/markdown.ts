@@ -195,13 +195,60 @@ export function extractWikilinks(body: string): string[] {
  * The plugin writes `## 核心内容`, `## 来源与依据` and `## 相关记忆`; a human may add
  * any further `## …` sections, which are preserved as-is.
  */
-export function parseBody(body: string): { summary: string; sections: MemorySection[]; related: string[] } {
+/** Fence marker for a code block opening line, or null. */
+function fenceMarker(line: string): string | null {
+  const match = /^[ \t]*(`{3,}|~{3,})/.exec(line)
+  if (match === null) return null
+  const marker = match[1] ?? ''
+  return marker.slice(0, 3)
+}
+
+function isFenceClose(line: string, fence: string): boolean {
+  const trimmed = line.trim()
+  if (trimmed.length < fence.length) return false
+  if (!/^(`{3,}|~{3,})$/.test(trimmed)) return false
+  return trimmed[0] === fence[0]
+}
+
+/** First ATX H1 that is not inside a fenced code block (a `#` line in a fence is code). */
+export function firstHeadingOutsideFence(body: string): string | null {
+  let fence: string | null = null
+  for (const line of body.replace(/\r\n/g, '\n').split('\n')) {
+    if (fence !== null) {
+      if (isFenceClose(line, fence)) fence = null
+      continue
+    }
+    const open = fenceMarker(line)
+    if (open !== null) {
+      fence = open
+      continue
+    }
+    const h1 = /^#[ \t]+(.+?)[ \t]*$/.exec(line)
+    if (h1 !== null) return (h1[1] ?? '').trim()
+  }
+  return null
+}
+export function parseBody(body: string): { summary: string; sections: MemorySection[]; related: string[]; evidence: string } {
   const lines = body.replace(/\r\n/g, '\n').split('\n')
   const sections: MemorySection[] = []
   let current: { heading: string; lines: string[] } | null = null
   const preamble: string[] = []
 
+  let fence: string | null = null
   for (const line of lines) {
+    if (fence !== null) {
+      if (isFenceClose(line, fence)) fence = null
+      if (current === null) preamble.push(line)
+      else current.lines.push(line)
+      continue
+    }
+    const open = fenceMarker(line)
+    if (open !== null) {
+      fence = open
+      if (current === null) preamble.push(line)
+      else current.lines.push(line)
+      continue
+    }
     const heading = /^##[ \t]+(.+?)[ \t]*$/.exec(line)
     const h1 = /^#[ \t]+(.+?)[ \t]*$/.exec(line)
     if (heading !== null) {
@@ -229,10 +276,10 @@ export function parseBody(body: string): { summary: string; sections: MemorySect
       : extractWikilinks(body)
   return {
     summary,
-    sections: evidenceSection !== undefined && evidenceSection.body.length > 0
-      ? extra.filter((section) => section.heading !== SECTION_EVIDENCE)
-      : extra,
+    // Evidence is rendered from `memory.evidence`; keep it out of the generic sections.
+    sections: extra.filter((section) => section.heading !== SECTION_EVIDENCE),
     related,
+    evidence: evidenceSection !== undefined ? evidenceSection.body : '',
   }
 }
 
@@ -288,12 +335,26 @@ export function spliceBody(preserved: string, memory: Memory): string {
   let sawSummary = false
   let sawEvidence = false
   let sawRelated = false
+  let fence: string | null = null
   const relatedLines =
     memory.related.length === 0 ? ['（暂无）'] : memory.related.map((target) => `- [[${target}]]`)
 
   let index = 0
   while (index < lines.length) {
     const line = lines[index] ?? ''
+    if (fence !== null) {
+      out.push(line)
+      if (isFenceClose(line, fence)) fence = null
+      index += 1
+      continue
+    }
+    const open = fenceMarker(line)
+    if (open !== null) {
+      fence = open
+      out.push(line)
+      index += 1
+      continue
+    }
     const h1 = /^#[ \t]+(.+?)[ \t]*$/.exec(line)
     if (h1 !== null) {
       out.push(`# ${memory.title}`)
@@ -309,7 +370,23 @@ export function spliceBody(preserved: string, memory: Memory): string {
     }
     const heading = (h2[1] ?? '').trim()
     let end = index + 1
-    while (end < lines.length && !/^#{1,2}[ \t]+/.test(lines[end] ?? '')) end += 1
+    let scanFence: string | null = null
+    while (end < lines.length) {
+      const candidate = lines[end] ?? ''
+      if (scanFence !== null) {
+        if (isFenceClose(candidate, scanFence)) scanFence = null
+        end += 1
+        continue
+      }
+      const scanOpen = fenceMarker(candidate)
+      if (scanOpen !== null) {
+        scanFence = scanOpen
+        end += 1
+        continue
+      }
+      if (/^#{1,2}[ \t]+/.test(candidate)) break
+      end += 1
+    }
     // Preserve the section's own trailing blank-line count so re-rendering an
     // edited section does not reflow the rest of the document.
     let trailingBlanks = 0
@@ -441,9 +518,8 @@ export interface ParsedMemory {
 export function parseMemoryDocument(source: string): ParsedMemory {
   const { meta, body } = splitFrontmatter(source)
   const rawMeta = frontmatterToMetaRaw(meta)
-  const h1 = /^#[ \t]+(.+?)[ \t]*$/m.exec(body)
   const parsed = parseBody(body)
-  const h1Title = h1 !== null ? (h1[1] ?? '').trim() : ''
+  const h1Title = firstHeadingOutsideFence(body) ?? ''
   const declaredTitle = typeof rawMeta['title'] === 'string' ? rawMeta['title'].trim() : ''
   const title = declaredTitle.length > 0 ? declaredTitle : h1Title
 
@@ -455,6 +531,7 @@ export function parseMemoryDocument(source: string): ParsedMemory {
       summary: parsed.summary,
       sections: parsed.sections,
       related: parsed.related,
+      evidence: parsed.evidence,
     },
     title,
     body,

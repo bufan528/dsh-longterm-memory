@@ -143,8 +143,6 @@ export async function withFileLock<T>(filename: string, operation: () => Promise
   for (;;) {
     try {
       handle = await open(lockPath, 'wx')
-      await handle.writeFile(JSON.stringify({ pid: process.pid, at: new Date().toISOString(), nonce: randomUUID() }))
-      break
     } catch (error) {
       const code = (error as { code?: unknown } | null)?.code
       if (code !== 'EEXIST') {
@@ -163,7 +161,18 @@ export async function withFileLock<T>(filename: string, operation: () => Promise
       }
       await delay(wait)
       wait = Math.min(wait * 2, 200)
+      continue
     }
+    // The lock file exists but is still empty for a moment; a write failure must not
+    // leak the lock (otherwise every later writer waits for it to go stale).
+    try {
+      await handle.writeFile(JSON.stringify({ pid: process.pid, at: new Date().toISOString(), nonce: randomUUID() }))
+    } catch (error) {
+      await handle.close().catch(() => undefined)
+      await rm(lockPath, { force: true }).catch(() => undefined)
+      throw wrapFsError(error, FS_CODES.io, 'could not write the vault lock file', lockPath)
+    }
+    break
   }
 
   try {
@@ -174,17 +183,32 @@ export async function withFileLock<T>(filename: string, operation: () => Promise
   }
 }
 
-async function isStaleLock(lockPath: string, staleMs: number): Promise<boolean> {
+export async function isStaleLock(lockPath: string, staleMs: number): Promise<boolean> {
+  let info
   try {
-    const info = await stat(lockPath)
-    if (Date.now() - info.mtimeMs > staleMs) return true
-    const raw = await readFile(lockPath, 'utf8')
+    info = await stat(lockPath)
+  } catch {
+    // Vanished between EEXIST and stat: `open(wx)` re-checks, so treat as free.
+    return true
+  }
+  if (Date.now() - info.mtimeMs > staleMs) return true
+  let raw: string
+  try {
+    raw = await readFile(lockPath, 'utf8')
+  } catch {
+    return true
+  }
+  try {
     const parsed = JSON.parse(raw) as { pid?: unknown }
-    if (typeof parsed.pid !== 'number') return true
+    if (typeof parsed.pid !== 'number') {
+      // A non-empty but malformed payload is only trusted to be stale after a grace
+      // period; a freshly-created empty lock belongs to a live writer mid-open.
+      return Date.now() - info.mtimeMs > 1000
+    }
     return !isProcessAlive(parsed.pid)
   } catch {
-    // An unreadable or vanished lock is treated as free; `open(wx)` re-checks.
-    return true
+    // The empty-file window between open('wx') and writeFile: not stale while recent.
+    return Date.now() - info.mtimeMs > 1000
   }
 }
 

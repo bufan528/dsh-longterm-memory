@@ -84,13 +84,27 @@ export function joinFrontmatterSource(frontmatter: readonly string[], body: stri
 function yamlScalar(value: string | number | boolean | null): string {
   if (value === null) return ''
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  const text = value.replace(/\r?\n/g, ' ')
-  if (text.length === 0) return "''"
+  if (value.length === 0) return "''"
+  // Multi-line / control characters must survive the round-trip. YAML cannot express
+  // them in a plain scalar, and flattening them to spaces silently loses lines; a
+  // double-quoted scalar with escapes is lossless and stays on one line.
+  if (/[\r\n\t]/.test(value)) {
+    const escaped = value
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+      .replace(/\r/g, '\\r')
+      .replace(/\n/g, '\\n')
+      .replace(/\t/g, '\\t')
+    return `"${escaped}"`
+  }
+  // Values that YAML treats as syntax must be quoted: indicators at the start
+  // (`- `, `? `, `: `), indicator characters anywhere, and scalar-like words.
   const needsQuoting =
-    /^[\s]|[\s]$/.test(text) ||
-    /[:#{}[\],&*?|<>=!%@`"']/.test(text) ||
-    /^(?:true|false|null|~|-?\d+(?:\.\d+)?)$/i.test(text)
-  return needsQuoting ? `'${text.replace(/'/g, "''")}'` : text
+    /^[\s]|[\s]$/.test(value) ||
+    /[:#{}[\],&*?|<>=!%@`"']/.test(value) ||
+    /^[-?:](?:\s|$)/.test(value) ||
+    /^(?:true|false|null|~|-?\d+(?:\.\d+)?)$/i.test(value)
+  return needsQuoting ? `'${value.replace(/'/g, "''")}'` : value
 }
 
 /** Group frontmatter lines into top-level entries, keeping comments attached in place. */
@@ -98,7 +112,8 @@ function entriesOf(frontmatter: readonly string[]): FrontmatterEntry[] {
   const entries: FrontmatterEntry[] = []
   let current: FrontmatterEntry = { key: null, lines: [] }
   for (const line of frontmatter) {
-    const match = /^([A-Za-z0-9_.-]+):(.*)$/.exec(line)
+    // YAML keys are arbitrary Unicode; CJK keys must not be mistaken for continuation lines.
+    const match = /^([^\s:#][^:]*?):[ \t]*(.*)$/.exec(line)
     if (match !== null) {
       if (current.lines.length > 0) entries.push(current)
       current = { key: match[1] ?? null, lines: [line] }
