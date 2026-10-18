@@ -65,7 +65,8 @@
     "lint": "node scripts/lint.mjs && node scripts/check-version-consistency.mjs",
     "check": "npm run build && npm run typecheck && npm run lint && npm run test",
     "pack:plugin": "npm run build && npm pack",
-    "verify:ui": "node scripts/ui-acceptance.mjs"
+    "verify:ui": "node scripts/ui-acceptance.mjs",
+    "prepare": "npm run build"
   },
   "dependencies": {
     "yaml": "^2.8.0",
