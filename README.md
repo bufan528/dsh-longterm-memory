@@ -30,10 +30,9 @@
   <a href="README.zh-CN.md"><strong>简体中文</strong></a>
 </p>
 
-> **Project status (2026-10-18).** Preview release. Source and a verified local
-> package are available, but the package is **not yet published on npm**, and the
-> desktop-app plugin entry has not been exercised end-to-end in an isolated desktop
-> environment. Installation from a locally built tarball is verified; see
+> **Project status (2026-10-18).** `dsh-longterm-memory@0.1.0` is published on npm.
+> The desktop-app plugin entry has not yet been exercised end-to-end in an isolated
+> desktop environment (the Web-profile install is verified); see
 > [Install](#install) and [Project status & limitations](#project-status--limitations).
 
 ---
@@ -110,16 +109,15 @@ flowchart LR
 
 ## Install
 
-### Option A — from npm (after publication)
+### Option A — from npm (recommended)
 
 ```bash
 dsh plugin --profile web add dsh-longterm-memory
 ```
 
-> The package is **not published yet** (2026-10-18). Until it is, use Option B.
-> The official desktop app manages plugins through its own plugin manager and a
-> reserved `desktop` profile; that path has not been verified end-to-end yet
-> (see [status](#project-status--limitations)).
+> Published as `dsh-longterm-memory@0.1.0` (latest). The official desktop app manages
+> plugins through its own plugin manager and a reserved `desktop` profile; that path
+> has not been verified end-to-end yet (see [status](#project-status--limitations)).
 
 ### Option B — build this repository and install the tarball (verified)
 
@@ -251,7 +249,7 @@ from your profile's `cordis.patch.yml`.
 | Verified DSH version | `0.2.1-rc.2` (host + real headless Chrome acceptance) |
 | Node.js | `>=20` |
 | Platform | Windows (primary), Node path rules elsewhere |
-| npm package | `dsh-longterm-memory` (name verified available; not yet published) |
+| npm package | `dsh-longterm-memory` — **0.1.0 published** (latest) |
 
 The `dsh.compatibility` field is informational; `engines.dsh` is the only decision
 source. Details and evidence: [docs/compatibility.md](docs/compatibility.md).
@@ -275,8 +273,7 @@ zero-dependency CDP clients using Node's built-in `WebSocket`.
 ## Project status & limitations
 
 - **Preview**: API and storage format may still change; `0.1.0` is the first public version.
-- **npm not published** as of 2026-10-18; official-registry installation is therefore
-  not yet verifiable.
+- **npm published**: `dsh-longterm-memory@0.1.0` (2026-10-18); registry installation verified.
 - **Desktop integration pending**: the plugin loads in a Web profile and the package
   installs from a tarball, but a full desktop-app acceptance run in an isolated
   environment has not been performed. Treat the desktop plugin-manager path as
