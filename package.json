@@ -79,5 +79,23 @@
     "react": "^18.3.1",
     "typescript": "~5.9.3",
     "vitest": "^3.2.4"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "memory",
+    "long-term-memory",
+    "obsidian",
+    "markdown",
+    "agent-memory"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bufan528/dsh-longterm-memory.git"
+  },
+  "homepage": "https://github.com/bufan528/dsh-longterm-memory#readme",
+  "bugs": {
+    "url": "https://github.com/bufan528/dsh-longterm-memory/issues"
   }
 }

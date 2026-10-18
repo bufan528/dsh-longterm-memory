@@ -49,7 +49,10 @@ describe('version consistency check', () => {
   it('detects README drift from engines.dsh', async () => {
     const dir = await fixture(async (target) => {
       const readme = await readFile(join(target, 'README.md'), 'utf8')
-      await writeFile(join(target, 'README.md'), readme.replace(/已验证的 DSH 版本[：:]\s*`?[^`\s]+`?/, '已验证的 DSH 版本：**`9.9.9`**'), 'utf8')
+      const drifted = readme
+        .replace(/(Verified DSH version\s*\|\s*`?)([0-9][^`|\s]*)/, '$19.9.9')
+        .replace(/(已验证的\s*DSH\s*版本[^0-9]*)([0-9][^`|\s]*)/, '$19.9.9')
+      await writeFile(join(target, 'README.md'), drifted, 'utf8')
     })
     expect(runIn(dir).code).toBe(1)
     await cleanup(dir)

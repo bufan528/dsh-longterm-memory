@@ -1,146 +1,304 @@
-# DSH Memory Vault · 长期记忆
+<p align="center">
+  <img src="icon.svg" width="88" height="88" alt="DSH Memory Vault icon" />
+</p>
 
-一个真正可用的 **DeepSeek Harness（DSH）长期记忆插件**：把记忆持久化为本机
-**Obsidian 兼容的 Markdown 仓库**，在 DSH 左侧栏提供独立管理页面，并在后续会话中
-按 token 预算检索与注入。
+<h1 align="center">DSH Memory Vault · 长期记忆</h1>
 
-- npm 包名：`dsh-longterm-memory`
-- 插件显示名：**长期记忆**
-- 产品名：**DSH Memory Vault**
-- 已验证的 DSH 版本：**`0.2.1-rc.2`**（以 `engines.dsh` 为准）
+<p align="center"><strong>Long-term memory for DeepSeek Harness, stored as a plain Markdown vault you own.</strong></p>
 
-> ⚠️ **包名说明**：任务书期望的 `dsh-memory-vault` **已被他人占用**（`flymysql`，
-> v0.1.5，且是面向 DSH `0.1.0-rc.6` 的同类产品）。本仓库因此使用经过核实未被占用的
-> `dsh-longterm-memory`。详见 [`docs/compatibility.md`](docs/compatibility.md#包名冲突)。
+<p align="center">
+  A first-level sidebar page, four model tools, token-budgeted recall, and a durable
+  history journal — no database, no telemetry, no cloud. Your memories stay as
+  Obsidian-compatible <code>.md</code> files on disk.
+</p>
+
+<p align="center">
+  <a href="https://github.com/bufan528/dsh-longterm-memory/stargazers"><img src="https://img.shields.io/github/stars/bufan528/dsh-longterm-memory?style=flat-square" alt="GitHub stars" /></a>
+  <img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="MIT License" />
+  <img src="https://img.shields.io/badge/DSH-%3E%3D0.2.1--rc.2%20%3C0.2.2-7C3AED?style=flat-square" alt="DSH 0.2.1-rc.2" />
+  <img src="https://img.shields.io/badge/node-%3E%3D20-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node >= 20" />
+  <img src="https://img.shields.io/badge/status-preview-E5B650?style=flat-square" alt="Preview" />
+</p>
+
+<p align="center">
+  <a href="#install"><strong>Install</strong></a> ·
+  <a href="#features">Features</a> ·
+  <a href="#configuration">Configuration</a> ·
+  <a href="#data-safety">Data safety</a> ·
+  <a href="#privacy">Privacy</a> ·
+  <a href="#development">Development</a> ·
+  <a href="README.zh-CN.md"><strong>简体中文</strong></a>
+</p>
+
+> **Project status (2026-10-18).** Preview release. Source and a verified local
+> package are available, but the package is **not yet published on npm**, and the
+> desktop-app plugin entry has not been exercised end-to-end in an isolated desktop
+> environment. Installation from a locally built tarball is verified; see
+> [Install](#install) and [Project status & limitations](#project-status--limitations).
 
 ---
 
-## 它做了什么
+## Why DSH Memory Vault?
 
-| 能力 | 实现方式 |
+Most "agent memory" features are a vector store or a black-box service. DSH Memory
+Vault makes the opposite trade-off:
+
+- **Markdown is the only source of truth.** Each memory is a human-readable note with
+  YAML frontmatter. Read, edit, link and back it up in Obsidian or any text editor.
+  There is no proprietary format and no export step.
+- **The index is disposable.** `.dsh-memory/index.json` is derived data; delete it and
+  the plugin rebuilds it from Markdown. Losing the index never loses a memory.
+- **Recall is budgeted and transparent.** Injection is computed per assembly from the
+  current index with explicit token/item caps; the page shows exactly what the model
+  would receive.
+- **History is durable.** Every change is recorded in a journal with before/after
+  digests, reasons and timestamps. A write-ahead outbox keeps history safe across
+  crashes — including the verified window where the Markdown is committed but the
+  journal append has not happened yet.
+- **Local by default.** No network requests, no model calls, no telemetry; the only
+  traffic is the local RPC between the management page and the DSH host.
+
+## Features
+
+| | |
 |---|---|
-| **本地长期记忆** | 每条记忆是一个独立的 Markdown 文件（YAML Frontmatter + 自然语言正文），可直接在 Obsidian 中阅读、编辑、双向链接 |
-| **可重建索引** | 索引是 `.dsh-memory/index.json`，**纯粹是派生数据**；删除后从 Markdown 完整重建，不丢任何记忆 |
-| **侧边栏入口** | 通过 DSH 官方 Slot `sidebar.panellist` 注册一级入口，`order: 20`（在「插件」「自动化任务」之下，「工作区」之上） |
-| **独立管理页面** | 通过官方 `main` keyed slot 注册，点击入口**打开页面而不是新建聊天** |
-| **记忆总览 / 检索 / 详情 / 管理** | 全部读取真实 Host 数据（HTTP RPC），无静态假数据 |
-| **自动记忆提取** | 在真实的 `session/event` → `turn/end` 边界上提取候选记忆。默认用**确定性本地规则**（零成本、零外发）；可选的模型辅助提取默认关闭，开启后会调用你自己配置的模型 |
-| **安全更新** | 去重 → 合并；补充 → 更新并保留来源；矛盾 → 双方都保留；低置信度 → 进 Inbox 待确认 |
-| **后续会话使用记忆** | `ctx.systemPrompt.section()` 的 `text` 函数**在每次组装时重新求值**，按预算注入当前记忆；另提供 4 个模型工具做按需检索；`POST /api/previewStanding` 可核验插件真实贡献的提示词文本 |
-| **隐私** | 默认拒绝写入密码 / API Key / 令牌 / 私钥；敏感类别强制人工确认；**默认零网络请求、零模型调用** |
+| **First-level sidebar page** | Registers a `sidebar.panellist` entry and a full management page (overview, search, detail, manage, inbox, settings) — not a chat tab. |
+| **Four model tools** | `memory_search`, `memory_get`, `memory_save`, `memory_forget` (save refuses credential-like content). |
+| **Automatic extraction** | Rule-based, fully local candidate extraction at the real `turn/end` boundary. Optional model-assisted extraction is **off by default**. |
+| **Ranked recall** | BM25-style lexical ranking over Markdown, with type/status/tag filters and a token budget. |
+| **Memory lifecycle** | `pending → active → stale / superseded / archived / conflict`, plus `low/medium/high` confidence. Low confidence and sensitive content wait in the Inbox for human confirmation. |
+| **Safe updates** | Deterministic dedupe/merge rules: duplicates merge, additions update while keeping sources, contradictions keep both sides, low confidence goes to Inbox. |
+| **Conflict handling** | Conflicting facts are kept side by side, never silently overwritten; a conflict-resolution page supports keep / merge / both. |
+| **Crash-safe writes** | Single-file atomic replace, per-file lock, optimistic checksum concurrency, durable journal outbox with idempotent recovery. |
+| **Obsidian compatible** | The vault carries `.obsidian/`, `[[wikilinks]]`, stable frontmatter and a human-readable `Index/`. |
+| **Bilingual UI** | Chinese and English (`language: zh | en`). |
+| **No runtime dependency on `@deepseek-ai/*`** | The host half only uses the Cordis context passed in, so DSH internals can change without breaking the bundle. |
 
-## 界面实拍（真实 headless Chrome 验收）
+### Interface
 
-左侧栏顺序与要求一致：**插件 → 自动化任务 → 长期记忆 → 工作区 → 会话列表**。
+Real acceptance screenshots (headless Chrome, real host data — no mocks):
 
-![左侧栏中的「长期记忆」入口](docs/evidence/02-sidebar.png)
+| Sidebar entry | Management page |
+|---|---|
+| ![Sidebar entry](docs/evidence/02-sidebar.png) | ![Memory page](docs/evidence/03-page.png) |
 
-![长期记忆管理页面（真实数据）](docs/evidence/03-page.png)
+More: [overview](docs/evidence/04-1-overview.png) · [search](docs/evidence/04-2-search.png) · [manage](docs/evidence/04-3-manage.png) · [inbox](docs/evidence/04-4-inbox.png) · [settings](docs/evidence/04-5-settings.png) · [dark theme](docs/evidence/theme-dark.png)
 
-更多截图（检索 / 管理 / 收件箱 / 设置）见 [`docs/evidence/`](docs/evidence/)，
-验收方法与原始 DOM 数据见 [`docs/verification.md`](docs/verification.md#6-侧边栏与页面验收真实浏览器)。
+## How it works
 
----
+```mermaid
+flowchart LR
+  A[DSH host] -->|tools / prompt section| P[Memory Vault host plugin]
+  U[Sidebar page] -->|local HTTP RPC| P
+  P --> V[(Markdown vault<br/>source of truth)]
+  P --> I[(index.json<br/>derived)]
+  P --> J[(journal outbox<br/>history)]
+  P --> Q[(quarantine<br/>unreadable notes)]
+  V -. rebuild .-> I
+  J -. recover .-> V
+```
 
-## 安装
+- The **host** owns the vault, index, journal and extraction; it never calls a model
+  unless you explicitly enable model-assisted extraction with your own provider.
+- The **management page** reads and writes through a loopback-only RPC surface
+  (`POST /dsh-longterm-memory/api/<method>`, 27 methods) guarded by a browser-trust
+  fence (loopback / trusted hosts, `Origin`, `sec-fetch-site`).
+- **Recall**: `memory_search` and automatic injection share one engine; explicit
+  recall may include retired memories (labelled history), injection only uses current
+  facts. `POST /api/previewStanding` and `POST /api/previewRecall` return the exact
+  text that would be injected.
 
-### 正式发布后（期望形态）
+## Install
+
+### Option A — from npm (after publication)
 
 ```bash
 dsh plugin --profile web add dsh-longterm-memory
 ```
 
-> **当前并未发布到 npm。** 本仓库是本地开发版本，安装方式见下。
+> The package is **not published yet** (2026-10-18). Until it is, use Option B.
+> The official desktop app manages plugins through its own plugin manager and a
+> reserved `desktop` profile; that path has not been verified end-to-end yet
+> (see [status](#project-status--limitations)).
 
-### 本地开发 / 验证（已实际验证）
+### Option B — build this repository and install the tarball (verified)
+
+Requires Node.js ≥ 20 and a DSH CLI. **Use an isolated `DSH_HOME`** so the test
+profile cannot touch your daily DSH profile:
 
 ```bash
-# 1. 构建并打包
-pnpm install
+# 1. Build and pack
+npm install
 npm run build
-npm pack                      # 产出 dsh-longterm-memory-0.1.0.tgz
+npm pack                     # -> dsh-longterm-memory-0.1.0.tgz
 
-# 2. 安装到隔离 profile（不会动真实 profile）
-$env:DSH_HOME = "<一个临时目录>"
-& "<DSH install>\resources\runtime\cli\bin\dsh.cmd" --profile lmv --from-default-profile web --dump-config
-& "<DSH install>\resources\runtime\cli\bin\dsh.cmd" plugin --profile lmv add .\dsh-longterm-memory-0.1.0.tgz
+# 2. Install into an isolated profile
+$env:DSH_HOME = "<temporary dir>"                # PowerShell
+# export DSH_HOME="<temporary dir>"              # bash
+dsh plugin --profile lmv add .\dsh-longterm-memory-0.1.0.tgz
 
-# 3. 配置仓库路径（可选；不配则自动发现）
-#    编辑 <DSH_HOME>\profiles\lmv\cordis.patch.yml，加入：
-#    - id: longterm-memory
-#      name: dsh-longterm-memory
-#      config:
-#        vaultPath: 'D:/path/to/DSH Memory'
-
-# 4. 启动
-& "<DSH install>\resources\runtime\cli\bin\dsh.cmd" --profile lmv --no-open --port 0
+# 3. Start
+dsh --profile lmv --no-open --port 0
 ```
 
-左侧栏出现 **长期记忆** 后，点击即进入管理页面。首次打开会显示环境探测结果，
-可一键初始化仓库或手动选择路径。
+Open the Web UI, click **长期记忆 / Long-term Memory** in the sidebar, and choose a
+vault directory (or let the plugin initialize one). You can also pre-set it:
 
----
+```yaml
+# <DSH_HOME>/profiles/lmv/cordis.patch.yml
+- id: longterm-memory
+  name: dsh-longterm-memory
+  config:
+    vaultPath: 'D:/path/to/DSH Memory'
+    language: zh
+```
 
-## 仓库结构
+> **Data-location warning.** If `vaultPath` is unset, the plugin initializes the
+> default location (`~/Documents/DSH Memory` on Windows). `DSH_HOME` isolates the
+> profile, **not** the vault. Always set `vaultPath` when testing.
+
+## Quick start
+
+1. Install as above and open the page.
+2. Click **初始化 / Initialize** and pick a folder (an existing Obsidian vault works).
+3. Create a memory with **新建 / New**, or let automatic extraction collect candidates
+   at the end of a turn; low-confidence items appear in **收件箱 / Inbox**.
+4. Ask the model something related; the plugin injects the standing section and the
+   tools return ranked hits from the vault.
+5. Open **设置 / Settings** to tune budgets, per-step recall, extraction and language.
+
+## Vault layout
 
 ```
 DSH Memory/
-├── README.md                    # 插件生成的说明（用户可改，不会重写）
-├── Memory Home.md               # 入口页
-├── .obsidian/                   # 让 Obsidian 识别为 vault（不修改 Obsidian 全局配置）
-├── Profile/  Preferences/       # 用户背景 / 长期偏好
-├── Projects/  Projects/State/   # 项目 / 项目进展
-├── Decisions/  Knowledge/       # 决策 / 知识
-├── Experiences/  Tasks/         # 经验教训 / 任务
-├── Inbox/                       # 待确认的候选记忆
-├── Archive/                     # 已归档 / 被替代
-├── Conflicts/                   # 存在事实冲突
-├── Index/                       # 人类可读索引（重建时覆盖）
-├── History/                     # 变更历史说明
-└── .dsh-memory/                 # 插件私有：config.json, index.json, journal/, quarantine/
+├── README.md                  # generated; user edits are preserved
+├── Memory Home.md             # entry page
+├── .obsidian/                 # makes Obsidian treat it as a vault
+├── Profile/  Preferences/     # profile, long-term preferences
+├── Projects/  Projects/State/ # projects and project state
+├── Decisions/  Knowledge/     # decisions, knowledge
+├── Experiences/  Tasks/       # lessons, tasks
+├── Inbox/                     # candidates awaiting confirmation
+├── Archive/  Conflicts/       # retired / contradictory memories
+├── Index/                     # human-readable index (regenerated)
+├── History/                   # change-history notes
+└── .dsh-memory/               # config.json, index.json, journal/, quarantine/
 ```
 
-**Markdown 文件是唯一事实来源。** 只删 `.dsh-memory/index.json` 不会丢任何记忆。
-完整格式见 [`docs/storage-format.md`](docs/storage-format.md)。
+Memory types: `profile`, `preference`, `project`, `project-state`, `decision`,
+`knowledge`, `experience`, `task`. Status: `active`, `pending`, `stale`,
+`superseded`, `conflict`, `archived`. Format details:
+[docs/storage-format.md](docs/storage-format.md).
 
----
+## Configuration
 
-## 开发
+All settings are optional; defaults live in `src/host/config.ts` and can be overridden
+from your profile's `cordis.patch.yml`.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `vaultPath` | auto-discover / initialize | Absolute memory vault path |
+| `language` | `zh` | UI language (`zh` / `en`) |
+| `enableTools` | `true` | Expose the four model tools |
+| `enablePromptSection` | `true` | Inject the standing memory section |
+| `standingBudgetTokens` | `700` | Token cap for the standing section |
+| `standingMaxItems` | `12` | Item cap for the standing section |
+| `recallBudgetTokens` | `600` | Token cap for one recall answer |
+| `recallMaxItems` | `8` | Item cap for one recall answer |
+| `enablePerStepRecall` | `false` | Splice retrieved memory into each step (replayed for the rest of the session) |
+| `enableAutoExtraction` | `true` | Rule-based extraction at turn end (local) |
+| `enableLlmExtraction` | `false` | Optional model-assisted extraction (sends turn text to **your** provider) |
+| `redactSecrets` | `true` | Refuse credential-like candidates |
+| `sensitiveNeedsConfirmation` | `true` | Health/finance/identity content waits for confirmation |
+| `maxCandidatesPerTurn` | `5` | Extraction cap per turn |
+
+## Data safety
+
+- **Atomic single-file writes** (temp file + rename) and a **per-file lock** with
+  stale-lock detection; the lock is released on failure, never leaked.
+- **Optimistic concurrency**: edits carry the expected checksum; a stale edit is
+  rejected with a reload hint instead of overwriting someone else's change.
+- **Index is rebuildable**: `rebuildIndex` / `syncIndex` recover from a deleted or
+  corrupt index. Corruption diagnostics are surfaced, not hidden.
+- **Durable journal**: every change gets a before/after digest, reason and timestamp.
+  A write-ahead outbox recovers when the monthly archive fails, with idempotent
+  re-archiving and content-conflict detection (same event id + different payload is an
+  explicit integrity error, never a silent merge).
+- **Crash-window tests**: commit boundaries are exercised with real child-process
+  SIGKILLs, not simulated exceptions — including "Markdown written, commit marker not
+  yet persisted" and "recovery itself interrupted".
+- **Quarantine**: notes that cannot be parsed safely are isolated, never deleted.
+
+## Privacy
+
+- **No telemetry and no outbound network calls by default.** Host-side acceptance runs
+  showed zero network calls; the only client request target is the local DSH RPC.
+  Browser-runtime network verification of the desktop UI is still pending — see status.
+- **Model use is opt-in**: automatic extraction is rule-based and local; model-assisted
+  extraction (`enableLlmExtraction`) is off and, when enabled, uses the provider you
+  configured in DSH.
+- **Secrets are refused**: credential-like content (passwords, API keys, tokens,
+  private keys) is blocked before it reaches the vault; sensitive categories require
+  explicit confirmation.
+- **Injection is data, not instructions**: memories are wrapped and labelled as
+  untrusted data for the model. See [docs/privacy.md](docs/privacy.md).
+
+## Compatibility
+
+| | |
+|---|---|
+| DSH runtime | `>=0.2.1-rc.2 <0.2.2` (`engines.dsh`; `0.2.0-rc.2` is **not** supported) |
+| Verified DSH version | `0.2.1-rc.2` (host + real headless Chrome acceptance) |
+| Node.js | `>=20` |
+| Platform | Windows (primary), Node path rules elsewhere |
+| npm package | `dsh-longterm-memory` (name verified available; not yet published) |
+
+The `dsh.compatibility` field is informational; `engines.dsh` is the only decision
+source. Details and evidence: [docs/compatibility.md](docs/compatibility.md).
+
+## Development
 
 ```bash
+npm install
+npm run build        # tsc -> lib/host, esbuild -> lib/client.js
 npm run typecheck    # tsc --noEmit
-npm run lint         # 自定义契约检查（无 @deepseek-ai/* 依赖、bundle 格式、manifest 契约）
-npm test             # 运行完整测试套件（数量以本机实际输出为准）
-npm run build        # tsc -> lib/host, esbuild -> lib/client.js (__ModuleLoader__ 格式)
-npm run check        # 依次跑上面四步
+npm run lint         # contract checks + version-consistency check
+npm test             # full suite (currently 40 files / 581 cases)
+npm run check        # build -> typecheck -> lint -> test (clean checkout safe)
 npm run pack:plugin  # build + npm pack
-npm run verify:ui    # 真实 headless Chrome 验收（需先 --url <隔离宿主 URL>）
 ```
 
-浏览器验收脚本（`scripts/ui-verify.mjs` / `scripts/ui-acceptance.mjs`）是**零依赖**的
-CDP 实现，只使用 Node 24 自带的 `WebSocket`，不安装 Puppeteer/Playwright。
+Tests cover unit, integration, packaging, real HTTP-route validation, and deterministic
+fault injection (including real subprocess kills). The browser acceptance scripts are
+zero-dependency CDP clients using Node's built-in `WebSocket`.
 
-## 文档
+## Project status & limitations
 
-| 文档 | 内容 |
+- **Preview**: API and storage format may still change; `0.1.0` is the first public version.
+- **npm not published** as of 2026-10-18; official-registry installation is therefore
+  not yet verifiable.
+- **Desktop integration pending**: the plugin loads in a Web profile and the package
+  installs from a tarball, but a full desktop-app acceptance run in an isolated
+  environment has not been performed. Treat the desktop plugin-manager path as
+  unverified until reported otherwise.
+- **Known follow-ups**: a few concurrency and move-atomicity edge cases remain open;
+  frontmatter and lock regressions found in review were fixed in `0.1.0` and are locked
+  by tests.
+- **Vault location**: with `vaultPath` unset the plugin initializes
+  `~/Documents/DSH Memory`. Set it explicitly to keep test data isolated.
+
+## Documentation
+
+| Doc | Contents |
 |---|---|
-| [docs/precheck.md](docs/precheck.md) | 第一轮 Phase 0 只读预检：环境基线、证据表、边界 |
-| [docs/architecture.md](docs/architecture.md) | 架构、DSH 接口依据、模型提取与提示词自证 |
-| [docs/storage-format.md](docs/storage-format.md) | Markdown / Frontmatter / 索引 / 日志格式 |
-| [docs/privacy.md](docs/privacy.md) | 隐私与安全模型、威胁分析、模型提取的数据流 |
-| [docs/compatibility.md](docs/compatibility.md) | 冻结的契约、manifest 字段、包名冲突、desktop 边界 |
-| [docs/verification.md](docs/verification.md) | **第二轮**真实执行过的验证与真实输出（本轮证据入口） |
-| [docs/troubleshooting.md](docs/troubleshooting.md) | 常见问题与恢复步骤 |
-| [docs/evidence/](docs/evidence/) | 真实浏览器截图、页面文本、侧边栏 DOM 数据 |
-| [.recon/findings/](.recon/findings/) | 四份只读技术调查报告（DSH 源码证据来源） |
-
-## 授权边界
-
-本仓库**没有**执行 `git commit` / `git push` / `npm publish`，**没有**向真实用户 Obsidian
-Vault 写入任何内容，**没有**发起真实模型请求，也**没有**安装到正在运行的真实
-`desktop` profile。所有安装与运行验证都在 `DSH_HOME` 指向的临时目录中完成。逐项清单见
-[`docs/verification.md`](docs/verification.md#9-本轮未执行的授权边界)。
+| [docs/architecture.md](docs/architecture.md) | Architecture, DSH API usage, prompt assembly |
+| [docs/storage-format.md](docs/storage-format.md) | Markdown / frontmatter / index / journal formats |
+| [docs/privacy.md](docs/privacy.md) | Privacy and threat model |
+| [docs/compatibility.md](docs/compatibility.md) | Compatibility contract and evidence |
+| [docs/verification.md](docs/verification.md) | Verification log and acceptance evidence |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | Recovery and FAQ |
+| [docs/evidence/](docs/evidence/) | Screenshots and raw acceptance data |
 
 ## License
 
-MIT
+[MIT](LICENSE)
