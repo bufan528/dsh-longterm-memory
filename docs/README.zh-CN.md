@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icon.svg" width="88" height="88" alt="DSH Memory Vault icon" />
+  <img src="../icon.svg" width="88" height="88" alt="DSH Memory Vault icon" />
 </p>
 
 <h1 align="center">DSH Memory Vault · 长期记忆</h1>
@@ -26,10 +26,10 @@
   <a href="#数据安全">数据安全</a> ·
   <a href="#隐私">隐私</a> ·
   <a href="#开发">开发</a> ·
-  <a href="README.md"><strong>English</strong></a>
+  <a href="../README.md"><strong>English</strong></a>
 </p>
 
-> **项目状态（2026-10-19）**：`dsh-longterm-memory@0.1.1` 已发布到 npm。
+> **项目状态（2026-10-19）**：`dsh-longterm-memory@0.1.2` 已发布到 npm。
 > 桌面应用插件入口尚未在隔离桌面环境中端到端验证（Web profile 安装已验证），
 > 见 [安装](#安装) 与 [项目状态与限制](#项目状态与限制)。
 
@@ -72,9 +72,9 @@
 
 | 侧边栏入口 | 管理页面 |
 |---|---|
-| ![侧边栏入口](docs/evidence/02-sidebar.png) | ![管理页面](docs/evidence/03-page.png) |
+| ![侧边栏入口](evidence/02-sidebar.png) | ![管理页面](evidence/03-page.png) |
 
-更多：[总览](docs/evidence/04-1-overview.png) · [检索](docs/evidence/04-2-search.png) · [管理](docs/evidence/04-3-manage.png) · [收件箱](docs/evidence/04-4-inbox.png) · [设置](docs/evidence/04-5-settings.png) · [深色主题](docs/evidence/theme-dark.png)
+更多：[总览](evidence/04-1-overview.png) · [检索](evidence/04-2-search.png) · [管理](evidence/04-3-manage.png) · [收件箱](evidence/04-4-inbox.png) · [设置](evidence/04-5-settings.png) · [深色主题](evidence/theme-dark.png)
 
 ## 工作原理
 
@@ -106,7 +106,7 @@ flowchart LR
 dsh plugin --profile web add dsh-longterm-memory
 ```
 
-> 已发布为 `dsh-longterm-memory@0.1.1`（latest）。桌面应用通过自己的插件管理器与
+> 已发布为 `dsh-longterm-memory@0.1.2`（latest）。桌面应用通过自己的插件管理器与
 > 保留的 `desktop` profile 安装；该路径尚未端到端验证（见[状态](#项目状态与限制)）。
 
 ### 方式 B —— 从本仓库构建并安装 tarball（已验证）
@@ -117,11 +117,11 @@ dsh plugin --profile web add dsh-longterm-memory
 ```bash
 npm install
 npm run build
-npm pack                     # 产出 dsh-longterm-memory-0.1.1.tgz
+npm pack                     # 产出 dsh-longterm-memory-0.1.2.tgz
 
 $env:DSH_HOME = "<临时目录>"              # PowerShell
 # export DSH_HOME="<临时目录>"            # bash
-dsh plugin --profile lmv add .\dsh-longterm-memory-0.1.1.tgz
+dsh plugin --profile lmv add .\dsh-longterm-memory-0.1.2.tgz
 
 dsh --profile lmv --no-open --port 0
 ```
@@ -172,7 +172,7 @@ DSH Memory/
 记忆类别：`profile`、`preference`、`project`、`project-state`、`decision`、
 `knowledge`、`experience`、`task`。状态：`active`、`pending`、`stale`、
 `superseded`、`conflict`、`archived`。格式详见
-[docs/storage-format.md](docs/storage-format.md)。
+[docs/storage-format.md](storage-format.md)。
 
 ## 配置
 
@@ -217,7 +217,7 @@ DSH Memory/
 - **凭据被拒绝**：密码 / API Key / 令牌 / 私钥类内容在进入仓库前被拦截；敏感类别需
   显式确认。
 - **注入内容视为数据而非指令**：记忆会被包装并标注为不可信数据。详见
-  [docs/privacy.md](docs/privacy.md)。
+  [docs/privacy.md](privacy.md)。
 
 ## 兼容性
 
@@ -227,10 +227,10 @@ DSH Memory/
 | 已验证 DSH 版本 | `0.2.1-rc.2`（Host + 真实 headless Chrome 验收） |
 | Node.js | `>=20` |
 | 平台 | Windows（主要），其他平台遵循 Node 路径规则 |
-| npm 包名 | `dsh-longterm-memory` —— **0.1.1 已发布**（latest） |
+| npm 包名 | `dsh-longterm-memory` —— **0.1.2 已发布**（latest） |
 
 `dsh.compatibility` 仅为说明性元数据；`engines.dsh` 是唯一决策来源。细节与证据见
-[docs/compatibility.md](docs/compatibility.md)。
+[docs/compatibility.md](compatibility.md)。
 
 ## 开发
 
@@ -250,7 +250,7 @@ npm run pack:plugin  # build + npm pack
 ## 项目状态与限制
 
 - **预览版**：API 与存储格式仍可能变化；`0.1.0` 是首个公开版本。
-- **npm 已发布**：`dsh-longterm-memory@0.1.1`（2026-10-19），注册表安装已验证。
+- **npm 已发布**：`dsh-longterm-memory@0.1.2`（2026-10-19），注册表安装已验证。
 - **桌面集成待验证**：插件可在 Web profile 加载、tarball 可安装，但尚未在隔离环境中
   完成完整桌面应用验收；桌面插件管理器路径在得到报告前应视为未验证。
 - **已知后续项**：仍有少量并发与移动原子性边界；审查中发现的 frontmatter 与锁问题
@@ -262,14 +262,14 @@ npm run pack:plugin  # build + npm pack
 
 | 文档 | 内容 |
 |---|---|
-| [docs/architecture.md](docs/architecture.md) | 架构、DSH 接口使用、提示词组装 |
-| [docs/storage-format.md](docs/storage-format.md) | Markdown / frontmatter / 索引 / 日志格式 |
-| [docs/privacy.md](docs/privacy.md) | 隐私与威胁模型 |
-| [docs/compatibility.md](docs/compatibility.md) | 兼容性契约与证据 |
-| [docs/verification.md](docs/verification.md) | 验证记录与验收证据 |
-| [docs/troubleshooting.md](docs/troubleshooting.md) | 恢复步骤与常见问题 |
-| [docs/evidence/](docs/evidence/) | 截图与原始验收数据 |
+| [docs/architecture.md](architecture.md) | 架构、DSH 接口使用、提示词组装 |
+| [docs/storage-format.md](storage-format.md) | Markdown / frontmatter / 索引 / 日志格式 |
+| [docs/privacy.md](privacy.md) | 隐私与威胁模型 |
+| [docs/compatibility.md](compatibility.md) | 兼容性契约与证据 |
+| [docs/verification.md](verification.md) | 验证记录与验收证据 |
+| [docs/troubleshooting.md](troubleshooting.md) | 恢复步骤与常见问题 |
+| [docs/evidence/](evidence/) | 截图与原始验收数据 |
 
 ## 许可证
 
-[MIT](LICENSE)
+[MIT](../LICENSE)
