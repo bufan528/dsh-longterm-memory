@@ -1035,7 +1035,85 @@ export class MemoryService {
   }
 
   async confirm(id: string, reason = '用户确认该记忆有效'): Promise<{ id: string }> {
+    const candidate = this.candidates.find((entry) => entry.id === id)
+    if (candidate !== undefined) return await this.confirmCandidate(candidate, reason)
     return this.transition(id, 'active', reason)
+  }
+
+  /**
+   * Apply a user confirmation to an Inbox candidate.
+   *
+   * Candidates are not memory files yet (`MemoryCandidate` is the pre-file
+   * shape), so `transition()` cannot find them in the index — which is why the
+   * Inbox buttons used to fail with `not-found`. The comparison the extractor
+   * made when parking the candidate is re-derived against the current index:
+   *
+   * - a new fact is written as an `active` note;
+   * - a supplement or a duplicate is folded into the memory it belongs to
+   *   (text already present is not appended twice);
+   * - a contradiction keeps both sides, with the new note recording the
+   *   conflict target.
+   *
+   * The candidate then leaves the Inbox in every successful branch.
+   */
+  private async confirmCandidate(candidate: MemoryCandidate, reason: string): Promise<{ id: string }> {
+    if (this.repository === null) throw new ServiceError(ERROR_CODES.internal, '仓库不可用。')
+    const { index } = this.requireIndex()
+    const comparison = compareCandidate(candidate, viewsFromIndex(index))
+    const confidence: Confidence = candidate.confidence === 'low' ? 'medium' : candidate.confidence
+    const confirmed: MemoryCandidate = { ...candidate, confidence, decision: comparison.decision }
+
+    const targetId =
+      comparison.decision.action === 'update'
+        ? comparison.decision.targetId
+        : comparison.decision.action === 'merge'
+          ? comparison.decision.targetIds[0]
+          : undefined
+
+    if (targetId !== undefined) {
+      const loaded = await this.repository.load(targetId)
+      if (loaded !== null) {
+        const before = loaded.memory
+        const next: Memory = {
+          ...before,
+          summary: appendUnique(before.summary, confirmed.summary),
+          // Do not rewrite `evidence` here: existing notes carry a multi-line
+          // block scalar, and the in-place frontmatter editor deliberately
+          // refuses to rewrite multi-line scalars. The candidate's provenance is
+          // preserved through `sourceSessions` and the journal instead.
+          sourceSessions: [...new Set([...before.sourceSessions, ...confirmed.sourceSessions])],
+          tags: [...new Set([...before.tags, ...confirmed.tags])],
+          confidence: before.confidence === 'low' ? 'medium' : before.confidence,
+          updatedAt: nowIso(),
+        }
+        await this.repository.save(next)
+        await this.repository.journal({
+          at: nowIso(),
+          op: 'update',
+          id: before.id,
+          before: summarize(before),
+          after: summarize(next),
+          reason: `${reason}（候选记忆${comparison.decision.action === 'merge' ? '判定为重复，已合并' : '判定为补充，已并入'}）`,
+        })
+        this.candidates = this.candidates.filter((entry) => entry.id !== candidate.id)
+        await this.refreshAfterWrite()
+        return { id: before.id }
+      }
+    }
+
+    const memory = this.memoryFromCandidate(confirmed, 'active')
+    if (comparison.decision.action === 'conflict') memory.conflictsWith = [comparison.decision.targetId]
+    await this.repository.save(memory)
+    await this.repository.journal({
+      at: nowIso(),
+      op: 'create',
+      id: memory.id,
+      after: summarize(memory),
+      reason: `${reason}（候选记忆：${candidate.reason}）`,
+    })
+    this.candidates = this.candidates.filter((entry) => entry.id !== candidate.id)
+    await this.refreshAfterWrite()
+    return { id: memory.id }
   }
 
   async setStatus(id: string, status: MemoryStatus, reason?: string): Promise<{ id: string }> {
@@ -1090,6 +1168,18 @@ export class MemoryService {
   }
 
   async reject(id: string, reason = '用户拒绝该候选记忆', keepFile = false): Promise<{ id: string }> {
+    const candidate = this.candidates.find((entry) => entry.id === id)
+    if (candidate !== undefined) {
+      // A rejected candidate is not a memory file: dropping it from the Inbox is
+      // the whole operation. `keepFile` explicitly asks for a durable note, so
+      // materialize it as pending and archive that.
+      if (!keepFile) {
+        this.candidates = this.candidates.filter((entry) => entry.id !== id)
+        return { id }
+      }
+      await this.materializeCandidate(id)
+      return await this.transition(id, 'archived', reason)
+    }
     const { index } = this.requireIndex()
     const record = index.records.get(id)
     if (record === undefined) throw new ServiceError(ERROR_CODES.notFound, `未找到记忆 ${id}。`)
@@ -1934,6 +2024,21 @@ function statusToOp(status: MemoryStatus): JournalEntry['op'] {
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min
   return Math.max(min, Math.min(max, value))
+}
+
+/**
+ * Append `extra` to `base` unless it is already there.
+ *
+ * Confirming a candidate that was judged a duplicate must not double the
+ * survivor's summary or evidence text; when the text is new (a real supplement)
+ * it is appended in the same `\n\n`-separated form the rest of the plugin uses.
+ */
+function appendUnique(base: string, extra: string): string {
+  const trimmedBase = base.trim()
+  const trimmedExtra = extra.trim()
+  if (trimmedExtra.length === 0) return trimmedBase
+  if (trimmedBase.includes(trimmedExtra)) return trimmedBase
+  return trimmedBase.length === 0 ? trimmedExtra : `${trimmedBase}\n\n${trimmedExtra}`
 }
 
 function top(records: readonly IndexRecord[], score: (record: IndexRecord) => number, limit: number): WireHit[] {

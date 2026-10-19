@@ -727,26 +727,23 @@ function interpolate(template: string, params?: Record<string, unknown>): string
   )
 }
 
-function fromDictionary(language: Language, key: string, params?: Record<string, unknown>): string {
-  const table = DICTIONARIES[language]
-  const template = table[key] ?? ZH[key]
-  if (template === undefined) return key
-  return interpolate(template, params)
-}
-
 /**
  * Translate `key` into the active language.
  *
- * A bound `locale` translator wins when it knows the key; otherwise this
- * module's dictionary answers, so the panel never shows raw keys merely because
- * the locale service is missing.
+ * The plugin's own `language` setting is authoritative: it is an explicit user
+ * choice, so it must win over the host's live locale translator. The bound
+ * translator is still consulted for keys this bundle does not ship, which keeps
+ * the panel usable if the host adds strings of its own.
  */
 export function t(key: string, params?: Record<string, unknown>): string {
+  const own = DICTIONARIES[activeLanguage][key]
+  if (own !== undefined) return interpolate(own, params)
   if (boundTranslator !== null) {
     const bound = boundTranslator(key, params)
     if (typeof bound === 'string' && bound.length > 0 && bound !== key) return bound
   }
-  return fromDictionary(activeLanguage, key, params)
+  const fallback = ZH[key]
+  return fallback === undefined ? key : interpolate(fallback, params)
 }
 
 /** The language currently used by the built-in dictionary. */

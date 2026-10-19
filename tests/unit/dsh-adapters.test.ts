@@ -631,6 +631,26 @@ describe('routes', () => {
     ).rejects.toMatchObject({ code: 'write-conflict' })
   })
 
+  it('confirms an Inbox candidate over the wire', async () => {
+    const turn = await service.processTurn({ userText: '这个项目的进度已经完成了 60%。' })
+    const candidate = turn.pending[0]
+    if (candidate === undefined) return
+    const webServer = fakeWebServer()
+    installRoutes(fakeCtx({ webServer }), service)
+    const handler = webServer.routes[0]?.handler
+    if (handler === undefined) return
+
+    const response = fakeResponse()
+    await handler(
+      await fakeRequest({ id: candidate.id }, {}, 'POST', `${ROUTE_PREFIX}/confirm`),
+      response as unknown as ServerResponse,
+    )
+    expect(response.status).toBe(200)
+    expect(JSON.parse(response.body)).toMatchObject({ ok: true, data: { id: candidate.id } })
+    expect((await service.get(candidate.id)).memory.status).toBe('active')
+    expect(service.listCandidates()).toEqual([])
+  })
+
   it('rejects an unknown dispatch method', async () => {
     await expect(dispatch(service, 'not-a-method', {})).rejects.toMatchObject({ code: 'not-found' })
   })

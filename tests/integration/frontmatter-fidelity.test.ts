@@ -101,6 +101,18 @@ describe('editFrontmatterSource keeps untouched lines byte-identical', () => {
     expect(first.source).toBe(DOC)
   })
 
+  it('leaves an unchanged multi-line block scalar byte-identical while updating another field', () => {
+    // This is the shape every extracted memory has: a `|-` evidence block. The
+    // plugin rewrites other owned fields on confirm/status changes, and that used
+    // to be refused because the unchanged evidence block spans several lines.
+    const source = DOC.replace('custom_key: keep-me', 'evidence: |-\n  第一行\n  第二行')
+    const result = editFrontmatterSource(source, { scalars: { evidence: '第一行\n第二行', status: 'archived' } })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.source).toContain('evidence: |-\n  第一行\n  第二行')
+    expect(result.source).toContain('status: archived')
+  })
+
   it('rebuilds a list and keeps the comments that followed it', () => {
     const result = editFrontmatterSource(DOC, { arrays: { tags: ['one', 'two'] } })
     expect(result.ok).toBe(true)

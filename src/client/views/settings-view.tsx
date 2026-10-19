@@ -41,6 +41,10 @@ export function SettingsView(props: { vault: VaultInfo | null; onChanged: () => 
     setDraft((current) => (current === null ? current : { ...current, ...changes }))
   }
 
+  // The "unsaved changes" hint must reflect reality: it used to be rendered
+  // unconditionally, so the settings card always claimed there were changes.
+  const dirty = draft !== null && settings.data !== null && JSON.stringify(draft) !== JSON.stringify(settings.data)
+
   const doSave = async (): Promise<void> => {
     if (draft === null) return
     const payload: Partial<PluginSettings> = {
@@ -94,7 +98,7 @@ export function SettingsView(props: { vault: VaultInfo | null; onChanged: () => 
         title={translate('settings.title')}
         actions={
           <>
-            <span className="lmv-meta">{translate('settings.dirty')}</span>
+            {dirty ? <span className="lmv-meta">{translate('settings.dirty')}</span> : null}
             <Button variant="primary" disabled={save.busy} onClick={() => void doSave()}>
               {translate('common.save')}
             </Button>

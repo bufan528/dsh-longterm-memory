@@ -29,11 +29,30 @@
   <a href="../README.md"><strong>English</strong></a>
 </p>
 
-> **项目状态（2026-10-19）**：`dsh-longterm-memory@0.1.2` 已发布到 npm。
-> 桌面应用插件入口尚未在隔离桌面环境中端到端验证（Web profile 安装已验证），
-> 见 [安装](#安装) 与 [项目状态与限制](#项目状态与限制)。
+> **项目状态（2026-10-19）**：`dsh-longterm-memory@0.1.3` 已发布到 npm，并附带在最新
+> GitHub Release 中。桌面应用插件入口已在实际运行的桌面端完成端到端验证（五个页签
+> 61/61 真实浏览器检查，真实 Vault，测试后已还原）；此前"桌面路径未验证"的说明已解除。
+> 见 [安装](#安装)、[0.1.3 更新内容](#013-更新内容) 与
+> [项目状态与限制](#项目状态与限制)。
 
 ---
+
+## 0.1.3 更新内容
+
+- **收件箱可操作了**：内存候选的 **确认入库 / 拒绝** 现在真的生效。确认会写成 active
+  记忆（`low` 置信度提升为 `medium`）；重复/补充会合并进已有记忆而不是产生重复；矛盾
+  则双方保留。拒绝不写任何文件。
+- **自动提取的记忆可以改状态了**：多行 `evidence:` 块标量不再导致 `unsafe-edit` 失败。
+- **界面语言设置已生效**（此前会被宿主 locale 覆盖）。
+- **设置页不再常驻"有未保存的修改"**。
+- **新增真实浏览器端到端套件**（`npm run verify:e2e`），覆盖五个页签，含收件箱、详情、
+  设置、批量与合并流程。
+
+完整说明：[CHANGELOG.md](../CHANGELOG.md) ·
+[最新 Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest)
+
+![收件箱确认/拒绝已修复](evidence/05-e2e-inbox-confirmed.png)
+![合并对话框](evidence/06-e2e-merge-dialog.png)
 
 ## 为什么是 DSH Memory Vault？
 
@@ -100,14 +119,28 @@ flowchart LR
 
 ## 安装
 
-### 方式 A —— 从 npm 安装（推荐）
+### 方式 A —— 从 npm 安装最新版（推荐）
 
 ```bash
-dsh plugin --profile web add dsh-longterm-memory
+dsh plugin --profile web add dsh-longterm-memory@latest
 ```
 
-> 已发布为 `dsh-longterm-memory@0.1.2`（latest）。桌面应用通过自己的插件管理器与
-> 保留的 `desktop` profile 安装；该路径尚未端到端验证（见[状态](#项目状态与限制)）。
+> 最新版本：`dsh-longterm-memory@0.1.3`。使用 `@latest`（或省略版本号）可确保每次都
+> 安装最新发布版。桌面应用内请通过 **插件 / 插件管理器** 或 **插件市场** 安装/更新，
+> 按提示重启应用；该路径已在 0.1.3 端到端验证。
+
+### 方式 A2 —— 下载最新打包 tarball（无需构建）
+
+每个 GitHub Release 都附带最新 `.tgz`（及 `.sha256`）：
+
+```powershell
+# 下载最新 Release 资源到当前目录
+gh release download --repo bufan528/dsh-longterm-memory --pattern "*.tgz" --dir .
+dsh plugin --profile web add .\dsh-longterm-memory-0.1.3.tgz
+```
+
+没有 `gh`？打开
+<https://github.com/bufan528/dsh-longterm-memory/releases/latest> 手动下载即可。
 
 ### 方式 B —— 从本仓库构建并安装 tarball（已验证）
 
@@ -117,11 +150,11 @@ dsh plugin --profile web add dsh-longterm-memory
 ```bash
 npm install
 npm run build
-npm pack                     # 产出 dsh-longterm-memory-0.1.2.tgz
+npm pack                     # 产出 dsh-longterm-memory-0.1.3.tgz
 
 $env:DSH_HOME = "<临时目录>"              # PowerShell
 # export DSH_HOME="<临时目录>"            # bash
-dsh plugin --profile lmv add .\dsh-longterm-memory-0.1.2.tgz
+dsh plugin --profile lmv add .\dsh-longterm-memory-0.1.3.tgz
 
 dsh --profile lmv --no-open --port 0
 ```
@@ -211,7 +244,8 @@ DSH Memory/
 ## 隐私
 
 - **默认无遥测、无外联。** Host 侧验收运行观察到 0 次网络调用；客户端唯一请求目标是
-  DSH 本机 RPC。桌面 UI 的浏览器运行时网络验证仍在进行中（见状态）。
+  DSH 本机 RPC。0.1.3 的桌面端 E2E 运行了真实页面并断言无页面错误 / 无未捕获异常；
+  它不是包级别的网络抓包审计。
 - **模型使用可选**：自动提取是本地规则；模型辅助提取默认关闭，开启后使用你在 DSH
   中配置的 Provider。
 - **凭据被拒绝**：密码 / API Key / 令牌 / 私钥类内容在进入仓库前被拦截；敏感类别需
@@ -227,7 +261,8 @@ DSH Memory/
 | 已验证 DSH 版本 | `0.2.1-rc.2`（Host + 真实 headless Chrome 验收） |
 | Node.js | `>=20` |
 | 平台 | Windows（主要），其他平台遵循 Node 路径规则 |
-| npm 包名 | `dsh-longterm-memory` —— **0.1.2 已发布**（latest） |
+| npm 包名 | `dsh-longterm-memory` —— **0.1.3 已发布**（latest） |
+| 下载方式 | npm `@latest`，或[最新 GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest) 的 tarball |
 
 `dsh.compatibility` 仅为说明性元数据；`engines.dsh` 是唯一决策来源。细节与证据见
 [docs/compatibility.md](compatibility.md)。
@@ -239,22 +274,29 @@ npm install
 npm run build        # tsc -> lib/host，esbuild -> lib/client.js
 npm run typecheck    # tsc --noEmit
 npm run lint         # 契约检查 + 版本一致性检查
-npm test             # 完整测试套件（当前 40 文件 / 581 用例）
+npm test             # 完整测试套件（当前 41 文件 / 595 用例）
 npm run check        # build -> typecheck -> lint -> test（干净检出安全）
 npm run pack:plugin  # build + npm pack
+npm run verify:e2e -- --url "http://127.0.0.1:<port>/?token=..."   # 真实浏览器 E2E（61 项）
 ```
+
+`verify:e2e` 通过 CDP 驱动真实 Chrome，点击真实管理页，并用插件 RPC 与磁盘上的
+Markdown 文件校验每个效果。对需要 token 的桌面端监听端口，可先为本机生成桌面临时会话
+cookie，再用 `--cookie-file <name=value 文件>` 传入。
 
 测试覆盖单元、集成、打包、真实 HTTP 路由校验与确定性故障注入（含真实子进程强杀）。
 浏览器验收脚本是零依赖 CDP 客户端，使用 Node 内置 `WebSocket`。
 
 ## 项目状态与限制
 
-- **预览版**：API 与存储格式仍可能变化；`0.1.0` 是首个公开版本。
-- **npm 已发布**：`dsh-longterm-memory@0.1.2`（2026-10-19），注册表安装已验证。
-- **桌面集成待验证**：插件可在 Web profile 加载、tarball 可安装，但尚未在隔离环境中
-  完成完整桌面应用验收；桌面插件管理器路径在得到报告前应视为未验证。
-- **已知后续项**：仍有少量并发与移动原子性边界；审查中发现的 frontmatter 与锁问题
-  已在 `0.1.0` 修复并由测试锁定。
+- **预览版**：API 与存储格式仍可能变化；`0.1.0` 是首个公开版本，当前发布版为 `0.1.3`。
+- **npm 已发布**：`dsh-longterm-memory@0.1.3`（2026-10-19），注册表安装已验证。npm
+  的 `latest` dist-tag 与 GitHub Release 始终指向最新版本。
+- **桌面端已验证**：完整真实浏览器 E2E 已在运行中的桌面应用上通过（61/61 项，五个
+  页签，真实 Vault，测试后已还原）。
+- **已知后续项**：内存收件箱候选是草稿——确认前不计入 `待确认数量` / `Inbox/` 目录，
+  确认或拒绝后即离开收件箱。仍有少量并发与移动原子性边界；审查中发现的 frontmatter
+  与锁问题已在 `0.1.0` 修复并由测试锁定。
 - **仓库位置**：未设置 `vaultPath` 时插件会初始化 `~/Documents/DSH Memory`；
   测试时请显式设置以隔离数据。
 
@@ -267,6 +309,7 @@ npm run pack:plugin  # build + npm pack
 | [docs/privacy.md](privacy.md) | 隐私与威胁模型 |
 | [docs/compatibility.md](compatibility.md) | 兼容性契约与证据 |
 | [docs/verification.md](verification.md) | 验证记录与验收证据 |
+| [CHANGELOG.md](../CHANGELOG.md) | 每个发布版本的更新记录 |
 | [docs/troubleshooting.md](troubleshooting.md) | 恢复步骤与常见问题 |
 | [docs/evidence/](evidence/) | 截图与原始验收数据 |
 

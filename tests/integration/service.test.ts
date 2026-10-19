@@ -541,6 +541,73 @@ describe('candidates', () => {
   })
 })
 
+describe('acting on Inbox candidates', () => {
+  it('confirms a parked candidate into an active memory', async () => {
+    const turn = await service.processTurn({ userText: '这个项目的进度已经完成了 60%。' })
+    const candidate = turn.pending[0]
+    expect(candidate).toBeDefined()
+    const id = candidate?.id ?? ''
+    expect(service.listCandidates().map((entry) => entry.id)).toContain(id)
+    // The candidate is not a memory file yet, which is exactly why the old
+    // confirm/reject path could not find it.
+    await expect(service.confirm(id)).resolves.toEqual({ id })
+    expect(service.listCandidates().map((entry) => entry.id)).not.toContain(id)
+
+    const detail = await service.get(id)
+    expect(detail.memory.status).toBe('active')
+    // Confirming a candidate is an explicit act of trust: low becomes medium.
+    expect(detail.memory.confidence).toBe('medium')
+    expect(detail.relativePath).not.toContain('Inbox')
+    expect(service.search({ text: '进度', includeNonCurrent: true }).hits.map((hit) => hit.record.id)).toContain(id)
+  })
+
+  it('rejects a parked candidate without writing a memory', async () => {
+    const turn = await service.processTurn({ userText: '这个项目的进度已经完成了 60%。' })
+    const id = turn.pending[0]?.id ?? ''
+    expect(id.length).toBeGreaterThan(0)
+    await expect(service.reject(id)).resolves.toEqual({ id })
+    expect(service.listCandidates()).toEqual([])
+    await expect(service.get(id)).rejects.toMatchObject({ code: 'not-found' })
+    expect(service.search({ text: '进度', includeNonCurrent: true }).total).toBe(0)
+  })
+
+  it('refuses to confirm or reject an id that is neither a memory nor a candidate', async () => {
+    await expect(service.confirm('mem_missing')).rejects.toMatchObject({ code: 'not-found' })
+    await expect(service.reject('mem_missing')).rejects.toMatchObject({ code: 'not-found' })
+  })
+
+  it('confirms a manually added candidate into an active memory', async () => {
+    const added = service.addCandidate({
+      type: 'task',
+      title: '补齐索引重建测试',
+      summary: '需要覆盖索引损坏后的重建路径。',
+      confidence: 'medium',
+    })
+    await service.confirm(added.id)
+    const detail = await service.get(added.id)
+    expect(detail.memory.status).toBe('active')
+    expect(service.listCandidates()).toEqual([])
+  })
+
+  it('merges a confirmed duplicate into the existing memory instead of creating another', async () => {
+    const first = await service.processTurn({ userText: '请记住：我更喜欢用 PowerShell 而不是 bash。', sessionId: 's', turn: 1 })
+    expect(first.applied).toHaveLength(1)
+    const targetId = first.applied[0]?.id ?? ''
+
+    const second = await service.processTurn({ userText: '请记住：我更喜欢用 PowerShell 而不是 bash。', sessionId: 's2', turn: 1 })
+    const candidate = second.pending[0]
+    expect(candidate).toBeDefined()
+    await expect(service.confirm(candidate?.id ?? '')).resolves.toEqual({ id: targetId })
+    expect(service.listCandidates()).toEqual([])
+
+    const hits = service.search({ text: 'PowerShell', includeNonCurrent: true }).hits.filter((hit) => hit.record.type === 'preference')
+    expect(hits).toHaveLength(1)
+    expect(hits[0]?.record.id).toBe(targetId)
+    // The candidate's source session was folded into the survivor.
+    expect((await service.get(targetId)).memory.sourceSessions).toContain('s2')
+  })
+})
+
 describe('recall and context budget', () => {
   it('produces a fenced, bounded recall block for a relevant query', async () => {
     await service.save(saveRequest({ title: '索引重建策略', summary: '索引重建只依赖 Markdown。' }))

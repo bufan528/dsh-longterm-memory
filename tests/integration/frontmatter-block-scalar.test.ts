@@ -67,6 +67,24 @@ describe('block scalars survive a real load → save → load', () => {
     expect(status).toBe('archived')
   })
 
+  it('updates a plugin-owned multi-line field without rewriting its block scalar', async () => {
+    // Extracted memories carry a multi-line `evidence: |-` block. A confirm or
+    // status change must edit only the changed scalar and leave that block intact.
+    const turn = await service.processTurn({ userText: '请记住：我更喜欢用 PowerShell 而不是 bash。', sessionId: 'probe' })
+    const id = turn.applied[0]?.id ?? ''
+    const before = await service.readRaw(id)
+    expect(before?.content).toContain('evidence: |-')
+    const evidenceBlock = before?.content.split('\n').filter((line) => line.startsWith('  ') && line.includes('PowerShell')).join('\n') ?? ''
+
+    await service.setStatus(id, 'archived', 'multi-line evidence status change')
+
+    const after = await service.readRaw(id)
+    const content = after?.content ?? ''
+    expect(content).toContain('evidence: |-')
+    expect(content).toContain(evidenceBlock)
+    expect(/^status:\s*(\S+)$/m.exec(content)?.[1]).toBe('archived')
+  })
+
   it('leaves a body-level --- untouched', async () => {
     const created = await service.save({ type: 'knowledge', title: '正文分隔线', summary: '正文。', tags: [], confidence: 'high', importance: 50 })
     const raw = await service.readRaw(created.id)

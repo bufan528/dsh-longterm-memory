@@ -30,12 +30,33 @@
   <a href="docs/README.zh-CN.md"><strong>简体中文</strong></a>
 </p>
 
-> **Project status (2026-10-19).** `dsh-longterm-memory@0.1.2` is published on npm.
-> The desktop-app plugin entry has not yet been exercised end-to-end in an isolated
-> desktop environment (the Web-profile install is verified); see
-> [Install](#install) and [Project status & limitations](#project-status--limitations).
+> **Project status (2026-10-19).** `dsh-longterm-memory@0.1.3` is published on npm and
+> attached to the latest GitHub Release. The desktop-app plugin entry is now verified
+> end-to-end in the running desktop app (61/61 real-browser checks over all five tabs,
+> real vault, restored afterwards); the earlier "desktop path unverified" caveat is
+> resolved. See [Install](#install), [What's new in 0.1.3](#whats-new-in-013) and
+> [Project status & limitations](#project-status--limitations).
 
 ---
+
+## What's new in 0.1.3
+
+- **Inbox is actionable.** **确认入库 / Confirm** and **拒绝 / Reject** now work for
+  in-memory candidates. Confirming writes an active memory (`low` confidence is raised
+  to `medium`), folds a duplicate/supplement into the existing memory instead of
+  duplicating it, and keeps both sides of a contradiction. Rejecting writes no file.
+- **Status changes on extracted memories work.** A multi-line `evidence:` block
+  scalar no longer blocks saves with `unsafe-edit`.
+- **The UI language setting works** (it previously lost to the host locale).
+- **No more permanent "unsaved changes" hint** on the settings page.
+- **New real-browser E2E suite** (`npm run verify:e2e`) covering all five tabs,
+  including the Inbox, detail, settings, batch and merge flows.
+
+Full details: [CHANGELOG.md](CHANGELOG.md) ·
+[latest release](https://github.com/bufan528/dsh-longterm-memory/releases/latest)
+
+![Inbox confirm/reject fixed](https://raw.githubusercontent.com/bufan528/dsh-longterm-memory/main/docs/evidence/05-e2e-inbox-confirmed.png)
+![Merge dialog](https://raw.githubusercontent.com/bufan528/dsh-longterm-memory/main/docs/evidence/06-e2e-merge-dialog.png)
 
 ## Why DSH Memory Vault?
 
@@ -109,15 +130,31 @@ flowchart LR
 
 ## Install
 
-### Option A — from npm (recommended)
+### Option A — install the latest from npm (recommended)
 
 ```bash
-dsh plugin --profile web add dsh-longterm-memory
+dsh plugin --profile web add dsh-longterm-memory@latest
 ```
 
-> Published as `dsh-longterm-memory@0.1.2` (latest). The official desktop app manages
-> plugins through its own plugin manager and a reserved `desktop` profile; that path
-> has not been verified end-to-end yet (see [status](#project-status--limitations)).
+> Latest release: `dsh-longterm-memory@0.1.3`. Use `@latest` (or omit the version) so
+> an installation always fetches the newest published version. Inside the official
+> desktop app, install or update the plugin from **插件 / Plugin manager** or
+> **插件市场 / Plugin Market**, then restart the app when prompted. The desktop path is
+> verified end-to-end in 0.1.3.
+
+### Option A2 — download the latest packaged tarball (no build required)
+
+The newest `.tgz` (and its `.sha256`) is attached to every GitHub Release:
+
+```powershell
+# Download the latest release asset into the current directory
+gh release download --repo bufan528/dsh-longterm-memory --pattern "*.tgz" --dir .
+dsh plugin --profile web add .\dsh-longterm-memory-0.1.3.tgz
+```
+
+No `gh`? Open
+<https://github.com/bufan528/dsh-longterm-memory/releases/latest> and download the
+asset manually.
 
 ### Option B — build this repository and install the tarball (verified)
 
@@ -128,12 +165,12 @@ profile cannot touch your daily DSH profile:
 # 1. Build and pack
 npm install
 npm run build
-npm pack                     # -> dsh-longterm-memory-0.1.2.tgz
+npm pack                     # -> dsh-longterm-memory-0.1.3.tgz
 
 # 2. Install into an isolated profile
 $env:DSH_HOME = "<temporary dir>"                # PowerShell
 # export DSH_HOME="<temporary dir>"              # bash
-dsh plugin --profile lmv add .\dsh-longterm-memory-0.1.2.tgz
+dsh plugin --profile lmv add .\dsh-longterm-memory-0.1.3.tgz
 
 # 3. Start
 dsh --profile lmv --no-open --port 0
@@ -230,8 +267,9 @@ from your profile's `cordis.patch.yml`.
 ## Privacy
 
 - **No telemetry and no outbound network calls by default.** Host-side acceptance runs
-  showed zero network calls; the only client request target is the local DSH RPC.
-  Browser-runtime network verification of the desktop UI is still pending — see status.
+  showed zero network calls; the only client request target is the local DSH RPC. The
+  0.1.3 desktop E2E run exercised the real page and asserted zero page errors / uncaught
+  exceptions; it is not a packet-level network audit.
 - **Model use is opt-in**: automatic extraction is rule-based and local; model-assisted
   extraction (`enableLlmExtraction`) is off and, when enabled, uses the provider you
   configured in DSH.
@@ -249,7 +287,8 @@ from your profile's `cordis.patch.yml`.
 | Verified DSH version | `0.2.1-rc.2` (host + real headless Chrome acceptance) |
 | Node.js | `>=20` |
 | Platform | Windows (primary), Node path rules elsewhere |
-| npm package | `dsh-longterm-memory` — **0.1.2 published** (latest) |
+| npm package | `dsh-longterm-memory` — **0.1.3 published** (latest) |
+| Downloads | npm `@latest`, or the tarball on the [latest GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest) |
 
 The `dsh.compatibility` field is informational; `engines.dsh` is the only decision
 source. Details and evidence: [docs/compatibility.md](docs/compatibility.md).
@@ -261,10 +300,16 @@ npm install
 npm run build        # tsc -> lib/host, esbuild -> lib/client.js
 npm run typecheck    # tsc --noEmit
 npm run lint         # contract checks + version-consistency check
-npm test             # full suite (currently 40 files / 581 cases)
+npm test             # full suite (currently 41 files / 595 cases)
 npm run check        # build -> typecheck -> lint -> test (clean checkout safe)
 npm run pack:plugin  # build + npm pack
+npm run verify:e2e -- --url "http://127.0.0.1:<port>/?token=..."   # real-browser E2E (61 checks)
 ```
+
+`verify:e2e` drives a real Chrome over CDP, clicks the real management page and checks
+every effect through the plugin RPC and the Markdown files on disk. For a token-guarded
+desktop listener, mint the desktop launch cookie for the current machine and pass it
+with `--cookie-file <name=value file>`.
 
 Tests cover unit, integration, packaging, real HTTP-route validation, and deterministic
 fault injection (including real subprocess kills). The browser acceptance scripts are
@@ -272,13 +317,16 @@ zero-dependency CDP clients using Node's built-in `WebSocket`.
 
 ## Project status & limitations
 
-- **Preview**: API and storage format may still change; `0.1.0` is the first public version.
-- **npm published**: `dsh-longterm-memory@0.1.2` (2026-10-19); registry installation verified.
-- **Desktop integration pending**: the plugin loads in a Web profile and the package
-  installs from a tarball, but a full desktop-app acceptance run in an isolated
-  environment has not been performed. Treat the desktop plugin-manager path as
-  unverified until reported otherwise.
-- **Known follow-ups**: a few concurrency and move-atomicity edge cases remain open;
+- **Preview**: API and storage format may still change; `0.1.0` was the first public
+  version, `0.1.3` is the current release.
+- **npm published**: `dsh-longterm-memory@0.1.3` (2026-10-19); registry installation
+  verified. The npm `latest` dist-tag and the GitHub Release always point at the newest
+  version.
+- **Desktop verified**: the full real-browser E2E suite passes against the running
+  desktop app (61/61 checks, all five tabs, real vault restored afterwards).
+- **Known follow-ups**: in-memory Inbox candidates are drafts — they are not counted in
+  `待确认数量` / the `Inbox/` folder until confirmed; they leave the Inbox when
+  confirmed or rejected. A few concurrency and move-atomicity edge cases remain open;
   frontmatter and lock regressions found in review were fixed in `0.1.0` and are locked
   by tests.
 - **Vault location**: with `vaultPath` unset the plugin initializes
@@ -293,6 +341,7 @@ zero-dependency CDP clients using Node's built-in `WebSocket`.
 | [docs/privacy.md](docs/privacy.md) | Privacy and threat model |
 | [docs/compatibility.md](docs/compatibility.md) | Compatibility contract and evidence |
 | [docs/verification.md](docs/verification.md) | Verification log and acceptance evidence |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes for every published version |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Recovery and FAQ |
 | [docs/evidence/](docs/evidence/) | Screenshots and raw acceptance data |
 

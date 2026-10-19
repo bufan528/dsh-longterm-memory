@@ -144,6 +144,29 @@ const isComment = (line: string): boolean => /^\s*#/.test(line)
 const isBlank = (line: string): boolean => line.trim().length === 0
 const isSequenceItem = (line: string): boolean => /^\s*-\s|^\s*-$/.test(line)
 
+/**
+ * Decode the value of a literal block-scalar entry (`key: |`, `|-`, `|+`), or
+ * `null` when the entry is not a literal block this module can read safely.
+ *
+ * Only literal blocks are decoded: folded scalars (`>`) and explicit indentation
+ * indicators involve line-folding rules that are easy to get subtly wrong, and a
+ * false "unchanged" would be worse than the current conservative refusal.
+ */
+function literalBlockValue(entry: FrontmatterEntry): string | null {
+  const match = /^([^\s:#][^:]*?):[ \t]*(.*)$/.exec(entry.lines[0] ?? '')
+  if (match === null) return null
+  const indicator = (match[2] ?? '').replace(/\s+#.*$/, '').trim()
+  const style = /^([|>])([+-]?)(\d*)$/.exec(indicator)
+  if (style === null || style[1] !== '|' || (style[3] ?? '').length > 0) return null
+  const lines = entry.lines.slice(1)
+  const indents = lines
+    .filter((line) => line.trim().length > 0)
+    .map((line) => /^[ \t]*/.exec(line)?.[0].length ?? 0)
+  if (indents.length === 0) return ''
+  const indent = Math.min(...indents)
+  return lines.map((line) => (line.trim().length === 0 ? '' : line.slice(indent))).join('\n')
+}
+
 
 /**
  * Apply updates to a document's frontmatter without reformatting anything else.
@@ -189,6 +212,19 @@ export function editFrontmatterSource(
       continue
     }
     const extras = entry.lines.slice(1)
+    const blockValue = literalBlockValue(entry)
+    if (blockValue !== null) {
+      // A block scalar whose value did not change must be left byte-for-byte.
+      // Refusing unconditionally made every save of a note with a multi-line
+      // `evidence` field fail with "unsafe-edit" — including confirm/status
+      // changes on automatically extracted memories. A *changed* block scalar is
+      // still refused: rewriting it in place could drop content.
+      if (typeof value === 'string' && blockValue.trimEnd() === value.trimEnd()) continue
+      return {
+        ok: false,
+        reason: `字段 "${key}" 的值跨越多行，无法在不丢失内容的前提下就地更新，拒绝覆盖该文件。`,
+      }
+    }
     const continuation = extras.filter((line) => !isComment(line) && !isBlank(line))
     if (continuation.length > 0) {
       return {

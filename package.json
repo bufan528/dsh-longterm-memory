@@ -1,6 +1,6 @@
 {
   "name": "dsh-longterm-memory",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "DSH Memory Vault (长期记忆) — durable local long-term memory for DeepSeek Harness, stored as an Obsidian-compatible Markdown vault with a rebuildable index, an in-sidebar management page, and real per-turn recall.",
   "private": false,
   "type": "module",
@@ -52,6 +52,7 @@
     "icon.svg",
     "locale/*.json",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
@@ -66,7 +67,11 @@
     "check": "npm run build && npm run typecheck && npm run lint && npm run test",
     "pack:plugin": "npm run build && npm pack",
     "verify:ui": "node scripts/ui-acceptance.mjs",
+    "verify:e2e": "node scripts/ui-e2e-flows.mjs",
     "prepare": "npm run build"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
   },
   "dependencies": {
     "yaml": "^2.8.0",

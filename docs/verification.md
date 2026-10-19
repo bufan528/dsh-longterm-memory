@@ -613,3 +613,16 @@ POST /dsh-longterm-memory/api/previewRecall(相关/无关) → 1 条 / 0 条
 | 退出码 | 0 |
 | 环境 | Windows / Node v24.13.0 / npm 11.6.2 / TS 5.9.3 / DSH 0.2.1-rc.2 |
 | 说明 | 命令自行构建后执行 typecheck、lint、test；原始工作目录 `lib` 未改动 |
+
+## RR-4 / 0.1.3 端到端验证记录（2026-10-19）
+
+| 项 | 值 |
+|---|---|
+| 版本 | `dsh-longterm-memory@0.1.3`（未发布前的候选构建） |
+| 自动化测试 | 41 文件 / 595 用例通过（0 失败）；`tsc --noEmit`、`npm run lint`、`npm run build` 退出码 0 |
+| 真实浏览器 E2E | `scripts/ui-e2e-flows.mjs`：61 项检查全通过（五个页签） |
+| 运行对象 | ① CLI 启动的真实 DSH Web 宿主（隔离 profile + 临时 Vault）；② **运行中的桌面应用本体**（真实 Vault `%USERPROFILE%\Documents\DSH Memory`） |
+| 覆盖 | 侧边栏/五页签、索引重建与同步、收件箱候选确认/拒绝/重复合并、检索→详情、归档/恢复/置顶、原文 Markdown 写入、两步删除、设置持久化与中英切换、召回预览、批量置顶/取消、合并对话框 |
+| 桌面端结果 | 61/61 通过；无页面错误面板、无未捕获异常；测试后 Vault 恢复为原 3 条记忆、设置还原、无 E2E 文件残留、`outOfSync=0` |
+| 证据 | 内部验收产物（`.scratch/` 下，未入库）与 12 张真实截图；节选截图见 `docs/evidence/05-e2e-inbox-confirmed.png`、`docs/evidence/06-e2e-merge-dialog.png` |
+| 说明 | 桌面端监听需要本机会话 cookie，E2E 通过一次性本地签名 cookie 访问；未记录任何凭据 |

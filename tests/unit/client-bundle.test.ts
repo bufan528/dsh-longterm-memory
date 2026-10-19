@@ -300,7 +300,7 @@ describe('lib/client.js', () => {
     expect(mock.registrations).toHaveLength(2)
   })
 
-  it('binds the locale service when present and prefers its translator', () => {
+  it('binds the locale service when present but keeps the plugin language authoritative', () => {
     const { captured } = loadBundle()
     const plugin = captured.factory(makeRequire())
     const mock = makeMockContext({ withLocale: true })
@@ -312,7 +312,9 @@ describe('lib/client.js', () => {
     expect(mock.localeRegistrations[0]?.dictionaries.en?.panel).toBe('Long-term memory')
     expect(mock.localeBinds).toEqual([NS])
 
+    // The host translator (`T:panel`) must not override the plugin's own
+    // dictionary: the plugin's `language` setting is an explicit user choice.
     const panel = mock.registrations[0]
-    expect((panel?.options.label as () => string)()).toBe('T:panel')
+    expect((panel?.options.label as () => string)()).toBe('长期记忆')
   })
 })
