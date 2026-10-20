@@ -30,16 +30,20 @@
   <a href="../README.md"><strong>English</strong></a>
 </p>
 
-> **项目状态（2026-10-20）**：`dsh-longterm-memory@0.1.3` 已发布到 npm、附带在最新
+> **项目状态（2026-10-20）**：`dsh-longterm-memory@0.1.4` 已发布到 npm、附带在最新
 > GitHub Release 中，并且**已上架 DSH 插件市场**
 > （[awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)，
 > 2026-10-19 收录）。可在应用内 **插件市场 / Plugin Market** 安装，或执行
 > `dsh plugin add dsh-longterm-memory@latest`。桌面应用插件入口已在实际运行的桌面端
 > 完成端到端验证（五个页签 61/61 真实浏览器检查，真实 Vault，测试后已还原）。
-> 见 [安装](#安装)、[0.1.3 更新内容](#013-更新内容) 与
+> 见 [安装](#安装)、[0.1.4 更新内容](#014-更新内容) 与
 > [项目状态与限制](#项目状态与限制)。
 
 ---
+
+## 0.1.4 更新内容
+
+**0.1.4 是文档发布**：插件已**上架 DSH 插件市场**（2026-10-19 收录），可在应用内 **插件市场 / Plugin Market** 安装或更新。本版无代码变更，包含 0.1.3 的全部修复。
 
 ## 0.1.3 更新内容
 
@@ -139,7 +143,7 @@ Vault**，在插件卡片上安装/更新，按提示重启应用。条目维护
 dsh plugin --profile web add dsh-longterm-memory@latest
 ```
 
-> 最新版本：`dsh-longterm-memory@0.1.3`。使用 `@latest`（或省略版本号）可确保每次都
+> 最新版本：`dsh-longterm-memory@0.1.4`。使用 `@latest`（或省略版本号）可确保每次都
 > 安装最新发布版。
 
 ### 方式 C —— 下载最新打包 tarball（无需构建）
@@ -149,7 +153,7 @@ dsh plugin --profile web add dsh-longterm-memory@latest
 ```powershell
 # 下载最新 Release 资源到当前目录
 gh release download --repo bufan528/dsh-longterm-memory --pattern "*.tgz" --dir .
-dsh plugin --profile web add .\dsh-longterm-memory-0.1.3.tgz
+dsh plugin --profile web add .\dsh-longterm-memory-0.1.4.tgz
 ```
 
 没有 `gh`？打开
@@ -163,11 +167,11 @@ dsh plugin --profile web add .\dsh-longterm-memory-0.1.3.tgz
 ```bash
 npm install
 npm run build
-npm pack                     # 产出 dsh-longterm-memory-0.1.3.tgz
+npm pack                     # 产出 dsh-longterm-memory-0.1.4.tgz
 
 $env:DSH_HOME = "<临时目录>"              # PowerShell
 # export DSH_HOME="<临时目录>"            # bash
-dsh plugin --profile lmv add .\dsh-longterm-memory-0.1.3.tgz
+dsh plugin --profile lmv add .\dsh-longterm-memory-0.1.4.tgz
 
 dsh --profile lmv --no-open --port 0
 ```
@@ -274,7 +278,7 @@ DSH Memory/
 | 已验证 DSH 版本 | `0.2.1-rc.2`（Host + 真实 headless Chrome 验收） |
 | Node.js | `>=20` |
 | 平台 | Windows（主要），其他平台遵循 Node 路径规则 |
-| npm 包名 | `dsh-longterm-memory` —— **0.1.3 已发布**（latest） |
+| npm 包名 | `dsh-longterm-memory` —— **0.1.4 已发布**（latest） |
 | 下载方式 | npm `@latest`，或[最新 GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest) 的 tarball |
 | DSH 插件市场 | **已上架** [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)（2026-10-19 收录）；更新跟随 npm `latest` |
 
@@ -303,8 +307,8 @@ cookie，再用 `--cookie-file <name=value 文件>` 传入。
 
 ## 项目状态与限制
 
-- **预览版**：API 与存储格式仍可能变化；`0.1.0` 是首个公开版本，当前发布版为 `0.1.3`。
-- **npm 已发布**：`dsh-longterm-memory@0.1.3`（2026-10-19），注册表安装已验证。npm
+- **预览版**：API 与存储格式仍可能变化；`0.1.0` 是首个公开版本，当前发布版为 `0.1.4`。
+- **npm 已发布**：`dsh-longterm-memory@0.1.4`（2026-10-20），注册表安装已验证。npm
   的 `latest` dist-tag 与 GitHub Release 始终指向最新版本。
 - **已上架 DSH 插件市场**：条目位于
   [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)

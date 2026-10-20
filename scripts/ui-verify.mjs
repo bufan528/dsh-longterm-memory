@@ -37,8 +37,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const WORKSPACE = path.resolve(HERE, '..');
 export const DEFAULT_USER_DATA_DIR = path.join(WORKSPACE, '.scratch', 'chrome-profile');
-export const DEFAULT_CHROME = '<chrome>';
-export const DEFAULT_EDGE = '<edge>';
+export const DEFAULT_CHROME = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+export const DEFAULT_EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 
 export const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

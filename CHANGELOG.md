@@ -4,6 +4,22 @@ All notable changes to **DSH Memory Vault (`dsh-longterm-memory`)** are document
 here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.4] - 2026-10-20
+
+### Changed
+
+- **DSH Plugin Market listing.** The plugin is listed in the
+  [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
+  catalog (added 2026-10-19). The README now documents installation from the in-app
+  **插件市场 / Plugin Market**; later releases need no new marketplace submission and
+  are picked up automatically from the npm `latest` tag.
+- **Repository privacy cleanup.** Personal Windows user paths, real Obsidian/DSH vault
+  paths, live DSH session ids, local ports and local install paths were replaced with
+  generic placeholders; the two 0.1.3 E2E screenshots were regenerated in an isolated
+  profile (neutral vault path; no conversation titles or account name); the git history
+  was rewritten to remove the same data and to use a GitHub noreply commit identity.
+- No runtime code changes.
+
 ## [0.1.3] - 2026-10-19
 
 ### Fixed

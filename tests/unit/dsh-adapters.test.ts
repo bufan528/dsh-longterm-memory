@@ -550,7 +550,7 @@ describe('routes', () => {
     expect(shell.status).toBe(200)
 
     const matching = fakeResponse()
-    await handler(await fakeRequest({}, { origin: 'http://127.0.0.1:<port>' }), matching as unknown as ServerResponse)
+    await handler(await fakeRequest({}, { origin: 'http://127.0.0.1:19387' }), matching as unknown as ServerResponse)
     expect(matching.status).toBe(200)
   })
 
