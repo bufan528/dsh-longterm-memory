@@ -21,6 +21,7 @@
 
 <p align="center">
   <a href="#安装"><strong>安装</strong></a> ·
+  <a href="https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/"><strong>DSH 插件市场</strong></a> ·
   <a href="#功能">功能</a> ·
   <a href="#配置">配置</a> ·
   <a href="#数据安全">数据安全</a> ·
@@ -29,9 +30,12 @@
   <a href="../README.md"><strong>English</strong></a>
 </p>
 
-> **项目状态（2026-10-19）**：`dsh-longterm-memory@0.1.3` 已发布到 npm，并附带在最新
-> GitHub Release 中。桌面应用插件入口已在实际运行的桌面端完成端到端验证（五个页签
-> 61/61 真实浏览器检查，真实 Vault，测试后已还原）；此前"桌面路径未验证"的说明已解除。
+> **项目状态（2026-10-20）**：`dsh-longterm-memory@0.1.3` 已发布到 npm、附带在最新
+> GitHub Release 中，并且**已上架 DSH 插件市场**
+> （[awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)，
+> 2026-10-19 收录）。可在应用内 **插件市场 / Plugin Market** 安装，或执行
+> `dsh plugin add dsh-longterm-memory@latest`。桌面应用插件入口已在实际运行的桌面端
+> 完成端到端验证（五个页签 61/61 真实浏览器检查，真实 Vault，测试后已还原）。
 > 见 [安装](#安装)、[0.1.3 更新内容](#013-更新内容) 与
 > [项目状态与限制](#项目状态与限制)。
 
@@ -119,17 +123,26 @@ flowchart LR
 
 ## 安装
 
-### 方式 A —— 从 npm 安装最新版（推荐）
+### 方式 A —— 从 DSH 插件市场安装（桌面端推荐）
+
+在桌面应用内打开 **插件市场 / Plugin Market**，搜索 **长期记忆** 或 **DSH Memory
+Vault**，在插件卡片上安装/更新，按提示重启应用。条目维护在
+[awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
+目录中（2026-10-19 收录）；首次收录后，每次 `npm publish` 发布的新版本都会自动出现在
+市场中并可一键更新，无需再次提交市场申请。
+
+市场页面：<https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/>
+
+### 方式 B —— 从 npm 安装最新版
 
 ```bash
 dsh plugin --profile web add dsh-longterm-memory@latest
 ```
 
 > 最新版本：`dsh-longterm-memory@0.1.3`。使用 `@latest`（或省略版本号）可确保每次都
-> 安装最新发布版。桌面应用内请通过 **插件 / 插件管理器** 或 **插件市场** 安装/更新，
-> 按提示重启应用；该路径已在 0.1.3 端到端验证。
+> 安装最新发布版。
 
-### 方式 A2 —— 下载最新打包 tarball（无需构建）
+### 方式 C —— 下载最新打包 tarball（无需构建）
 
 每个 GitHub Release 都附带最新 `.tgz`（及 `.sha256`）：
 
@@ -142,7 +155,7 @@ dsh plugin --profile web add .\dsh-longterm-memory-0.1.3.tgz
 没有 `gh`？打开
 <https://github.com/bufan528/dsh-longterm-memory/releases/latest> 手动下载即可。
 
-### 方式 B —— 从本仓库构建并安装 tarball（已验证）
+### 方式 D —— 从本仓库构建并安装 tarball（已验证）
 
 需要 Node.js ≥ 20 与 DSH CLI。**请使用隔离的 `DSH_HOME`**，避免测试 profile 触碰
 日常 profile：
@@ -263,6 +276,7 @@ DSH Memory/
 | 平台 | Windows（主要），其他平台遵循 Node 路径规则 |
 | npm 包名 | `dsh-longterm-memory` —— **0.1.3 已发布**（latest） |
 | 下载方式 | npm `@latest`，或[最新 GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest) 的 tarball |
+| DSH 插件市场 | **已上架** [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)（2026-10-19 收录）；更新跟随 npm `latest` |
 
 `dsh.compatibility` 仅为说明性元数据；`engines.dsh` 是唯一决策来源。细节与证据见
 [docs/compatibility.md](compatibility.md)。
@@ -292,6 +306,10 @@ cookie，再用 `--cookie-file <name=value 文件>` 传入。
 - **预览版**：API 与存储格式仍可能变化；`0.1.0` 是首个公开版本，当前发布版为 `0.1.3`。
 - **npm 已发布**：`dsh-longterm-memory@0.1.3`（2026-10-19），注册表安装已验证。npm
   的 `latest` dist-tag 与 GitHub Release 始终指向最新版本。
+- **已上架 DSH 插件市场**：条目位于
+  [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
+  目录（2026-10-19 收录）。可在应用内 **插件市场 / Plugin Market** 安装；后续版本通过
+  npm `latest` 自动被发现，无需逐版本重新提交。中国区目录镜像可能比源站滞后约一天。
 - **桌面端已验证**：完整真实浏览器 E2E 已在运行中的桌面应用上通过（61/61 项，五个
   页签，真实 Vault，测试后已还原）。
 - **已知后续项**：内存收件箱候选是草稿——确认前不计入 `待确认数量` / `Inbox/` 目录，

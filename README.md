@@ -30,11 +30,25 @@
   <a href="docs/README.zh-CN.md"><strong>简体中文</strong></a>
 </p>
 
-> **Project status (2026-10-19).** `dsh-longterm-memory@0.1.3` is published on npm and
-> attached to the latest GitHub Release. The desktop-app plugin entry is now verified
-> end-to-end in the running desktop app (61/61 real-browser checks over all five tabs,
-> real vault, restored afterwards); the earlier "desktop path unverified" caveat is
-> resolved. See [Install](#install), [What's new in 0.1.3](#whats-new-in-013) and
+<p align="center">
+  <a href="#install"><strong>Install</strong></a> ·
+  <a href="https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/"><strong>DSH Plugin Market</strong></a> ·
+  <a href="#features">Features</a> ·
+  <a href="#configuration">Configuration</a> ·
+  <a href="#data-safety">Data safety</a> ·
+  <a href="#privacy">Privacy</a> ·
+  <a href="#development">Development</a> ·
+  <a href="docs/README.zh-CN.md"><strong>简体中文</strong></a>
+</p>
+
+> **Project status (2026-10-20).** `dsh-longterm-memory@0.1.3` is published on npm,
+> attached to the latest GitHub Release, and **listed in the DSH Plugin Market**
+> ([awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/),
+> added 2026-10-19). Install it from the in-app **插件市场 / Plugin Market**, or from
+> npm with `dsh plugin add dsh-longterm-memory@latest`. The desktop-app plugin entry is
+> verified end-to-end in the running desktop app (61/61 real-browser checks over all five
+> tabs, real vault, restored afterwards). See [Install](#install),
+> [What's new in 0.1.3](#whats-new-in-013) and
 > [Project status & limitations](#project-status--limitations).
 
 ---
@@ -130,19 +144,27 @@ flowchart LR
 
 ## Install
 
-### Option A — install the latest from npm (recommended)
+### Option A — from the DSH Plugin Market (recommended for desktop)
+
+In the official desktop app, open **插件市场 / Plugin Market**, search for
+**长期记忆** or **DSH Memory Vault**, then install or update from the plugin card and
+restart the app when prompted. The listing lives in the
+[awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
+registry (added 2026-10-19); after the first listing, each `npm publish` makes the new
+version available for one-click updates — no separate marketplace submission is needed.
+
+Market page: <https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/>
+
+### Option B — install the latest from npm
 
 ```bash
 dsh plugin --profile web add dsh-longterm-memory@latest
 ```
 
 > Latest release: `dsh-longterm-memory@0.1.3`. Use `@latest` (or omit the version) so
-> an installation always fetches the newest published version. Inside the official
-> desktop app, install or update the plugin from **插件 / Plugin manager** or
-> **插件市场 / Plugin Market**, then restart the app when prompted. The desktop path is
-> verified end-to-end in 0.1.3.
+> an installation always fetches the newest published version.
 
-### Option A2 — download the latest packaged tarball (no build required)
+### Option C — download the latest packaged tarball (no build required)
 
 The newest `.tgz` (and its `.sha256`) is attached to every GitHub Release:
 
@@ -156,7 +178,7 @@ No `gh`? Open
 <https://github.com/bufan528/dsh-longterm-memory/releases/latest> and download the
 asset manually.
 
-### Option B — build this repository and install the tarball (verified)
+### Option D — build this repository and install the tarball (verified)
 
 Requires Node.js ≥ 20 and a DSH CLI. **Use an isolated `DSH_HOME`** so the test
 profile cannot touch your daily DSH profile:
@@ -289,6 +311,7 @@ from your profile's `cordis.patch.yml`.
 | Platform | Windows (primary), Node path rules elsewhere |
 | npm package | `dsh-longterm-memory` — **0.1.3 published** (latest) |
 | Downloads | npm `@latest`, or the tarball on the [latest GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest) |
+| DSH Plugin Market | **Listed** in [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/) since 2026-10-19; updates follow the npm `latest` tag |
 
 The `dsh.compatibility` field is informational; `engines.dsh` is the only decision
 source. Details and evidence: [docs/compatibility.md](docs/compatibility.md).
@@ -322,6 +345,12 @@ zero-dependency CDP clients using Node's built-in `WebSocket`.
 - **npm published**: `dsh-longterm-memory@0.1.3` (2026-10-19); registry installation
   verified. The npm `latest` dist-tag and the GitHub Release always point at the newest
   version.
+- **Listed in the DSH Plugin Market**: the plugin is in the
+  [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
+  catalog (added 2026-10-19). Install it from the in-app **插件市场 / Plugin Market**;
+  future releases are picked up automatically from the npm `latest` tag, so no new
+  marketplace submission is needed per version. The China-region catalog mirror may lag
+  the origin by up to about a day.
 - **Desktop verified**: the full real-browser E2E suite passes against the running
   desktop app (61/61 checks, all five tabs, real vault restored afterwards).
 - **Known follow-ups**: in-memory Inbox candidates are drafts — they are not counted in

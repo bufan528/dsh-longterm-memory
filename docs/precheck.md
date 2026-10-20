@@ -20,7 +20,7 @@ Harness is the authority"*, `references/practices.md:3`).
 | DSH runtime version | **`0.2.0-rc.2`** | `@deepseek-ai/*/package.json` `version` fields |
 | DSH home | `%USERPROFILE%\.dsh` (`$env:DSH_HOME`) | environment |
 | DSH profile | `desktop` (`$env:DSH_PROFILE`), `%USERPROFILE%\.dsh\profiles\desktop` | environment |
-| Session id | `session-<redacted>-8437-4c5e-8a96-bd65a398f372` | environment |
+| Session id | `session-00000000-0000-4000-8000-000000000000` | environment |
 | Web GUI | `http://127.0.0.1:<port>` (`$env:DSH_WEB_URL`) | environment |
 | DSH CLI | `<DSH install>\resources\runtime\cli\bin\dsh.cmd` | file + `--help` output |
 | Reference plugin A | `dsh-context@0.72.0` — installed in the live profile | `node_modules\dsh-context\package.json` |

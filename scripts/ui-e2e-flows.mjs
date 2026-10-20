@@ -318,18 +318,30 @@ async function shot(name) {
 
 async function openPluginPage({ reload = false } = {}) {
   if (reload) await browser.goto(url, { settleMs: 3000 })
-  // The preview-notice modal must be dismissed before the sidebar is clickable.
-  // DOM clicks are used here instead of CDP pointer events: the desktop shell
-  // layers its own widgets over the sidebar, and a coordinate click can land on
-  // the wrong element.
-  const notice = await browser.evaluate(`(() => {
-    const norm = (value) => String(value ?? '').replace(/\s+/g, ' ').trim()
-    const button = [...document.querySelectorAll('button')].find((el) => norm(el.innerText) === '继续')
-    if (!button) return false
-    button.click()
-    return true
-  })()`)
-  if (notice === true) await delay(700)
+  // Dismiss blocking first-run dialogs (preview notice, account onboarding, …)
+  // before the sidebar is clickable. DOM clicks are used here instead of CDP
+  // pointer events: the desktop shell layers its own widgets over the sidebar,
+  // and a coordinate click can land on the wrong element.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const dismissed = await browser.evaluate(`(() => {
+      const norm = (value) => String(value ?? '').replace(/\\s+/g, ' ').trim()
+      const visible = (el) => {
+        const rect = el.getBoundingClientRect()
+        if (rect.width < 2 || rect.height < 2) return false
+        const style = getComputedStyle(el)
+        return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) !== 0
+      }
+      const buttons = [...document.querySelectorAll('button')].filter(visible)
+      const close = buttons.find((el) => el.getAttribute('aria-label') === '关闭' || norm(el.innerText) === '关闭')
+      const cont = buttons.find((el) => norm(el.innerText) === '继续')
+      const target = close ?? cont
+      if (target === undefined) return false
+      target.click()
+      return true
+    })()`)
+    if (dismissed !== true) break
+    await delay(600)
+  }
   await waitFor(async () => {
     const state = await browser.evaluate(`(() => {
       const norm = (value) => String(value ?? '').replace(/\s+/g, ' ').trim()
