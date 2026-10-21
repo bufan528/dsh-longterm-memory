@@ -17,11 +17,14 @@
   <img src="https://img.shields.io/badge/DSH-%3E%3D0.2.1--rc.2%20%3C0.2.2-7C3AED?style=flat-square" alt="DSH 0.2.1-rc.2" />
   <img src="https://img.shields.io/badge/node-%3E%3D20-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node >= 20" />
   <img src="https://img.shields.io/badge/status-preview-E5B650?style=flat-square" alt="Preview" />
+  <a href="https://dsh.works/awesome-dsh-plugins/"><img src="https://img.shields.io/badge/listed_on-dsh.works-00c2e9?style=flat-square&labelColor=0d0d0d" alt="listed on dsh.works" /></a>
+  <a href="https://dshmarket.com/"><img src="https://img.shields.io/badge/in--app_market-dshmarket-4f6ef7?style=flat-square" alt="available in dshmarket (in-app Plugin Market)" /></a>
 </p>
 
 <p align="center">
   <a href="#安装"><strong>安装</strong></a> ·
   <a href="https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/"><strong>DSH 插件市场</strong></a> ·
+  <a href="https://dsh.works/awesome-dsh-plugins/"><strong>dsh.works</strong></a> ·
   <a href="#功能">功能</a> ·
   <a href="#配置">配置</a> ·
   <a href="#数据安全">数据安全</a> ·
@@ -30,20 +33,25 @@
   <a href="../README.md"><strong>English</strong></a>
 </p>
 
-> **项目状态（2026-10-20）**：`dsh-longterm-memory@0.1.4` 已发布到 npm、附带在最新
-> GitHub Release 中，并且**已上架 DSH 插件市场**
-> （[awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)，
-> 2026-10-19 收录）。可在应用内 **插件市场 / Plugin Market** 安装，或执行
-> `dsh plugin add dsh-longterm-memory@latest`。桌面应用插件入口已在实际运行的桌面端
-> 完成端到端验证（五个页签 61/61 真实浏览器检查，真实 Vault，测试后已还原）。
-> 见 [安装](#安装)、[0.1.4 更新内容](#014-更新内容) 与
+> **项目状态（2026-10-21）**：`dsh-longterm-memory@0.1.4` 已发布到 npm、附带在最新
+> GitHub Release 中，并且**已进入两个社区目录**：
+> [DSH 插件市场](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
+> （2026-10-19 收录）和
+> [dsh.works 社区注册表](https://dsh.works/awesome-dsh-plugins/)
+> （`dshworks/awesome-dsh-plugins`，**verified**，2026-10-19 收录）。应用内
+> **插件市场 / Plugin Market** 就是 [dshmarket](https://github.com/dsh-market/dsh-market)
+> 插件，实时读取同一份目录，因此也可在 dshmarket 中直接发现与一键安装（无需单独提交）。
+> 也可执行 `dsh plugin add dsh-longterm-memory@latest`；
+> dsh.works 的条目同时供 **dsh-armory** 面板的「插件 → DSH 社区」市场展示与一键安装。
+> 桌面应用插件入口已在实际运行的桌面端完成端到端验证（五个页签 61/61 真实浏览器检查，
+> 真实 Vault，测试后已还原）。见 [安装](#安装)、[0.1.4 更新内容](#014-更新内容) 与
 > [项目状态与限制](#项目状态与限制)。
 
 ---
 
 ## 0.1.4 更新内容
 
-**0.1.4 是文档发布**：插件已**上架 DSH 插件市场**（2026-10-19 收录），可在应用内 **插件市场 / Plugin Market** 安装或更新。本版无代码变更，包含 0.1.3 的全部修复。
+**0.1.4 是文档发布**：插件已**上架 DSH 插件市场**（2026-10-19 收录），并进入 **dsh.works 社区注册表**（`dshworks/awesome-dsh-plugins`，verified；该注册表同时是 [dsh-armory](https://github.com/2026heshao/dsh-armory) 面板「插件 → DSH 社区」市场的上游数据源）。可在应用内 **插件市场 / Plugin Market** 安装或更新。本版无代码变更，包含 0.1.3 的全部修复。
 
 ## 0.1.3 更新内容
 
@@ -127,13 +135,16 @@ flowchart LR
 
 ## 安装
 
-### 方式 A —— 从 DSH 插件市场安装（桌面端推荐）
+### 方式 A —— 从应用内市场安装（dshmarket，桌面端推荐）
 
 在桌面应用内打开 **插件市场 / Plugin Market**，搜索 **长期记忆** 或 **DSH Memory
-Vault**，在插件卡片上安装/更新，按提示重启应用。条目维护在
+Vault**，在插件卡片上安装/更新，按提示重启应用。应用内市场就是
+[dshmarket](https://github.com/dsh-market/dsh-market) 插件
+（[dshmarket.com](https://dshmarket.com/)），它实时读取同一份
 [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
-目录中（2026-10-19 收录）；首次收录后，每次 `npm publish` 发布的新版本都会自动出现在
-市场中并可一键更新，无需再次提交市场申请。
+目录（2026-10-19 收录），因此**无需单独向 dshmarket 提交或关联**——线上注册表已显示
+`0.1.4` 与 5 张截图。首次收录后，每次 `npm publish` 发布的新版本都会自动出现在市场
+中并可一键更新。
 
 市场页面：<https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/>
 
@@ -281,6 +292,7 @@ DSH Memory/
 | npm 包名 | `dsh-longterm-memory` —— **0.1.4 已发布**（latest） |
 | 下载方式 | npm `@latest`，或[最新 GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest) 的 tarball |
 | DSH 插件市场 | **已上架** [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)（2026-10-19 收录）；更新跟随 npm `latest` |
+| dshmarket（应用内市场） | **已收录**，通过与上面相同的 [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/) 目录；2026-10-21 线上注册表核对为 `0.1.4` + 5 张截图（无需单独向 dshmarket 提交） |
 
 `dsh.compatibility` 仅为说明性元数据；`engines.dsh` 是唯一决策来源。细节与证据见
 [docs/compatibility.md](compatibility.md)。
@@ -314,6 +326,11 @@ cookie，再用 `--cookie-file <name=value 文件>` 传入。
   [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
   目录（2026-10-19 收录）。可在应用内 **插件市场 / Plugin Market** 安装；后续版本通过
   npm `latest` 自动被发现，无需逐版本重新提交。中国区目录镜像可能比源站滞后约一天。
+- **dshmarket（应用内市场）已收录**：应用内 **插件市场 / Plugin Market** 就是
+  [dshmarket](https://github.com/dsh-market/dsh-market) 插件，每次打开都会实时读取同一份
+  awesome-dsh-plugin 目录，因此本插件已经可以在其中发现与一键安装——不存在单独的
+  dshmarket 提交、认领或关联步骤。2026-10-21 线上注册表显示版本 `0.1.4`、5 张截图；
+  更新跟随 npm `latest`。
 - **桌面端已验证**：完整真实浏览器 E2E 已在运行中的桌面应用上通过（61/61 项，五个
   页签，真实 Vault，测试后已还原）。
 - **已知后续项**：内存收件箱候选是草稿——确认前不计入 `待确认数量` / `Inbox/` 目录，

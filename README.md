@@ -18,21 +18,14 @@
   <img src="https://img.shields.io/badge/DSH-%3E%3D0.2.1--rc.2%20%3C0.2.2-7C3AED?style=flat-square" alt="DSH 0.2.1-rc.2" />
   <img src="https://img.shields.io/badge/node-%3E%3D20-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node >= 20" />
   <img src="https://img.shields.io/badge/status-preview-E5B650?style=flat-square" alt="Preview" />
-</p>
-
-<p align="center">
-  <a href="#install"><strong>Install</strong></a> ·
-  <a href="#features">Features</a> ·
-  <a href="#configuration">Configuration</a> ·
-  <a href="#data-safety">Data safety</a> ·
-  <a href="#privacy">Privacy</a> ·
-  <a href="#development">Development</a> ·
-  <a href="docs/README.zh-CN.md"><strong>简体中文</strong></a>
+  <a href="https://dsh.works/awesome-dsh-plugins/"><img src="https://img.shields.io/badge/listed_on-dsh.works-00c2e9?style=flat-square&labelColor=0d0d0d" alt="listed on dsh.works" /></a>
+  <a href="https://dshmarket.com/"><img src="https://img.shields.io/badge/in--app_market-dshmarket-4f6ef7?style=flat-square" alt="available in dshmarket (in-app Plugin Market)" /></a>
 </p>
 
 <p align="center">
   <a href="#install"><strong>Install</strong></a> ·
   <a href="https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/"><strong>DSH Plugin Market</strong></a> ·
+  <a href="https://dsh.works/awesome-dsh-plugins/"><strong>dsh.works</strong></a> ·
   <a href="#features">Features</a> ·
   <a href="#configuration">Configuration</a> ·
   <a href="#data-safety">Data safety</a> ·
@@ -41,13 +34,18 @@
   <a href="docs/README.zh-CN.md"><strong>简体中文</strong></a>
 </p>
 
-> **Project status (2026-10-20).** `dsh-longterm-memory@0.1.4` is published on npm,
-> attached to the latest GitHub Release, and **listed in the DSH Plugin Market**
-> ([awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/),
-> added 2026-10-19). Install it from the in-app **插件市场 / Plugin Market**, or from
-> npm with `dsh plugin add dsh-longterm-memory@latest`. The desktop-app plugin entry is
-> verified end-to-end in the running desktop app (61/61 real-browser checks over all five
-> tabs, real vault, restored afterwards). See [Install](#install),
+> **Project status (2026-10-21).** `dsh-longterm-memory@0.1.4` is published on npm,
+> attached to the latest GitHub Release, and **listed in two community registries**:
+> the [DSH Plugin Market](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
+> (added 2026-10-19) and the
+> [dsh.works community registry](https://dsh.works/awesome-dsh-plugins/)
+> (`dshworks/awesome-dsh-plugins`, **verified**, added 2026-10-19). The in-app
+> **插件市场 / Plugin Market** is the [dshmarket](https://github.com/dsh-market/dsh-market)
+> plugin and reads that same catalog, so the plugin is discoverable and one-click
+> installable there as well (no separate submission). Install it from the in-app
+> market, or from npm with `dsh plugin add dsh-longterm-memory@latest`. The desktop-app
+> plugin entry is verified end-to-end in the running desktop app (61/61 real-browser
+> checks over all five tabs, real vault, restored afterwards). See [Install](#install),
 > [What's new](#whats-new) and [Project status & limitations](#project-status--limitations).
 
 ---
@@ -55,8 +53,11 @@
 ## What's new
 
 **0.1.4** is a documentation release: the plugin is now **listed in the DSH Plugin
-Market** (added 2026-10-19) and can be installed or updated from the in-app
-**插件市场 / Plugin Market**. No code changes; it ships all of the 0.1.3 fixes below.
+Market** (added 2026-10-19) and in the **dsh.works community registry**
+(`dshworks/awesome-dsh-plugins`, verified; it powers the **插件 → DSH 社区** market in
+the [dsh-armory](https://github.com/2026heshao/dsh-armory) dashboard). Install or
+update from the in-app **插件市场 / Plugin Market**, or from npm. No code changes; it
+ships all of the 0.1.3 fixes below.
 
 **0.1.3** made the Inbox actionable and fixed three other user-facing bugs:
 - **Inbox is actionable.** **确认入库 / Confirm** and **拒绝 / Reject** now work for
@@ -148,16 +149,26 @@ flowchart LR
 
 ## Install
 
-### Option A — from the DSH Plugin Market (recommended for desktop)
+### Option A — from the in-app market (dshmarket, recommended for desktop)
 
 In the official desktop app, open **插件市场 / Plugin Market**, search for
 **长期记忆** or **DSH Memory Vault**, then install or update from the plugin card and
-restart the app when prompted. The listing lives in the
+restart the app when prompted. That in-app market is the
+[dshmarket](https://github.com/dsh-market/dsh-market) plugin
+([dshmarket.com](https://dshmarket.com/)); it reads the same
 [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
-registry (added 2026-10-19); after the first listing, each `npm publish` makes the new
-version available for one-click updates — no separate marketplace submission is needed.
+catalog (added 2026-10-19), so **no separate dshmarket submission or association is
+needed** — the live registry already shows `0.1.4` with the five screenshots. After the
+first listing, each `npm publish` makes the new version available for one-click updates.
 
 Market page: <https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/>
+
+> **Also discoverable via dsh-armory.** The [dsh-armory](https://github.com/2026heshao/dsh-armory)
+> dashboard's **插件 → DSH 社区** market reads the
+> [dshworks/awesome-dsh-plugins](https://github.com/dshworks/awesome-dsh-plugins) registry
+> (browse at [dsh.works](https://dsh.works/awesome-dsh-plugins/)), where this plugin is
+> listed as **verified** with npm `dsh-longterm-memory`. There is no separate submission
+> to dsh-armory: keeping the npm `latest` tag current keeps both listings current.
 
 ### Option B — install the latest from npm
 
@@ -316,6 +327,8 @@ from your profile's `cordis.patch.yml`.
 | npm package | `dsh-longterm-memory` — **0.1.4 published** (latest) |
 | Downloads | npm `@latest`, or the tarball on the [latest GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest) |
 | DSH Plugin Market | **Listed** in [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/) since 2026-10-19; updates follow the npm `latest` tag |
+| dshmarket (in-app market) | **Listed** through the same [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/) catalog; the live registry checks showed `0.1.4` with 5 screenshots on 2026-10-21 (no separate dshmarket submission) |
+| dsh.works registry | **Listed + verified** in [dshworks/awesome-dsh-plugins](https://dsh.works/awesome-dsh-plugins/) since 2026-10-19; surfaced by the **插件 → DSH 社区** market in the [dsh-armory](https://github.com/2026heshao/dsh-armory) dashboard |
 
 The `dsh.compatibility` field is informational; `engines.dsh` is the only decision
 source. Details and evidence: [docs/compatibility.md](docs/compatibility.md).
@@ -355,6 +368,20 @@ zero-dependency CDP clients using Node's built-in `WebSocket`.
   future releases are picked up automatically from the npm `latest` tag, so no new
   marketplace submission is needed per version. The China-region catalog mirror may lag
   the origin by up to about a day.
+- **Available in dshmarket (in-app Plugin Market)**: the
+  [dshmarket](https://github.com/dsh-market/dsh-market) plugin reads the same
+  awesome-dsh-plugin catalog live on every open, so this plugin is already reachable in
+  **插件市场 / Plugin Market** — no separate dshmarket submission, claim, or association
+  step exists. The live registry on 2026-10-21 showed version `0.1.4` with 5 screenshots;
+  updates follow the npm `latest` tag.
+- **Also listed in dsh.works**: the entry in
+  [dshworks/awesome-dsh-plugins](https://github.com/dshworks/awesome-dsh-plugins) is
+  `status: verified` with `npm: dsh-longterm-memory` (added 2026-10-19), so the
+  **插件 → DSH 社区** market in the
+  [dsh-armory](https://github.com/2026heshao/dsh-armory) dashboard lists and installs it
+  without any separate dsh-armory submission. Both registries follow the npm `latest`
+  tag; dsh-armory revalidates its catalog cache every few minutes (new installs fetch
+  fresh).
 - **Desktop verified**: the full real-browser E2E suite passes against the running
   desktop app (61/61 checks, all five tabs, real vault restored afterwards).
 - **Known follow-ups**: in-memory Inbox candidates are drafts — they are not counted in
