@@ -148,6 +148,13 @@ Vault**，在插件卡片上安装/更新，按提示重启应用。应用内市
 
 市场页面：<https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/>
 
+> **也可通过 dsh-armory 发现。** [dsh-armory](https://github.com/2026heshao/dsh-armory)
+> 面板的 **插件 → DSH 社区** 市场读取
+> [dshworks/awesome-dsh-plugins](https://github.com/dshworks/awesome-dsh-plugins) 注册表
+> （可浏览 [dsh.works](https://dsh.works/awesome-dsh-plugins/)），本插件在其中为
+> **verified**、npm 名为 `dsh-longterm-memory`。**无需单独向 dsh-armory 提交**：保持
+> npm `latest` 为最新，即可让两个目录同步。
+
 ### 方式 B —— 从 npm 安装最新版
 
 ```bash
@@ -293,6 +300,7 @@ DSH Memory/
 | 下载方式 | npm `@latest`，或[最新 GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest) 的 tarball |
 | DSH 插件市场 | **已上架** [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)（2026-10-19 收录）；更新跟随 npm `latest` |
 | dshmarket（应用内市场） | **已收录**，通过与上面相同的 [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/) 目录；2026-10-21 线上注册表核对为 `0.1.4` + 5 张截图（无需单独向 dshmarket 提交） |
+| dsh.works 注册表 | **已收录 + verified**（[dshworks/awesome-dsh-plugins](https://dsh.works/awesome-dsh-plugins/)，2026-10-19）；供 **dsh-armory** 面板的「插件 → DSH 社区」市场展示与一键安装 |
 
 `dsh.compatibility` 仅为说明性元数据；`engines.dsh` 是唯一决策来源。细节与证据见
 [docs/compatibility.md](compatibility.md)。
@@ -331,6 +339,12 @@ cookie，再用 `--cookie-file <name=value 文件>` 传入。
   awesome-dsh-plugin 目录，因此本插件已经可以在其中发现与一键安装——不存在单独的
   dshmarket 提交、认领或关联步骤。2026-10-21 线上注册表显示版本 `0.1.4`、5 张截图；
   更新跟随 npm `latest`。
+- **dsh.works 已收录**：条目位于
+  [dshworks/awesome-dsh-plugins](https://github.com/dshworks/awesome-dsh-plugins)，状态为
+  `verified`、npm 名为 `dsh-longterm-memory`（2026-10-19 收录），因此
+  [dsh-armory](https://github.com/2026heshao/dsh-armory) 面板的「插件 → DSH 社区」市场
+  可直接展示与安装，无需单独向 dsh-armory 提交。两个目录都跟随 npm `latest`；
+  dsh-armory 每隔几分钟重验缓存，新安装会直接拉取最新目录。
 - **桌面端已验证**：完整真实浏览器 E2E 已在运行中的桌面应用上通过（61/61 项，五个
   页签，真实 Vault，测试后已还原）。
 - **已知后续项**：内存收件箱候选是草稿——确认前不计入 `待确认数量` / `Inbox/` 目录，
