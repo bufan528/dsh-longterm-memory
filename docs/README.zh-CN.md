@@ -33,8 +33,10 @@
   <a href="../README.md"><strong>English</strong></a>
 </p>
 
-> **项目状态（2026-10-21）**：`dsh-longterm-memory@0.1.4` 已发布到 npm、附带在最新
-> GitHub Release 中，并且**已进入两个社区目录**：
+> **项目状态（2026-10-27）**：`dsh-longterm-memory@0.1.5` 是最新发布版（
+> [GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest)，
+> 附不带版本号的 `dsh-longterm-memory.tgz`）；npm 上最新已发布版本仍是 `0.1.4`，
+> 并且**已进入两个社区目录**：
 > [DSH 插件市场](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
 > （2026-10-19 收录）和
 > [dsh.works 社区注册表](https://dsh.works/awesome-dsh-plugins/)
@@ -172,17 +174,31 @@ Vault**，在插件卡片上安装/更新，按提示重启应用。应用内市
 dsh plugin --profile web add dsh-longterm-memory@latest
 ```
 
-> 最新版本：`dsh-longterm-memory@0.1.4`。使用 `@latest`（或省略版本号）可确保每次都
-> 安装最新发布版。
+> 最新 **npm** 版本：`dsh-longterm-memory@0.1.4`。使用 `@latest`（或省略版本号）可确保
+> 每次都安装最新**已发布**版。最新 **GitHub** 版本为 `v0.1.5`；在 0.1.5 发布到 npm
+> 之前，请用下面的方式 C 从 tarball 安装。
 
 ### 方式 C —— 下载最新打包 tarball（无需构建）
 
-每个 GitHub Release 都附带最新 `.tgz`（及 `.sha256`）：
+每个 GitHub Release 都同时附带**不带版本号的最新别名**（`dsh-longterm-memory.tgz`）、
+带版本号的副本，以及各自的 SHA-256 校验文件，因此「下载最新」不需要知道版本号：
 
 ```powershell
-# 下载最新 Release 资源到当前目录
-gh release download --repo bufan528/dsh-longterm-memory --pattern "*.tgz" --dir .
-dsh plugin --profile web add .\dsh-longterm-memory-0.1.4.tgz
+# 固定 URL —— 永远指向最新 Release
+Invoke-WebRequest -Uri https://github.com/bufan528/dsh-longterm-memory/releases/latest/download/dsh-longterm-memory.tgz -OutFile .\dsh-longterm-memory.tgz
+
+# 可选：用发布出来的 .sha256 资产校验
+Invoke-WebRequest -Uri https://github.com/bufan528/dsh-longterm-memory/releases/latest/download/dsh-longterm-memory.tgz.sha256 -OutFile .\dsh-longterm-memory.tgz.sha256
+(Get-FileHash .\dsh-longterm-memory.tgz -Algorithm SHA256).Hash.ToLower() -eq ((Get-Content .\dsh-longterm-memory.tgz.sha256) -split '\s+')[0]
+
+dsh plugin --profile web add .\dsh-longterm-memory.tgz
+```
+
+装好 `gh` CLI 时同样可以按固定名字下载（不带版本号）：
+
+```powershell
+gh release download --repo bufan528/dsh-longterm-memory --pattern "dsh-longterm-memory.tgz" --dir .
+dsh plugin --profile web add .\dsh-longterm-memory.tgz
 ```
 
 没有 `gh`？打开
@@ -196,11 +212,11 @@ dsh plugin --profile web add .\dsh-longterm-memory-0.1.4.tgz
 ```bash
 npm install
 npm run build
-npm pack                     # 产出 dsh-longterm-memory-0.1.4.tgz
+npm pack                     # 产出 dsh-longterm-memory-0.1.5.tgz
 
 $env:DSH_HOME = "<临时目录>"              # PowerShell
 # export DSH_HOME="<临时目录>"            # bash
-dsh plugin --profile lmv add .\dsh-longterm-memory-0.1.4.tgz
+dsh plugin --profile lmv add .\dsh-longterm-memory-0.1.5.tgz
 
 dsh --profile lmv --no-open --port 0
 ```
@@ -370,8 +386,8 @@ UI，旧版只有终端二维码）。官方插件是独立项目，本插件只
 | 已验证 DSH 版本 | `0.2.1-rc.3` —— 当前桌面宿主，插件已在其上真实加载并响应 RPC（见 [docs/compatibility.md](compatibility.md) §12） |
 | Node.js | `>=20` |
 | 平台 | Windows（主要），其他平台遵循 Node 路径规则 |
-| npm 包名 | `dsh-longterm-memory` —— **0.1.4 已发布**（latest） |
-| 下载方式 | npm `@latest`，或[最新 GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest) 的 tarball |
+| npm 包名 | `dsh-longterm-memory` —— **npm 已发布 0.1.4**；**0.1.5** 为最新 GitHub Release |
+| 下载方式 | [最新 GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest) 的固定别名 `dsh-longterm-memory.tgz`（含 `.sha256`），或 npm `@latest`（0.1.4） |
 | DSH 插件市场 | **已上架** [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)（2026-10-19 收录）；更新跟随 npm `latest` |
 | dshmarket（应用内市场） | **已收录**，通过与上面相同的 [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/) 目录；2026-10-21 线上注册表核对为 `0.1.4` + 5 张截图（无需单独向 dshmarket 提交） |
 | dsh.works 注册表 | **已收录 + verified**（[dshworks/awesome-dsh-plugins](https://dsh.works/awesome-dsh-plugins/)，2026-10-19）；供 **dsh-armory** 面板的「插件 → DSH 社区」市场展示与一键安装 |

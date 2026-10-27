@@ -34,8 +34,10 @@
   <a href="docs/README.zh-CN.md"><strong>简体中文</strong></a>
 </p>
 
-> **Project status (2026-10-21).** `dsh-longterm-memory@0.1.4` is published on npm,
-> attached to the latest GitHub Release, and **listed in two community registries**:
+> **Project status (2026-10-27).** `dsh-longterm-memory@0.1.5` is the newest release
+> ([GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest)
+> with a version-agnostic `dsh-longterm-memory.tgz` asset); `0.1.4` remains the newest
+> version published on npm, and the plugin is **listed in two community registries**:
 > the [DSH Plugin Market](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
 > (added 2026-10-19) and the
 > [dsh.works community registry](https://dsh.works/awesome-dsh-plugins/)
@@ -187,17 +189,32 @@ Market page: <https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/>
 dsh plugin --profile web add dsh-longterm-memory@latest
 ```
 
-> Latest release: `dsh-longterm-memory@0.1.4`. Use `@latest` (or omit the version) so
-> an installation always fetches the newest published version.
+> Latest **npm** release: `dsh-longterm-memory@0.1.4`. Use `@latest` (or omit the
+> version) so an installation always fetches the newest **published** version. The
+> newest **GitHub** release is `v0.1.5`; until 0.1.5 is published to npm, install it
+> from the tarball below (Option C).
 
 ### Option C — download the latest packaged tarball (no build required)
 
-The newest `.tgz` (and its `.sha256`) is attached to every GitHub Release:
+Every GitHub Release ships a **versionless alias** (`dsh-longterm-memory.tgz`) next to
+the versioned copy and their SHA-256 checksums, so "latest" needs no version number:
 
 ```powershell
-# Download the latest release asset into the current directory
-gh release download --repo bufan528/dsh-longterm-memory --pattern "*.tgz" --dir .
-dsh plugin --profile web add .\dsh-longterm-memory-0.1.4.tgz
+# Stable URL — always the newest release
+Invoke-WebRequest -Uri https://github.com/bufan528/dsh-longterm-memory/releases/latest/download/dsh-longterm-memory.tgz -OutFile .\dsh-longterm-memory.tgz
+
+# optional: verify the checksum against the published .sha256 asset
+Invoke-WebRequest -Uri https://github.com/bufan528/dsh-longterm-memory/releases/latest/download/dsh-longterm-memory.tgz.sha256 -OutFile .\dsh-longterm-memory.tgz.sha256
+(Get-FileHash .\dsh-longterm-memory.tgz -Algorithm SHA256).Hash.ToLower() -eq ((Get-Content .\dsh-longterm-memory.tgz.sha256) -split '\s+')[0]
+
+dsh plugin --profile web add .\dsh-longterm-memory.tgz
+```
+
+With the `gh` CLI, the same alias can be fetched version-agnostically:
+
+```powershell
+gh release download --repo bufan528/dsh-longterm-memory --pattern "dsh-longterm-memory.tgz" --dir .
+dsh plugin --profile web add .\dsh-longterm-memory.tgz
 ```
 
 No `gh`? Open
@@ -213,12 +230,12 @@ profile cannot touch your daily DSH profile:
 # 1. Build and pack
 npm install
 npm run build
-npm pack                     # -> dsh-longterm-memory-0.1.4.tgz
+npm pack                     # -> dsh-longterm-memory-0.1.5.tgz
 
 # 2. Install into an isolated profile
 $env:DSH_HOME = "<temporary dir>"                # PowerShell
 # export DSH_HOME="<temporary dir>"              # bash
-dsh plugin --profile lmv add .\dsh-longterm-memory-0.1.4.tgz
+dsh plugin --profile lmv add .\dsh-longterm-memory-0.1.5.tgz
 
 # 3. Start
 dsh --profile lmv --no-open --port 0
@@ -413,8 +430,8 @@ its binding status.
 | Verified DSH version | `0.2.1-rc.3` — current desktop host; the plugin is loaded and serving RPC on it (see [docs/compatibility.md](docs/compatibility.md) §12) |
 | Node.js | `>=20` |
 | Platform | Windows (primary), Node path rules elsewhere |
-| npm package | `dsh-longterm-memory` — **0.1.4 published** (latest) |
-| Downloads | npm `@latest`, or the tarball on the [latest GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest) |
+| npm package | `dsh-longterm-memory` — **0.1.4 published** on npm; **0.1.5** is the newest GitHub Release |
+| Downloads | [Latest GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest) — stable alias `dsh-longterm-memory.tgz` (+ `.sha256`), or npm `@latest` (0.1.4) |
 | DSH Plugin Market | **Listed** in [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/) since 2026-10-19; updates follow the npm `latest` tag |
 | dshmarket (in-app market) | **Listed** through the same [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/) catalog; the live registry checks showed `0.1.4` with 5 screenshots on 2026-10-21 (no separate dshmarket submission) |
 | dsh.works registry | **Listed + verified** in [dshworks/awesome-dsh-plugins](https://dsh.works/awesome-dsh-plugins/) since 2026-10-19; surfaced by the **插件 → DSH 社区** market in the [dsh-armory](https://github.com/2026heshao/dsh-armory) dashboard |
