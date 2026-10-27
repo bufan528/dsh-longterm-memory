@@ -17,6 +17,15 @@
 import { z } from 'zod'
 import { DEFAULT_SETTINGS, type PluginSettings } from '../shared/protocol.js'
 
+/** 联动标记集合：只校验形状，具体清洗在运行时归一化时完成。 */
+const markersSchema = z
+  .object({
+    origins: z.array(z.string()).optional(),
+    presets: z.array(z.string()).optional(),
+    cwds: z.array(z.string()).optional(),
+  })
+  .strict()
+
 export const pluginConfigSchema = z
   .object({
     /** Absolute path of the memory vault. Omitted means "discover it". */
@@ -35,6 +44,22 @@ export const pluginConfigSchema = z
     redactSecrets: z.boolean().optional(),
     sensitiveNeedsConfirmation: z.boolean().optional(),
     maxCandidatesPerTurn: z.number().int().min(0).max(50).optional(),
+    /**
+     * QQ 接入与长期记忆联动。
+     *
+     * 允许在 `cordis.patch.yml` 里预设策略（例如给独立 QQ profile 固定成
+     * 「拒绝 QQ 读取」），管理页面上保存的选择会覆盖这里同名字段。
+     */
+    qqLinkage: z
+      .object({
+        mode: z.enum(['off', 'deny-qq', 'allowlist']).optional(),
+        writeMode: z.enum(['inbox-only', 'direct']).optional(),
+        allowTools: z.boolean().optional(),
+        qqMarkers: markersSchema.optional(),
+        trustedMarkers: markersSchema.optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
 

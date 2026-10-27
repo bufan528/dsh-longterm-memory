@@ -4,6 +4,52 @@ All notable changes to **DSH Memory Vault (`dsh-longterm-memory`)** are document
 here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.5] - 2026-10-27
+
+### Added
+
+- **QQ integration tab.** A sixth first-level tab
+  (`记忆总览 | 记忆检索 | 记忆管理 | 收件箱 | QQ 接入 | 设置`) that shows the status of
+  the official `@tencent-connect/dsh-qqbot` plugin, a QQ ↔ long-term-memory linkage
+  policy, a session-permission preview, inbox wiring and a diagnostics card. Status
+  detection uses a read-only same-origin `GET /qqbot/im-qqbot/bind` probe (`200` =
+  loaded, with the binding `phase`; `404` = not installed/loaded; anything else =
+  cannot confirm). The page does not reimplement the QQ protocol, generate QR codes,
+  open the official binding panel (there is no reliable public path to its settings
+  section / sidebar tab), or read/store/echo the AppSecret.
+- **QQ ↔ memory linkage policy.** Three modes (`off` / `deny-qq` / `allowlist`) and four
+  enforcement points (standing prompt section, per-step recall, turn-end write-back,
+  memory tools), driven by one shared pure-function module (`src/shared/qq-linkage.ts`)
+  so the page preview and the host enforcement cannot disagree. QQ sessions are
+  identified only by explicitly configured `origin` / `agentPreset` / `cwd` markers;
+  private and group chats are **not** distinguishable because the official plugin does
+  not write its scope into the DSH session header. Safe defaults: `mode: off`,
+  `writeMode: inbox-only`, `allowTools: false`.
+- **New RPC methods** `qqLinkage` / `setQqLinkage`, returning a `QqLinkageReport`
+  (config, runtime capability notes, enforcement registration, host facts, recent
+  session samples, per-point counters). RPC surface: 27 → 29 methods.
+- **Documentation**: new `docs/qq-integration.md` (Chinese), QQ sections in `README.md`
+  and `docs/README.zh-CN.md`, a "QQ 接入联动" section in `docs/architecture.md`, and
+  host-compatibility records in `docs/compatibility.md` §12–§14.
+
+### Changed
+
+- **Verified DSH version is now `0.2.1-rc.3`** (the current desktop host; the plugin is
+  loaded and serving RPC on it). `engines.dsh` moves to `>=0.2.1-rc.3 <0.2.2`;
+  `dsh.compatibility.dshReleases` keeps the historical `0.2.1-rc.2` entry and adds
+  `0.2.1-rc.3`. The host decides admission from `engines.dsh` / peer ranges only —
+  `dsh.compatibility` is documentation — so "declared" and "admitted" are separate
+  matters.
+
+### Known limitations
+
+- The official QQ plugin's compatibility list still covers only DSH `0.1.0-rc.8` and
+  `0.2.0-rc.2`; `0.2.1-rc.3` is admitted by the host's peer-range check, **not**
+  officially validated, and the 0.2.1 line has open community reports (issues #60 / #58).
+- The QQ tab and linkage policy have not been exercised by the real-browser E2E suite;
+  the official QQ plugin was not installed during development, so only the probe's
+  `404` branch was observed.
+
 ## [0.1.4] - 2026-10-20
 
 ### Changed

@@ -26,6 +26,9 @@ import {
   type VaultInfo,
 } from '../../shared/types.js'
 import { newMemoryId, nowIso } from '../../shared/validate.js'
+import { normalizeQqLinkage, QQ_LINKAGE_MODES, QQ_WRITE_MODES, type QqLinkageConfig } from '../../shared/qq-linkage.js'
+import type { QqHostFacts, QqLinkageReport } from '../../shared/protocol.js'
+import { QqLinkageRuntime } from '../qq/linkage.js'
 import {
   INDEX_FORMAT_VERSION,
   checksum,
@@ -117,6 +120,16 @@ export interface ServiceDeps {
   capabilities?: Partial<CapabilityReport>
   /** Test seam: called at commit boundaries so a child process can be killed there. */
   commitBarrier?: (phase: 'after-stage' | 'after-write' | 'after-survivor' | 'after-other' | 'after-commit') => Promise<void> | void
+  /**
+   * Absolute path of the loaded host module (`lib/host/index.js`).
+   *
+   * Used only to derive the **real** DSH profile this process was loaded into:
+   * an installed plugin lives at `<DSH_HOME>/profiles/<name>/node_modules/...`,
+   * which is a stronger fact than an inherited `DSH_PROFILE` environment
+   * variable. Omitted in tests and in self-linked dev installs, in which case the
+   * report falls back to the environment and says so.
+   */
+  modulePath?: string
   logger?: { info: (message: string, ...rest: unknown[]) => void; warn: (message: string, ...rest: unknown[]) => void }
 }
 
@@ -176,7 +189,14 @@ export class MemoryService {
   /** True when this run created the vault (as opposed to adopting an existing one). */
   private vaultCreated = false
   /** The registered system-prompt section descriptor, for honest self-inspection. */
-  private standingProbe: { name: string; order: number; text: () => string } | undefined
+  private standingProbe: { name: string; order: number; text: (context?: unknown) => string } | undefined
+  /**
+   * QQ 接入联动的运行时。
+   *
+   * 它与本服务同生命周期，配置从 `this.settings.qqLinkage` 实时读取，因此页面
+   * 上保存的策略会立刻在四个执行点生效；计数与样本只存在内存里，从不写盘。
+   */
+  readonly linkage: QqLinkageRuntime
 
   constructor(deps: ServiceDeps = {}) {
     this.deps = deps
@@ -184,6 +204,10 @@ export class MemoryService {
     if (deps.configuredVaultPath !== undefined && deps.configuredVaultPath !== null) {
       this.settings.vaultPath = deps.configuredVaultPath
     }
+    this.linkage = new QqLinkageRuntime({
+      config: () => this.settings.qqLinkage,
+      ...(deps.logger === undefined ? {} : { logger: deps.logger }),
+    })
     this.recomputeSettings()
     this.capabilities = {
       filesystem: true,
@@ -427,6 +451,11 @@ export class MemoryService {
       ...(this.deps.configSettings ?? {}),
       ...this.userSettings,
     }
+    // 联动配置是嵌套对象：逐字段合并 config 与用户选择，再归一化。直接整体覆盖
+    // 会让「只改了 mode」的保存把 config 里的 QQ 标记整段抹掉。
+    const configured = normalizeQqLinkage(this.deps.configSettings?.qqLinkage)
+    const chosen = this.userSettings.qqLinkage as Partial<QqLinkageConfig> | undefined
+    this.settings.qqLinkage = mergeQqLinkage(configured, chosen)
     if (this.deps.configuredVaultPath !== undefined && this.deps.configuredVaultPath !== null && this.userSettings.vaultPath === undefined) {
       this.settings.vaultPath = this.deps.configuredVaultPath
     }
@@ -456,6 +485,32 @@ export class MemoryService {
     this.userSettings = candidate
     this.recomputeSettings()
     return this.getSettings()
+  }
+
+  /* ------------------------------------------------------- QQ 接入联动 */
+
+  /**
+   * 读取 QQ 接入联动报告：配置、运行时能力、执行点注册情况、宿主事实、
+   * 最近会话判定样本与拦截计数。
+   *
+   * 页面拿到的是**同一份判定**（shared/qq-linkage 的纯函数），所以「页面显示的
+   * 策略」与「后端真正执行的策略」不可能不一致。
+   */
+  qqLinkageReport(): QqLinkageReport {
+    return this.linkage.report(hostFacts(this.deps.modulePath), this.root)
+  }
+
+  /**
+   * 更新 QQ 接入联动配置。
+   *
+   * 只接受 {@link QqLinkageConfig} 的字段：枚举值在边界校验，标记列表在归一化
+   * 时去空/去重/限长。配置通过既有的 Vault 设置持久化机制写盘，不新建数据库。
+   */
+  async setQqLinkage(patch: Partial<QqLinkageConfig>): Promise<QqLinkageReport> {
+    validateQqLinkagePatch(patch)
+    const merged = mergeQqLinkage(normalizeQqLinkage(this.settings.qqLinkage), patch)
+    await this.setSettings({ qqLinkage: merged })
+    return this.qqLinkageReport()
   }
 
   /* -------------------------------------------------------------- discovery */
@@ -1665,6 +1720,16 @@ export class MemoryService {
       const comparison = compareCandidate(candidate, existing)
       candidate.decision = comparison.decision
 
+      // QQ 联动策略：识别为 QQ 通道的会话，写入方式可能是「只进收件箱」。
+      // 这里在**应用之前**改道，所以候选记忆仍然完整经过既有的提取、敏感信息
+      // 与冲突判定流程，只是不会被直接写成 active 长期记忆。
+      if (input.forceInbox === true) {
+        candidate.decision = { action: 'inbox', rationale: 'QQ 会话按联动策略只写入收件箱，等待人工确认' }
+        pending.push(candidate)
+        this.candidates.push(candidate)
+        continue
+      }
+
       if (!mayAutoApply(candidate)) {
         candidate.decision = { action: 'inbox', rationale: `${comparison.decision.action === 'create' ? '新信息' : comparison.decision.action}，置信度不足或需要人工判断` }
         pending.push(candidate)
@@ -1964,6 +2029,97 @@ export function validateSettingsPatch(patch: Partial<PluginSettings>): void {
   if (vaultPath !== undefined && vaultPath !== null && typeof vaultPath !== 'string') {
     throw new ServiceError(ERROR_CODES.invalid, 'vaultPath 必须是字符串或 null。')
   }
+  const qqLinkage = (patch as Record<string, unknown>)['qqLinkage']
+  if (qqLinkage !== undefined) validateQqLinkagePatch(qqLinkage as Partial<QqLinkageConfig>)
+}
+
+/**
+ * QQ 联动配置的边界校验。
+ *
+ * 标记列表只校验「是字符串数组」，具体清洗交给
+ * {@link normalizeQqLinkage}（去空、去重、限长），这样即使配置来自手写的
+ * `cordis.patch.yml`，也不会把脏值写进设置。
+ */
+export function validateQqLinkagePatch(patch: Partial<QqLinkageConfig> | unknown): void {
+  if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
+    throw new ServiceError(ERROR_CODES.invalid, 'QQ 联动配置必须是对象。')
+  }
+  const record = patch as Record<string, unknown>
+  const mode = record['mode']
+  if (mode !== undefined && !(QQ_LINKAGE_MODES as readonly string[]).includes(mode as string)) {
+    throw new ServiceError(ERROR_CODES.invalid, `未知的 QqLinkage 模式：${String(mode)}`)
+  }
+  const writeMode = record['writeMode']
+  if (writeMode !== undefined && !(QQ_WRITE_MODES as readonly string[]).includes(writeMode as string)) {
+    throw new ServiceError(ERROR_CODES.invalid, `未知的 QQ 写回模式：${String(writeMode)}`)
+  }
+  if (record['allowTools'] !== undefined && typeof record['allowTools'] !== 'boolean') {
+    throw new ServiceError(ERROR_CODES.invalid, 'QQ 联动的 allowTools 必须是布尔值。')
+  }
+  for (const key of ['qqMarkers', 'trustedMarkers'] as const) {
+    const markers = record[key]
+    if (markers === undefined) continue
+    if (markers === null || typeof markers !== 'object' || Array.isArray(markers)) {
+      throw new ServiceError(ERROR_CODES.invalid, `QQ 联动的 ${key} 必须是对象。`)
+    }
+    const markerRecord = markers as Record<string, unknown>
+    for (const field of ['origins', 'presets', 'cwds'] as const) {
+      const list = markerRecord[field]
+      if (list === undefined) continue
+      if (!Array.isArray(list) || list.some((entry) => typeof entry !== 'string')) {
+        throw new ServiceError(ERROR_CODES.invalid, `QQ 联动的 ${key}.${field} 必须是字符串数组。`)
+      }
+    }
+  }
+}
+
+/** 逐字段合并联动配置：未提供的字段沿用 `base`，避免一次保存抹掉其它字段。 */
+export function mergeQqLinkage(base: QqLinkageConfig, override: Partial<QqLinkageConfig> | undefined): QqLinkageConfig {
+  if (override === undefined || override === null) return normalizeQqLinkage(base)
+  return normalizeQqLinkage({
+    mode: override.mode ?? base.mode,
+    writeMode: override.writeMode ?? base.writeMode,
+    allowTools: override.allowTools ?? base.allowTools,
+    qqMarkers: override.qqMarkers ?? base.qqMarkers,
+    trustedMarkers: override.trustedMarkers ?? base.trustedMarkers,
+  })
+}
+
+/** 宿主环境事实；优先从模块安装路径推导 Profile，其次读环境变量，绝不猜测。 */
+function hostFacts(modulePath: string | undefined): QqHostFacts {
+  const env = typeof process === 'undefined' ? {} : process.env
+  const read = (name: string): string | null => {
+    const value = env[name]
+    return typeof value === 'string' && value.length > 0 ? value : null
+  }
+  const derived = deriveProfileFromModulePath(modulePath)
+  return {
+    profile: derived?.name ?? read('DSH_PROFILE'),
+    profileDir: derived?.dir ?? read('DSH_PROFILE_DIR'),
+    profileSource: derived !== null ? 'module-path' : read('DSH_PROFILE') !== null || read('DSH_PROFILE_DIR') !== null ? 'env' : 'unknown',
+    dshHome: read('DSH_HOME'),
+    platform: typeof process === 'undefined' ? 'unknown' : process.platform,
+    nodeVersion: typeof process === 'undefined' ? 'unknown' : process.version,
+  }
+}
+
+/**
+ * 从插件模块的安装路径推导 Profile。
+ *
+ * 已安装的插件路径形如 `<DSH_HOME>/profiles/<name>/node_modules/dsh-longterm-memory/...`，
+ * 这比继承来的 `DSH_PROFILE` 环境变量更可信（命令行用 `--profile` 启动时，环境
+ * 变量可能仍是父进程的值）。用 `link:` 开发安装时路径在仓库里，推导会失败，
+ * 这时返回 null，由调用方退回环境变量并在报告里标明来源。
+ */
+function deriveProfileFromModulePath(modulePath: string | undefined): { name: string; dir: string } | null {
+  if (modulePath === undefined || modulePath.length === 0) return null
+  const match = /^(.*?[\\/]profiles[\\/])([^\\/]+)[\\/]/i.exec(modulePath)
+  if (match === null) return null
+  const prefix = match[1]
+  const name = match[2]
+  if (prefix === undefined || name === undefined || name.length === 0) return null
+  const dir = `${prefix}${name}`
+  return { name, dir }
 }
 /** Boundary validation for `merge`: the HTTP body is untyped at runtime. */
 export function validateMergeRequest(request: MergeRequest): void {

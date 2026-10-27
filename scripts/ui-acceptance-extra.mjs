@@ -737,13 +737,14 @@ async function main() {
     const panelShot = await browser.screenshot(path.join(config.out, 's9-panel-single.png'));
     s9.screenshots.push({ name: 's9-panel-single.png', path: panelShot.path, bytes: panelShot.bytes });
 
-    /* -- Scenario 1: five page entries -------------------------------- */
-    const s1 = makeScenario('1', 'Five page entries load without an error panel');
+    /* -- Scenario 1: six page entries --------------------------------- */
+    const s1 = makeScenario('1', 'Six page entries load without an error panel');
     const anchors = {
       记忆总览: ['存储路径', '记忆总览'],
       记忆检索: ['关键词', '检索'],
       记忆管理: ['索引维护', '存储位置'],
       收件箱: ['候选与收件箱'],
+      'QQ 接入': ['接入状态', '探测地址'],
       设置: ['插件设置', '界面语言'],
     };
     const tabScreens = [];
@@ -754,7 +755,7 @@ async function main() {
       const state = await eva(browser, pageLmvState);
       const expected = anchors[label] ?? [];
       const anchor = expected.find((text) => state.mainText.includes(text)) ?? null;
-      const name = `s1-${String(index + 1)}-${['overview', 'search', 'manage', 'inbox', 'settings'][index] ?? 'tab'}.png`;
+      const name = `s1-${String(index + 1)}-${['overview', 'search', 'manage', 'inbox', 'qq', 'settings'][index] ?? 'tab'}.png`;
       const shot = await browser.screenshot(path.join(config.out, name));
       tabScreens.push({ name, path: shot.path, bytes: shot.bytes });
       check(s1, state.activeNav === label, `tab ${label} is marked active`, `activeNav=${state.activeNav}`);
@@ -1045,8 +1046,8 @@ async function main() {
     const settings = await rpc.ok('getSettings', {});
     check(s7, settings.language === 'zh', 'plugin setting language is zh', settings.language);
     const zhState = await eva(browser, pageLmvState);
-    const chineseNav = ['记忆总览', '记忆检索', '记忆管理', '收件箱', '设置'];
-    check(s7, chineseNav.every((label) => zhState.nav.includes(label)), 'all five navigation labels are Chinese', JSON.stringify(zhState.nav));
+    const chineseNav = ['记忆总览', '记忆检索', '记忆管理', '收件箱', 'QQ 接入', '设置'];
+    check(s7, chineseNav.every((label) => zhState.nav.includes(label)), 'all six navigation labels are Chinese', JSON.stringify(zhState.nav));
     check(s7, await browser.evaluate('document.documentElement.lang') === 'zh-CN', 'document language is zh-CN', await browser.evaluate('document.documentElement.lang'));
 
     await openHostSettings(browser);

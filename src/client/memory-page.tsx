@@ -22,10 +22,11 @@ import { InboxView } from './views/inbox.js'
 import { InitView } from './views/init.js'
 import { ManageView } from './views/manage.js'
 import { OverviewView } from './views/overview.js'
+import { QqView } from './views/qq.js'
 import { SearchView } from './views/search.js'
 import { SettingsView } from './views/settings-view.js'
 
-type Section = 'overview' | 'search' | 'manage' | 'inbox' | 'settings'
+type Section = 'overview' | 'search' | 'manage' | 'inbox' | 'qq' | 'settings'
 
 interface Toast {
   id: number
@@ -38,6 +39,7 @@ const SECTIONS: readonly { key: Section; labelKey: string }[] = [
   { key: 'search', labelKey: 'nav.search' },
   { key: 'manage', labelKey: 'nav.manage' },
   { key: 'inbox', labelKey: 'nav.inbox' },
+  { key: 'qq', labelKey: 'nav.qq' },
   { key: 'settings', labelKey: 'nav.settings' },
 ]
 
@@ -80,6 +82,10 @@ export function MemoryPage(_props: SlotProps): ReactElement {
         setTag(next)
         setSelectedId(null)
         setSection('search')
+      },
+      openInbox: () => {
+        setSelectedId(null)
+        setSection('inbox')
       },
       refreshStatus,
       selection,
@@ -140,6 +146,8 @@ export function MemoryPage(_props: SlotProps): ReactElement {
       <ManageView vault={vault} onVaultChanged={refreshStatus} />
     ) : section === 'inbox' ? (
       <InboxView />
+    ) : section === 'qq' ? (
+      <QqView vault={vault} />
     ) : (
       <SettingsView vault={vault} onChanged={refreshStatus} />
     )

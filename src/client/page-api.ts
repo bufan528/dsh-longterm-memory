@@ -20,6 +20,8 @@ export interface PageApi {
   openMemory: (id: string) => void
   /** Jump to Search with `tag` pre-filled as the tag filter. */
   searchTag: (tag: string) => void
+  /** Jump to the Inbox section (used by the QQ page's pending-memory link). */
+  openInbox: () => void
   /** Re-read the `status` RPC (vault stats, index state, settings). */
   refreshStatus: () => void
   /** Ids currently ticked for bulk actions and merging. */
@@ -34,6 +36,7 @@ const FALLBACK: PageApi = {
   toast: () => undefined,
   openMemory: () => undefined,
   searchTag: () => undefined,
+  openInbox: () => undefined,
   refreshStatus: () => undefined,
   selection: [],
   toggleSelect: () => undefined,

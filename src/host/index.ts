@@ -18,6 +18,8 @@
  * @module dsh-longterm-memory/host/index
  */
 
+import { fileURLToPath } from 'node:url'
+
 import { resolveConfig } from './config.js'
 import { MemoryService } from './core/service.js'
 import { installStandingSection, installTurnExtraction, installPerStepRecall } from './dsh/inject.js'
@@ -77,6 +79,10 @@ export function apply(ctx: CordisContextLike, config?: unknown): void {
   const service = new MemoryService({
     ...(settings.vaultPath === undefined ? {} : { configuredVaultPath: settings.vaultPath }),
     configSettings: settings,
+    // The loaded module path is the only trustworthy way to name the Profile this
+    // process actually runs in (an inherited DSH_PROFILE can name a different
+    // one). Derivation failure is handled inside the service.
+    modulePath: moduleFilePath(),
     ...(llmAdapter === undefined ? {} : { llmAdapter }),
     ...(ctx.logger === undefined
       ? {}
@@ -102,18 +108,21 @@ export function apply(ctx: CordisContextLike, config?: unknown): void {
   // ---------------------------------------------------------- prompt section
   if (settings.enablePromptSection !== false) {
     ctx.inject(['systemPrompt'], (scoped) => {
-      const installed = installStandingSection(scoped, service, notes)
+      const installed = installStandingSection(scoped, service, notes, service.linkage)
+      service.linkage.setEnforcement({ standing: installed })
       service.setCapabilities({ systemPrompt: installed })
     })
   } else {
     notes['systemPrompt'] = '长期记忆的常驻系统提示词分区已被配置关闭。'
+    service.linkage.setEnforcement({ standing: false })
     service.setCapabilities({ systemPrompt: false })
   }
 
   // --------------------------------------------------------------- LLM tools
   if (settings.enableTools !== false) {
     ctx.inject(['tools'], (scoped) => {
-      const result = installTools(scoped, service)
+      const result = installTools(scoped, service, service.linkage)
+      service.linkage.setEnforcement({ tools: result.registered.length > 0, registeredTools: result.registered })
       service.setCapabilities({
         tools: result.registered.length > 0,
         registeredTools: result.registered,
@@ -122,16 +131,22 @@ export function apply(ctx: CordisContextLike, config?: unknown): void {
     })
   } else {
     notes['tools'] = '模型记忆工具已被配置关闭。'
+    service.linkage.setEnforcement({ tools: false })
     service.setCapabilities({ tools: false })
   }
 
   // ------------------------------------------------- turn extraction trigger
   const extractionSettings: PluginSettings = { ...DEFAULT_SETTINGS, ...settings }
-  service.setCapabilities({ sessionEvents: installTurnExtraction(ctx, service, extractionSettings, notes) })
+  const extractionInstalled = installTurnExtraction(ctx, service, extractionSettings, notes, service.linkage)
+  service.linkage.setEnforcement({ extraction: extractionInstalled })
+  service.setCapabilities({ sessionEvents: extractionInstalled })
 
   // -------------------------------------------------------- optional per-step
   if (extractionSettings.enablePerStepRecall) {
-    installPerStepRecall(ctx, service, notes)
+    const perStepInstalled = installPerStepRecall(ctx, service, notes, service.linkage)
+    service.linkage.setEnforcement({ perStepRecall: perStepInstalled })
+  } else {
+    service.linkage.setEnforcement({ perStepRecall: false })
   }
 
   // ------------------------------------------------------------ LLM extraction
@@ -187,3 +202,18 @@ export function apply(ctx: CordisContextLike, config?: unknown): void {
 /** Exposed for tests and for embedders that want the service without the page. */
 export { MemoryService } from './core/service.js'
 export { resolveConfig, pluginConfigSchema } from './config.js'
+
+/**
+ * Absolute path of this module on disk.
+ *
+ * Under the Cordis loader this is the real installed `lib/host/index.js`, so the
+ * QQ diagnostics can derive the Profile from it instead of trusting an inherited
+ * environment variable.
+ */
+function moduleFilePath(): string | undefined {
+  try {
+    return fileURLToPath(import.meta.url)
+  } catch {
+    return undefined
+  }
+}

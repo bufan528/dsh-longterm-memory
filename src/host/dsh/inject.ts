@@ -23,6 +23,7 @@
 import type { PluginSettings } from '../../shared/protocol.js'
 import { renderRetiredNotice, type RetiredMemory } from '../../shared/retraction.js'
 import type { MemoryService } from '../core/service.js'
+import type { QqLinkageRuntime } from '../qq/linkage.js'
 
 /** Minimal Cordis context surface this module uses. */
 export interface CordisLike {
@@ -59,13 +60,18 @@ const MAX_TEXT_PER_ENTRY = 8000
  * @returns which paths were installed, so the management page can state the
  *   truth about what reaches the model instead of implying more.
  */
-export function installInjections(ctx: CordisLike, service: MemoryService, settings: PluginSettings): InjectionResult {
+export function installInjections(
+  ctx: CordisLike,
+  service: MemoryService,
+  settings: PluginSettings,
+  linkage?: QqLinkageRuntime,
+): InjectionResult {
   const notes: Record<string, string> = {}
-  const systemPrompt = installStandingSection(ctx, service, notes)
-  const sessionEvents = installTurnExtraction(ctx, service, settings, notes)
+  const systemPrompt = installStandingSection(ctx, service, notes, linkage)
+  const sessionEvents = installTurnExtraction(ctx, service, settings, notes, linkage)
   let perStepRecall = false
   if (settings.enablePerStepRecall) {
-    perStepRecall = installPerStepRecall(ctx, service, notes)
+    perStepRecall = installPerStepRecall(ctx, service, notes, linkage)
   } else {
     notes['perStepRecall'] = '每步注入默认关闭（会写入持久会话历史并长期占用 token）。'
   }
@@ -80,8 +86,19 @@ export function installInjections(ctx: CordisLike, service: MemoryService, setti
  * checks) can invoke the **same** `text` callback the prompt pipeline invokes.
  * That is how the plugin's prompt contribution is verified on a live host without
  * a model call: the callback is the contribution.
+ *
+ * DSH 0.2.1-rc.3 的 `systemPrompt.assemble({ agent, scope })` 会把同一个 context
+ * 传给分区的 `text`（见 `@deepseek-ai/dsh-agent` 的 `assembleContextFor`），因此
+ * 常驻注入可以按会话求值：QQ 联动的读取策略在这里真正生效，而不是只藏起开关。
+ * 若宿主某天不再传 context，本函数会退化为「未识别来源」，页面会如实显示
+ * 该执行点尚未被验证。
  */
-export function installStandingSection(ctx: CordisLike, service: MemoryService, notes: Record<string, string>): boolean {
+export function installStandingSection(
+  ctx: CordisLike,
+  service: MemoryService,
+  notes: Record<string, string>,
+  linkage?: QqLinkageRuntime,
+): boolean {
   const systemPrompt = ctx.get('systemPrompt') as
     | { section: (section: Record<string, unknown>) => unknown }
     | undefined
@@ -95,9 +112,22 @@ export function installStandingSection(ctx: CordisLike, service: MemoryService, 
     // Memory text may contain braces; interpolation must stay off or a stray
     // `{{name}}` would fail the whole prompt assembly.
     interpolate: false,
-    text: (): string => {
+    text: (context?: unknown): string => {
       try {
         if (!service.isReady()) return ''
+        if (linkage !== undefined) {
+          const agent = readValue(context, 'agent')
+          if (agent !== undefined && agent !== null) linkage.markStandingContextSeen()
+          // 没有 context 的调用（例如管理页的预览请求）不算一次会话判定：
+          // 它只验证「这段文本长什么样」，不应该被计入拦截。
+          if (agent !== undefined && agent !== null) {
+            const verdict = linkage.standing(agent)
+            if (!verdict.decision.allowed) {
+              ctx.logger?.info('dsh-longterm-memory: standing memory withheld (%s)', verdict.decision.reason)
+              return ''
+            }
+          }
+        }
         return service.standing().text
       } catch (error) {
         ctx.logger?.warn('dsh-longterm-memory: standing section failed: %o', error)
@@ -128,6 +158,7 @@ export function installTurnExtraction(
   service: MemoryService,
   settings: PluginSettings,
   notes: Record<string, string>,
+  linkage?: QqLinkageRuntime,
 ): boolean {
   if (!settings.enableAutoExtraction) {
     notes['sessionEvents'] = '自动提取已关闭：会话结束时不会生成候选记忆。'
@@ -141,7 +172,7 @@ export function installTurnExtraction(
       'session/event',
       ((session: unknown, event: unknown) => {
         try {
-          handleSessionEvent(ctx, service, buffers, chains, session, event)
+          handleSessionEvent(ctx, service, buffers, chains, session, event, linkage)
         } catch (error) {
           ctx.logger?.warn('dsh-longterm-memory: session/event handling failed: %o', error)
         }
@@ -162,6 +193,7 @@ function handleSessionEvent(
   chains: Map<string, Promise<void>>,
   session: unknown,
   event: unknown,
+  linkage?: QqLinkageRuntime,
 ): void {
   const type = readString(event, 'type')
   if (type === undefined) return
@@ -207,12 +239,24 @@ function handleSessionEvent(
         const ready = await service.ensureReady()
         if (!ready) return
       }
+      // QQ 联动：识别为 QQ 通道的会话，按配置可能只允许把候选记忆写入收件箱。
+      // 判定发生在写回之前，且发生在「提取/去重/冲突判定」之后，所以既有流程
+      // 一步都没被绕过。
+      let forceInbox = false
+      if (linkage !== undefined) {
+        const verdict = linkage.write(session)
+        forceInbox = !verdict.decision.allowed
+        if (forceInbox) {
+          ctx.logger?.info('dsh-longterm-memory: QQ session write forced to inbox (%s)', verdict.decision.reason)
+        }
+      }
       const result = await service.processTurn({
         userText: buffer.userText.join('\n'),
         assistantText: buffer.assistantText.join('\n'),
         sessionId,
         ...(turn === undefined ? {} : { turn }),
         ...(buffer.cwd === undefined ? {} : { cwd: buffer.cwd }),
+        ...(forceInbox ? { forceInbox: true } : {}),
       })
       if (result.applied.length > 0 || result.pending.length > 0) {
         ctx.logger?.info(
@@ -242,7 +286,12 @@ function handleSessionEvent(
  * costs tokens for the rest of the session. The system-prompt section is the
  * cheaper default; this exists for users who want per-step retrieval.
  */
-export function installPerStepRecall(ctx: CordisLike, service: MemoryService, notes: Record<string, string>): boolean {
+export function installPerStepRecall(
+  ctx: CordisLike,
+  service: MemoryService,
+  notes: Record<string, string>,
+  linkage?: QqLinkageRuntime,
+): boolean {
   let createUserMessage: ((input: Record<string, unknown>) => unknown) | undefined
   void (async () => {
     try {
@@ -261,11 +310,25 @@ export function installPerStepRecall(ctx: CordisLike, service: MemoryService, no
   // `agent/created`, and keep every disposer inside our own effect so unloading the
   // plugin removes all of them.
   const perAgentDisposers = new Map<string, () => void>()
-  const handler = async (_payload: unknown, next: () => Promise<unknown>, corrected: Set<string>): Promise<unknown> => {
+  const handler = async (
+    agent: unknown,
+    _payload: unknown,
+    next: () => Promise<unknown>,
+    corrected: Set<string>,
+  ): Promise<unknown> => {
     const decision = (await next()) as { kind?: string; messages?: unknown[] } | undefined
     try {
       if (decision === undefined || decision.kind !== 'enter' || createUserMessage === undefined) return decision
       if (!service.isReady()) return decision
+      // QQ 联动：读取策略在「拼接任何消息之前」生效。被拒绝时连此前注入的
+      // 失效提醒也不追加——那些提醒本身就含记忆标题，同样属于记忆内容。
+      if (linkage !== undefined) {
+        const verdict = linkage.read(agent)
+        if (!verdict.decision.allowed) {
+          ctx.logger?.info('dsh-longterm-memory: per-step recall withheld (%s)', verdict.decision.reason)
+          return decision
+        }
+      }
       const claimed = Array.isArray(decision.messages) ? decision.messages : []
 
       // --- retraction of earlier injections -------------------------------------
@@ -333,7 +396,7 @@ export function installPerStepRecall(ctx: CordisLike, service: MemoryService, no
           // One retraction memory per agent: an id is reported once per session.
           const corrected = new Set<string>()
           const scopedHandler = ((payload: unknown, next: () => Promise<unknown>) =>
-            handler(payload, next, corrected)) as (...args: never[]) => unknown
+            handler(agent, payload, next, corrected)) as (...args: never[]) => unknown
           const dispose = agent.ctx.effect(
             () => agent.ctx?.on('agent/pre-step', scopedHandler as (...args: never[]) => unknown, { prepend: true }),
             'dsh-longterm-memory: per-step recall',

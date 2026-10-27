@@ -57,7 +57,9 @@ describe('DSH manifest display metadata', () => {
   it('keeps engines.dsh as the single compatibility source', () => {
     const range = pkg.engines?.['dsh'] ?? ''
     expect(range).toMatch(/^>=/)
-    expect(range).toContain('0.2.1-rc.2')
+    // The lower bound tracks the DSH host release this build was verified against
+    // (0.2.1-rc.3), not the older 0.2.1-rc.2 it originally listed.
+    expect(range).toContain('0.2.1-rc.3')
     // dsh.bundle/dsh.client are the official bundle declarations.
     expect(pkg.dsh?.['bundle']).toBeDefined()
     expect(pkg.dsh?.['client']).toBeDefined()

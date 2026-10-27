@@ -63,6 +63,11 @@ DSH 浏览器模块表的 9 个固定基线是：
 `@deepseek-ai/dsh-client-store`, `@deepseek-ai/dsh-client-ui-slots`,
 `@deepseek-ai/dsh-client-ui-primitives`, `@deepseek-ai/dsh-client-ui-dockkit`。
 
+> **2026-10-27 复核（宿主 0.2.1-rc.3）**：web 壳的 seed 表实际有 **11** 个基线模块
+> （新增 `zod` 与 `@tanstack/react-virtual`），本条「9 个」是 0.2.1-rc.2 时的记录。
+> 本插件仍只 `require` `react` 与 `react/jsx-runtime`，属更保守的选择，不受影响。
+> 证据：[`docs/evidence/dsh-host-0.2.1-rc.3.md`](evidence/dsh-host-0.2.1-rc.3.md) §1.6。
+
 官方插件指南明确要求**不要** `require` `dsh-client-ui-primitives`。本插件因此：
 - 只 `require('react')` 与 `require('react/jsx-runtime')`；
 - 所有控件（按钮、输入、下拉、复选框、模态框、Toast）自己写，模态框自己实现焦点
@@ -72,7 +77,7 @@ DSH 浏览器模块表的 9 个固定基线是：
 
 `scripts/lint.mjs` 会强制检查这两条（bundle 里出现的 `require` 必须都在 seed 表内）。
 
-## 3. DSH 接口依据（全部来自已安装的 `0.2.0-rc.2`）
+## 3. DSH 接口依据（初版核对于 `0.2.0-rc.2`；宿主 `0.2.1-rc.3` 复核见 `docs/evidence/dsh-host-0.2.1-rc.3.md`）
 
 ### 3.1 一级侧边栏入口
 
@@ -240,6 +245,7 @@ renderStandingBlock()
 | `src/shared/search.ts` | CJK 分词（单字+双字）、加权倒排、排序、相关记忆、校验和 |
 | `src/shared/recall.ts` | token 估算、注入围栏、去毒化、预算渲染 |
 | `src/shared/protocol.ts` | Client↔Host 全部 RPC 方法、请求/响应、错误码 |
+| `src/shared/qq-linkage.ts` | QQ 联动契约：配置归一化、会话来源判定、四个执行点决策、运行时能力说明（0.1.5 新增） |
 | `src/host/core/fsx.ts` | 原子替换、跨进程文件锁、路径逃逸防护、递归列目录 |
 | `src/host/core/layout.ts` | vault 内所有路径的唯一来源 |
 | `src/host/core/discover.ts` | 环境判定、Obsidian 检测、候选路径、可用性判定 |
@@ -315,3 +321,100 @@ descriptor 也记到 service 上，并暴露 `POST /api/previewStanding`：它�
 `section.text(context)`，所以回调输出就是分区文本。这让「真实宿主上的提示词贡献」
 可以零模型调用地被验证（见 `docs/verification.md` §5.3），而不必伪造一个会话去骗过
 `assemble()`。
+
+## 10. QQ 接入联动
+
+**定位**：QQ 的连接、扫码、网关与凭据全部属于官方插件 `@tencent-connect/dsh-qqbot`；
+本插件只做「状态展示 + 导航 + 联动策略 + 诊断」。完整使用说明见
+[`docs/qq-integration.md`](qq-integration.md)。
+
+### 10.1 为什么不做成「调用官方插件」
+
+官方插件**不注册 cordis 服务、不导出内部模块、没有导航 API**（证据见
+[`docs/evidence/qq-official-plugin.md`](evidence/qq-official-plugin.md) §2、§8.3）。
+因此本插件与它**唯一的耦合点**是一条只读 HTTP 探针：
+
+```text
+GET /qqbot/im-qqbot/bind   （同源 fetch，AbortController 4 s）
+  200 + JSON  → 已加载，按 phase 区分 bound / waiting / starting / saving / failed
+  404         → 未安装 / 未加载（或该 profile 无 webServer）
+  其它        → 无法确认（不猜测）
+```
+
+探针在客户端半边，不读 `qrSvg` / `url` 内容，也不携带任何凭据。**不要**改用
+`ctx.get('im-qqbot')`：官方插件不 provide 服务，加载了也只会得到 `undefined`
+（证据文档 §6.1）。
+
+> 宿主另提供 `pluginInventory/list` 作为可选判据（宿主侧 `ctx.get('pluginInventory')`，
+> 客户端可经 `ctx.remote.pluginInventory` 调用；见
+> [`docs/evidence/dsh-host-0.2.1-rc.3.md`](evidence/dsh-host-0.2.1-rc.3.md) §4.2–§4.3，
+> 代码级确认、网络层未实测）。本页**未接线**，因此当前实现与官方插件之间只有上面这一条
+> 探针耦合。
+
+### 10.2 判定层：单一纯函数模块
+
+`src/shared/qq-linkage.ts` 是联动策略的**唯一实现来源**：
+
+| 层 | 内容 |
+|---|---|
+| 配置 | `QqLinkageConfig { mode, qqMarkers, trustedMarkers, writeMode, allowTools }`；`DEFAULT_QQ_LINKAGE` = `off` + 空标记 + `inbox-only` + `allowTools:false` |
+| 事实读取 | `readSessionFacts()` 统一兼容 `context.agent` / `session/event` 的 session / 工具上下文的 `exec.agent` 三种形状，读不到一律 `null`，不用默认值假装读到 |
+| 来源判定 | `classifyProvenance()`：QQ 标记优先于受信标记；`cwd` 在 Windows 下大小写不敏感并忽略尾部分隔符 |
+| 决策 | `decideRead()`（常驻注入 + 每步检索）、`decideWrite()`（是否允许直接落盘）、`decideTools()`（四个记忆工具是否可用） |
+| 能力说明 | `describeLinkageRuntime(config, sessionAwareStanding)` 生成页面要显示的 `notes` |
+
+客户端页面与宿主端执行**import 同一个模块**，所以「页面预览的结果」与「后端真正执行
+的结果」不可能不一致；页面不自己再推导一套策略。
+
+### 10.3 四个执行点的接线
+
+```text
+standing : systemPrompt.section 的 text()      → decideRead   → 不注入常驻记忆块
+recall   : 每步检索（enablePerStepRecall 路径）  → decideRead   → 跳过检索注入
+write    : session/event(turn/end) 的候选提取    → decideWrite  → 强制只进收件箱
+tools    : ctx.tools.register 的四个记忆工具     → decideTools  → 工具对该会话不可用
+```
+
+- **常驻注入能否按会话拦截**取决于宿主是否以带会话上下文的形式求值提示词分区的
+  `text` 回调：宿主 `0.2.1-rc.3` 的 `systemPrompt.assemble({agent, scope})` 会把同一
+  context 传给 `text`，`QqLinkageRuntime` 只在运行时真的看到 `agent` 时才把
+  `sessionAwareStanding` 置为 true；为 `false` 时页面必须如实说明「只能拦截每步检索
+  与工具」。
+- 每次拦截计入 `QqLinkageCounters`（`standingBlocked` / `recallBlocked` /
+  `writesForcedInbox` / `toolsBlocked`），并保留最近判定样本（`QqSessionSample`），
+  用于证明策略确实在跑而不是只改了界面。
+
+### 10.4 数据形状与 RPC
+
+`src/shared/protocol.ts` 新增两个方法 `qqLinkage` / `setQqLinkage`，返回
+`QqLinkageReport`：
+
+```ts
+interface QqLinkageReport {
+  config: QqLinkageConfig
+  runtime: LinkageRuntimeStatus   // 含 sessionAwareStanding 与 notes
+  enforcement: QqEnforcementReport // 四个执行点是否已注册 + registeredTools
+  host: QqHostFacts                // profile / profileDir / dshHome / platform / nodeVersion
+  vaultPath: string | null
+  sessions: QqSessionSample[]      // 最近判定样本
+  counters: QqLinkageCounters      // 本次进程生命周期内，重启归零
+}
+```
+
+### 10.5 新增模块
+
+| 文件 | 职责 |
+|---|---|
+| `src/shared/qq-linkage.ts` | 联动契约与纯函数（配置、判定、四执行点决策、运行能力说明） |
+| `src/shared/protocol.ts` | `qqLinkage` / `setQqLinkage` RPC 与报告类型 |
+| `src/host/qq/linkage.ts` | 宿主端 `QqLinkageRuntime`：四执行点判定、`sessionAwareStanding` 运行时观测、计数器与会话样本、报告组装 |
+| `src/host/core/service.ts` | 持有 `QqLinkageRuntime`，暴露 `qqLinkage()` / `setQqLinkage()`；配置来自 `settings.qqLinkage` |
+| `src/host/dsh/inject.ts` / `tools.ts` / `routes.ts` | 在既有提示词、每步检索、提取写回、工具与 RPC 路径上调用判定函数，不新增任何 QQ 协议实现 |
+| `src/client/qq-channel.ts` | 官方插件同源探针（4 s 超时）+ 诊断 / 隔离矩阵组合的纯函数 |
+| `src/client/views/qq.tsx` | 第 6 个一级页签「QQ 接入」的 6 张卡片 |
+
+### 10.6 安全边界
+
+本插件**不 import 官方包、不复制官方连接代码、不读写任何凭据**。AppSecret 由官方插件
+明文写入 `<profile>/cordis.patch.yml`（证据文档 §4.3），本插件不读取、不保存、不回显；
+也不自动修改任何 profile。策略默认关闭，升级不改变既有行为。

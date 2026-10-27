@@ -4,12 +4,12 @@
 
 | 项 | 值 | 证据 |
 |---|---|---|
-| 已验证的 DSH 版本 | **`0.2.1-rc.2`** | `app.asar` 内 `@deepseek-ai/dsh/package.json` 的 `version` |
-| 本包 `engines.dsh` 声明 | `>=0.2.1-rc.2 <0.2.2` | 宿主自带 `semver@7.8.5`：`0.2.1-rc.2`→true，`0.2.2`/`0.3.0`/`0.2.0-rc.2`→false |
-| 安装器接受结果 | **exit 0，无 `pluginCompatibilityWarning`，无需版本豁免** | 隔离 profile `r9a` 真实安装 + 启动日志扫描（0 条警告） |
+| 已验证的 DSH 版本 | **`0.2.1-rc.3`** | `app.asar` 内 `/dsh/package.json` 的 `version`；`D:\dsh\resources\runtime\primary-runtime\runtime.json` 的 `desktopVersion`（2026-10-27 实测，见 §12） |
+| 本包 `engines.dsh` 声明 | `>=0.2.1-rc.3 <0.2.2`（只声明 DSH **0.2.1 线**；0.1.5 起下限随重新核验上移到 rc.3） | 宿主自带 `semver@7.8.5`：`>=0.2.1-rc.3 <0.2.2` 对 `0.2.1-rc.3`→true；`0.2.2`/`0.3.0`/`0.2.0-rc.2`→false |
+| 安装器接受结果 | **exit 0，无 `pluginCompatibilityWarning`，无需版本豁免** | 隔离 profile `r9a` 真实安装 + 启动日志扫描（0 条警告；0.2.1-rc.2 时实测） |
 | 官方包清单 | 236 个 `@deepseek-ai/*` 包 | `app.asar` 内 `node_modules/@deepseek-ai/` |
 | 客户端 bundle 契约 | `window.__ModuleLoader__.load({id, factory})` | 87 个官方 `lib/client.js` 首行 |
-| 平台 seed 模块表 | 9 个固定词 | `dsh-web-frontend/dist/assets/index-5SrrfWpU.js:126` |
+| 平台 seed 模块表 | **11 个基线模块**（0.2.1-rc.3 复核；旧记录为 9 个，新增 `zod` 与 `@tanstack/react-virtual`） | `dsh-web-frontend/dist/assets/index-BXV-oxvX.js`（见 [`docs/evidence/dsh-host-0.2.1-rc.3.md`](evidence/dsh-host-0.2.1-rc.3.md) §1.6） |
 | 宿主插件导出形态 | `apply` / `inject` / `name`（可选 `Config`） | `cordis-plugin-development/references/host-plugin.md:49-53` |
 
 > ⚠️ **不要**把 `dsh.bundle`、`dsh.client`、`dsh.manifestVersion`、`dsh.compatibility`
@@ -31,16 +31,22 @@
 
 不匹配的后果：path/registry 安装被拒绝；tarball 安装回滚；已安装的在启动时跳过该 bundle。
 
-**本包声明 `engines.dsh = ">=0.2.1-rc.2 <0.2.2"`**，不声明任何 `@deepseek-ai/*` peerDependency
-（`scripts/lint.mjs` 作为硬规则检查后者）。选择该范围的理由：
+**本包只声明 `engines.dsh` 为「DSH 0.2.1 线」**（当前字面量
+`>=0.2.1-rc.3 <0.2.2`：下限锁在 0.2.1 的预发布号，上界 `<0.2.2`），不声明任何
+`@deepseek-ai/*` peerDependency（`scripts/lint.mjs` 作为硬规则检查后者）。选择该范围的理由：
 
-- 宿主实际版本 `0.2.1-rc.2` 必须满足（已用宿主自带 `semver@7.8.5` 验证为 `true`）；
+- 宿主实际版本 `0.2.1-rc.3` 必须满足（已用宿主自带 `semver@7.8.5` 验证为 `true`，见 §12）；
 - 预发布范围的 SemVer 行为：只有当比较器带同样的 `major.minor.patch` 元组及预发布号时才匹配
-  预发布版本，因此显式写 `>=0.2.1-rc.2` 而不是 `^0.2.0`（后者对 `0.2.1-rc.2` 为 `false`）；
+  预发布版本，因此显式写 `>=0.2.1-rc.<n>` 而不是 `^0.2.0`（后者对 0.2.1 预发布版本为 `false`）；
 - 上界 `<0.2.2` 表示**只声明 0.2.1 这一条已实测的线**，不把 0.2.2 / 0.3.x 纳入未验证的支持范围。
 
-> 不要为了"能装上"而放宽这个范围：真实安装器（隔离 profile `r9a`）在本范围下 exit 0、
-> 无警告、无需豁免，已实测。
+> **版本一致性检查的硬要求**：`scripts/check-version-consistency.mjs` 用**字符串子串**
+> 校验「README 与本文的已验证版本一致、且出现在 `engines.dsh` 字面量里、且列在
+> `dsh.compatibility.dshReleases` 中」。因此 `engines.dsh` 的字面量必须包含
+> `0.2.1-rc.3`（例如 `>=0.2.1-rc.3 <0.2.2`），否则 `npm run lint` 会失败。
+
+> 不要为了"能装上"而放宽这个范围：真实安装器（隔离 profile `r9a`）在 0.2.1 线范围内
+> exit 0、无警告、无需豁免，已实测。
 
 ## 3. `package.json` 字段契约
 
@@ -245,3 +251,111 @@ add <spec>` 同样可行。本轮**没有执行**任何一种（任务书禁止�
 
 > **结论**：官方支持的运行时卸载顺序是 **先停用、再卸载**。直接卸载正在运行的插件会被宿主拒绝，这不是插件缺陷。
 > 卸载只移除安装与注册，**不会删除用户的 Markdown 记忆仓库**。
+
+## 12. 本机宿主 0.2.1-rc.3 的实际核验（「声明」与「放行」是两件事）
+
+§1 的「已验证的 DSH 版本」在 0.1.5 之前只写过 `0.2.1-rc.2`；**实际运行的宿主是
+`0.2.1-rc.3`**。本节记录这一差异与影响，避免把「声明过 rc.2」误读成「没在 rc.3 上跑过」。
+
+宿主实现细节的静态核实见 [`docs/evidence/dsh-host-0.2.1-rc.3.md`](evidence/dsh-host-0.2.1-rc.3.md)
+（代码级、明确未做真机 HTTP）；§12.1 的「本插件真实加载」是本机 HTTP 实测，两者互补。
+
+### 12.1 实测事实（2026-10-27）
+
+| 检查项 | 结果 | 证据 |
+|---|---|---|
+| 宿主版本 | **`0.2.1-rc.3`** | `D:\dsh\resources\app.asar` 内 `/dsh/package.json` 的 `version` = `0.2.1-rc.3`；`D:\dsh\resources\runtime\primary-runtime\runtime.json` 的 `desktopVersion` = `0.2.1-rc.3` |
+| `engines.dsh` 对 rc.3 的判定 | **满足**（true） | 宿主自带 `semver@7.8.5` 复核：范围 `>=0.2.1-rc.3 <0.2.2` 对 `0.2.1-rc.3`，`includePrerelease` 取 true/false 均为 `true`（旧范围 `>=0.2.1-rc.2 <0.2.2` 同样为 true） |
+| 宿主是否读取 `dsh.compatibility` | **不读取** | `@deepseek-ai/dsh-app-boot` 的判定只读 `engines.dsh`，否则回退 `@deepseek-ai/dsh*` peer 范围（见 §2）；对 rc.3 的 asar 做字节级全量检索，`dshReleases` **0 次命中**（[`docs/evidence/dsh-host-0.2.1-rc.3.md`](evidence/dsh-host-0.2.1-rc.3.md) §6.1） |
+| 本插件在 rc.3 上是否真实加载 | **是** | 运行中的桌面宿主上 `POST /dsh-longterm-memory/api/status` → **200**，返回已初始化的 Vault 状态（同一响应中 `/` 为 401，说明认证层正常） |
+| 完整真实浏览器 E2E 在 rc.3 上 | **尚未记录** | 此前的 61/61 E2E 是在 0.2.1-rc.2 上跑的；rc.3 上的功能回归验收以 0.1.5 的验收记录为准 |
+
+### 12.2 为什么两件事会分开
+
+宿主安装/启动只做**范围判定**：`engines.dsh` 存在时只按它判定，否则回退
+`peerDependencies` 里的 `@deepseek-ai/dsh*` 范围，并用
+`semver.satisfies(runtimeVersion, range, { includePrerelease: true })` 求值；
+**`dsh.compatibility` 在运行时没有任何读取者**（§1 已述）。因此：
+
+- **声明**（`dshReleases` 里逐版本列出的「已验证」）只是人类可读文档；
+- **放行**（装得上、能启动）来自 `engines.dsh` / peer 范围。
+
+`0.2.1-rc.3` 属于「**范围放行、此前未声明**」的情况；0.1.5 起把声明补齐
+（`dshReleases` 保留 `0.2.1-rc.2` 并新增 `0.2.1-rc.3`）。
+
+**事实说明（版本下移的历史）**：上一轮发布（0.1.4）的验证目标是 `0.2.1-rc.2`；本轮
+（0.1.5）在 `0.2.1-rc.3` 上**重新核验**，因此 `engines.dsh` 的下限随之上移到
+`0.2.1-rc.3`。`0.2.1-rc.2` 的验证记录保留在 `dsh.compatibility.dshReleases` 里作为
+**历史**，不再作为当前验证目标——「保留历史键」不等于「仍支持 rc.2 之外的更老版本」。
+
+### 12.3 影响与维护要求
+
+1. `README.md` 的 `Verified DSH version`、本文件 §1 的「已验证的 DSH 版本」、`package.json`
+   的 `engines.dsh` 与 `dsh.compatibility.dshReleases` **必须一致地覆盖 `0.2.1-rc.3`**。
+2. `scripts/check-version-consistency.mjs` 用**字符串子串**判断「已验证版本出现在
+   `engines.dsh` 中」，因此 `engines.dsh` 的字面量必须包含 `0.2.1-rc.3`（例如
+   `>=0.2.1-rc.3 <0.2.2`），否则 `npm run lint` 失败（见 §2 的硬要求）。
+3. 本文件 §1 的「安装器接受结果」一行是 0.2.1-rc.2 时的隔离安装实测记录；范围判定
+   在 rc.3 上仍是 true，但**不要**把它改写成「rc.3 上做过安装器实测」——未做过就是未做过。
+
+## 13. 官方 QQ 接入插件与本机宿主的兼容关系
+
+本节只记录**官方插件**（`@tencent-connect/dsh-qqbot`）与本机宿主的兼容事实，与本插件
+自身的兼容声明是两件事。完整上下文见 [`docs/qq-integration.md`](qq-integration.md) §4。
+
+| 判定 | 结论 | 依据 |
+|---|---|---|
+| 官方验证过哪些 DSH 版本 | **只有 `0.1.0-rc.8`（CLI）与 `0.2.0-rc.2`（Desktop）**，是逐版本「已验证」记录，不是范围承诺 | 官方 `package.json` 的 `dsh.compatibility`；证据文档 §5.1 |
+| 官方是否声明兼容本机 `0.2.1-rc.3` | **否**（0.2.1 线未获任何声明；上游 `main` 的 0.5.3 也未补） | 证据文档 §5.1 |
+| 宿主会不会拦 | **不会**：官方包无 `engines.dsh` → 回退 peer 下限 `>=0.1.0-rc.6`；宿主用 `includePrerelease: true` 判定，`0.2.1-rc.3` 实测为 `true`，不产生 `pluginCompatibilityWarning` | 证据文档 §5.2 |
+| 是否存在已知回归 | **有**（第三方报告、官方未修）：issue #60（`qqbot_send_file` 在 0.2.1-rc.2 下失败）、issue #58（`settings-reader` 路径问题） | 证据文档 §5.3 |
+
+> 对外表述必须写成「**宿主 0.2.1-rc.3 可通过安装门槛（peer 范围放行），但官方未验证
+> 0.2.1 线，且社区有 open 回归报告**」；**不要**写「官方声明兼容 0.2.1-rc.3」。
+> 本机也未安装、未运行该官方插件（探针只实测到 `404` 分支），见证据文档 §7 与
+> [`docs/qq-integration.md`](qq-integration.md) §9.2。
+
+## 14. 0.1.5 新增配置：`qqLinkage`
+
+QQ ↔ 长期记忆联动配置保存在本插件既有设置里（不新建数据库、不新建文件格式），
+默认值来自 `src/shared/qq-linkage.ts` 的 `DEFAULT_QQ_LINKAGE`，通过管理页保存，也可以在
+profile 的 `cordis.patch.yml` 里预设。预设与页面保存的优先级与既有设置一致：**管理页
+保存的同名字段会覆盖 `cordis.patch.yml` 里的值**（`mergeQqLinkage(configured, chosen)`）。
+
+| 键 | 类型 | 默认 | 含义 |
+|---|---|---|---|
+| `mode` | `'off' \| 'deny-qq' \| 'allowlist'` | `'off'` | 联动保护模式：不拦截 / 拒绝 QQ 会话读取 / 仅受信会话可读取 |
+| `qqMarkers` | `{ origins: string[], presets: string[], cwds: string[] }` | 全空 | 判定为 QQ 会话的标记（`session.header` 的 `origin` / `agentPreset` / `cwd`） |
+| `trustedMarkers` | 同上 | 全空 | `allowlist` 模式下判定受信（本机桌面）会话的标记 |
+| `writeMode` | `'inbox-only' \| 'direct'` | `'inbox-only'` | QQ 会话候选记忆的写回方式：只进收件箱 / 允许直接落盘 |
+| `allowTools` | `boolean` | `false` | 是否允许 QQ 会话调用四个记忆工具 |
+
+```yaml
+# <profile>/cordis.patch.yml
+- id: longterm-memory
+  name: dsh-longterm-memory
+  config:
+    qqLinkage:
+      mode: deny-qq            # off | deny-qq | allowlist（默认 off）
+      qqMarkers:
+        presets: ['qq']        # 官方 QQ 插件配置里设置的 preset
+        cwds: []               # 绝对路径；Windows 下大小写不敏感
+        origins: []
+      trustedMarkers:
+        cwds: []               # allowlist 模式下填写你的桌面工作目录
+        presets: []
+        origins: []
+      writeMode: inbox-only    # inbox-only | direct
+      allowTools: false
+```
+
+补充约束（均来自 `src/shared/qq-linkage.ts`）：
+
+- `normalizeQqLinkage()` 会把未知的 `mode` / `writeMode` 回落到默认值，空串与重复标记
+  被剔除，**不会因为旧配置或手写错误而放宽策略**。
+- 每组标记最多 **32** 条、每条最多 **260** 字符（`MAX_MARKERS` / `MAX_MARKER_LENGTH`）。
+- 不配置任何 `qqMarkers` 时，`deny-qq` / `allowlist` **不会命中任何会话**（因为没有任何
+  会话能被识别为 QQ）；页面 `runtime.notes` 会明确提示。
+- `qqLinkage` 只影响四个执行点（常驻注入 / 每步检索 / 写回 / 工具），**不改变任何记忆
+  文件**；`mode: 'off'` 时行为与未接入 QQ 时完全一致。语义细节见
+  [`docs/qq-integration.md`](qq-integration.md) §5。

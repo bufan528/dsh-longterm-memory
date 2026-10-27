@@ -17,8 +17,9 @@
  * @module dsh-longterm-memory/client
  */
 
-import type { ClientContext } from './context.js'
+import type { ClientContext, LocaleScopedContext } from './context.js'
 import { NS, bindLocaleService, t } from './i18n.js'
+import { normalizeInventoryRow, setPluginInventoryBridge, type PluginInventoryRow } from './host-inventory.js'
 import { MemoryPage } from './memory-page.js'
 import { MemoryPanelIcon, PANEL_ID } from './sidebar-entry.js'
 import { CLIENT_CSS } from './styles.js'
@@ -56,10 +57,53 @@ function installStyles(): () => void {
 }
 
 /**
+ * Install the optional host inventory bridge (`remote.pluginInventory`).
+ *
+ * The dependency is declared exactly as the host's own client plugins do
+ * (`remote` + the dotted namespace); when either is absent the callback never
+ * fires and the bridge stays unavailable, so the QQ page degrades to the HTTP
+ * probe instead of assuming anything.
+ *
+ * The namespace is resolved **lazily on every call** on purpose: the Remote
+ * namespaces are mounted by the host's api-remotes client, which can finish
+ * after our plugin applies. Checking `list` once at install time would silently
+ * disable the bridge on a slow boot.
+ */
+function installInventoryBridge(scoped: LocaleScopedContext): void {
+  const remote = (scoped as unknown as { remote?: Record<string, unknown> }).remote
+  if (remote === undefined || remote === null) return
+  const resolveNamespace = (): { list: () => Promise<unknown> } | null => {
+    const namespace = remote['pluginInventory'] as { list?: () => Promise<unknown> } | undefined
+    if (namespace === undefined || typeof namespace.list !== 'function') return null
+    return { list: namespace.list.bind(namespace) }
+  }
+  setPluginInventoryBridge({
+    // Declared available as soon as `remote` exists; whether the namespace has
+    // mounted yet is verified on the first call, and a failure there is reported
+    // to the page as "unavailable" instead of pretending.
+    available: true,
+    note: '已接入宿主 pluginInventory Remote：可区分「未安装」与「已安装但停用/加载失败」。',
+    list: async () => {
+      const namespace = resolveNamespace()
+      if (namespace === null) throw new Error('宿主 pluginInventory Remote 尚未就绪')
+      const result = (await namespace.list()) as { ok?: unknown; value?: unknown; error?: { message?: unknown } } | null
+      if (result !== null && typeof result === 'object' && result.ok === false) {
+        const message = typeof result.error?.message === 'string' ? result.error.message : 'pluginInventory/list 返回失败'
+        throw new Error(message)
+      }
+      const payload = result !== null && typeof result === 'object' && result.ok === true ? result.value : result
+      const entries = (payload as { entries?: unknown } | null)?.entries
+      if (!Array.isArray(entries)) throw new Error('pluginInventory/list 响应缺少 entries')
+      return entries.map(normalizeInventoryRow).filter((row): row is PluginInventoryRow => row !== null)
+    },
+  })
+}
+
+/**
  * Install the panel.
  *
  * @param ctx - the Cordis client context; only `slots`, `effect` and the
- * optional `locale` injection are used.
+ * optional `locale` / `remote.pluginInventory` injections are used.
  */
 export function apply(ctx: ClientContext): void {
   if (applied) return
@@ -72,6 +116,19 @@ export function apply(ctx: ClientContext): void {
     if (dispose === undefined) return
     scoped.effect(() => dispose, `${PACKAGE_ID}: locale dictionary`)
   })
+
+  // Optional host bridge: the plugin inventory lets the QQ page tell "not
+  // installed" apart from "installed but disabled / failed to load". It is
+  // strictly optional — when the host does not expose the Remote the page falls
+  // back to the read-only HTTP probe and says so. A host that does not know the
+  // dotted service name must not take the panel down, hence the guard.
+  try {
+    ctx.inject(['remote', 'remote.pluginInventory'], (scoped) => {
+      installInventoryBridge(scoped)
+    })
+  } catch {
+    /* optional capability: the page degrades to the HTTP probe */
+  }
 
   // 1) First-level left-sidebar entry. Its `id` is the address the sidebar
   //    dispatches through `layout.selectPanel(id)`.

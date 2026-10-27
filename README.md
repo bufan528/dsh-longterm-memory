@@ -15,7 +15,7 @@
 <p align="center">
   <a href="https://github.com/bufan528/dsh-longterm-memory/stargazers"><img src="https://img.shields.io/github/stars/bufan528/dsh-longterm-memory?style=flat-square" alt="GitHub stars" /></a>
   <img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="MIT License" />
-  <img src="https://img.shields.io/badge/DSH-%3E%3D0.2.1--rc.2%20%3C0.2.2-7C3AED?style=flat-square" alt="DSH 0.2.1-rc.2" />
+  <img src="https://img.shields.io/badge/DSH-%3E%3D0.2.1--rc.3%20%3C0.2.2-7C3AED?style=flat-square" alt="DSH 0.2.1-rc.3" />
   <img src="https://img.shields.io/badge/node-%3E%3D20-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node >= 20" />
   <img src="https://img.shields.io/badge/status-preview-E5B650?style=flat-square" alt="Preview" />
   <a href="https://dsh.works/awesome-dsh-plugins/"><img src="https://img.shields.io/badge/listed_on-dsh.works-00c2e9?style=flat-square&labelColor=0d0d0d" alt="listed on dsh.works" /></a>
@@ -45,12 +45,22 @@
 > installable there as well (no separate submission). Install it from the in-app
 > market, or from npm with `dsh plugin add dsh-longterm-memory@latest`. The desktop-app
 > plugin entry is verified end-to-end in the running desktop app (61/61 real-browser
-> checks over all five tabs, real vault, restored afterwards). See [Install](#install),
+> checks over the five pre-existing tabs, real vault, restored afterwards; the 0.1.5 QQ
+> tab was verified separately on an isolated 0.2.1-rc.3 host, see
+> [docs/evidence/qq-verification.md](docs/evidence/qq-verification.md)). See [Install](#install),
 > [What's new](#whats-new) and [Project status & limitations](#project-status--limitations).
 
 ---
 
 ## What's new
+
+**0.1.5** adds a sixth tab, **QQ integration**
+(`记忆总览 | 记忆检索 | 记忆管理 | 收件箱 | QQ 接入 | 设置`), plus an optional
+QQ ↔ long-term-memory linkage policy (three modes, four enforcement points) and a
+diagnostics card. It is documented in [docs/qq-integration.md](docs/qq-integration.md).
+The existing 61-check real-browser E2E suite still covers the five pre-existing tabs;
+the QQ tab was verified on an isolated 0.2.1-rc.3 host (see
+[docs/evidence/qq-verification.md](docs/evidence/qq-verification.md)).
 
 **0.1.4** is a documentation release: the plugin is now **listed in the DSH Plugin
 Market** (added 2026-10-19) and in the **dsh.works community registry**
@@ -101,7 +111,7 @@ Vault makes the opposite trade-off:
 
 | | |
 |---|---|
-| **First-level sidebar page** | Registers a `sidebar.panellist` entry and a full management page (overview, search, detail, manage, inbox, settings) — not a chat tab. |
+| **First-level sidebar page** | Registers a `sidebar.panellist` entry and a full management page (**overview / search / manage / inbox / QQ integration / settings**) — not a chat tab. |
 | **Four model tools** | `memory_search`, `memory_get`, `memory_save`, `memory_forget` (save refuses credential-like content). |
 | **Automatic extraction** | Rule-based, fully local candidate extraction at the real `turn/end` boundary. Optional model-assisted extraction is **off by default**. |
 | **Ranked recall** | BM25-style lexical ranking over Markdown, with type/status/tag filters and a token budget. |
@@ -111,6 +121,7 @@ Vault makes the opposite trade-off:
 | **Crash-safe writes** | Single-file atomic replace, per-file lock, optimistic checksum concurrency, durable journal outbox with idempotent recovery. |
 | **Obsidian compatible** | The vault carries `.obsidian/`, `[[wikilinks]]`, stable frontmatter and a human-readable `Index/`. |
 | **Bilingual UI** | Chinese and English (`language: zh | en`). |
+| **Optional QQ integration tab** | Status / detection / linkage policy / diagnostics for the official `@tencent-connect/dsh-qqbot` — read-only where it can be, never reimplements the QQ protocol, never touches credentials. |
 | **No runtime dependency on `@deepseek-ai/*`** | The host half only uses the Cordis context passed in, so DSH internals can change without breaking the bundle. |
 
 ### Interface
@@ -140,7 +151,7 @@ flowchart LR
 - The **host** owns the vault, index, journal and extraction; it never calls a model
   unless you explicitly enable model-assisted extraction with your own provider.
 - The **management page** reads and writes through a loopback-only RPC surface
-  (`POST /dsh-longterm-memory/api/<method>`, 27 methods) guarded by a browser-trust
+  (`POST /dsh-longterm-memory/api/<method>`, 29 methods) guarded by a browser-trust
   fence (loopback / trusted hosts, `Origin`, `sec-fetch-site`).
 - **Recall**: `memory_search` and automatic injection share one engine; explicit
   recall may include retired memories (labelled history), injection only uses current
@@ -284,6 +295,83 @@ from your profile's `cordis.patch.yml`.
 | `sensitiveNeedsConfirmation` | `true` | Health/finance/identity content waits for confirmation |
 | `maxCandidatesPerTurn` | `5` | Extraction cap per turn |
 
+## QQ integration (optional, since 0.1.5)
+
+The sixth tab is **QQ 接入 / QQ access**; the tab order is
+`记忆总览 | 记忆检索 | 记忆管理 | 收件箱 | QQ 接入 | 设置`
+(overview · search · manage · inbox · QQ access · settings). It is a **status,
+navigation, policy and diagnostics** page: it never reimplements the QQ protocol and
+never copies the official connector's code.
+
+### What the page does
+
+- **Detects the official plugin** with a same-origin `GET /qqbot/im-qqbot/bind` probe
+  (4 s timeout): `200` = loaded (the JSON `phase` is `bound`, `waiting`, `starting`,
+  `saving` or `failed`), `404` = not installed / not loaded, anything else =
+  **cannot confirm**. It does **not** use `ctx.get('im-qqbot')`: the official plugin
+  registers no cordis service, so that lookup is `undefined` even when it is loaded.
+- **Does not open the official binding panel for you**: the host has a generic
+  main-page navigation API, but the official binding UI lives in a settings section /
+  right-sidebar tab with no reliable public open path, so the page gives instructions
+  for the in-app **设置 → QQ 机器人** section or the right-sidebar **QQ 机器人绑定**
+  tab instead.
+- **Never generates a QR code and never displays the AppSecret** (the only identity
+  value it shows is the non-secret `appId` the official plugin's own status route
+  returns).
+
+### QQ ↔ memory linkage
+
+Optional policy enforced at four points; **off by default**:
+
+| Mode | Effect |
+|---|---|
+| `off` (default) | Identical to running without QQ integration |
+| `deny-qq` | Sessions matching your QQ markers do not read long-term memory |
+| `allowlist` | Only sessions matching your trusted markers read memory |
+
+The four enforcement points are the standing prompt section, per-step recall,
+turn-end write-back (QQ candidates go to the Inbox unless `writeMode: direct`) and the
+four memory tools (`allowTools`, default `false`). QQ sessions can only be identified
+by markers **you** declare — `origin`, `agentPreset` or `cwd` (for example the
+`preset`/`cwd` set in the official plugin's config). **Private and group chats cannot
+be told apart**: the official plugin knows the scope internally but does not write it
+into the DSH session header, so this plugin does not fake per-group isolation.
+Details: [docs/qq-integration.md](docs/qq-integration.md) §5.
+
+### Credentials and vault/profile modes
+
+- The official plugin **writes `appId`/`appSecret` as plaintext YAML into
+  `<profile>/cordis.patch.yml`** (no keychain, no encryption). This plugin never reads
+  that file, never stores a credential, and never displays `appSecret` (the only
+  identity value it shows is the non-secret `appId` from the official status route).
+- **Same profile:** QQ sessions and desktop sessions share one Vault — and therefore
+  one memory. That is exactly why `deny-qq` / `allowlist` exist.
+- **Separate profile:** install this plugin in the QQ profile too and point both
+  `vaultPath` values at the same Vault; concurrent writes rely on the existing
+  journal / atomic-write / lock machinery. **This plugin never edits any profile.**
+- **Mismatched config:** different vault paths mean two independent vaults — not
+  shared. Details: [docs/qq-integration.md](docs/qq-integration.md) §7.
+
+### Compatibility caveat
+
+The official `@tencent-connect/dsh-qqbot` lists **only DSH `0.1.0-rc.8` and
+`0.2.0-rc.2`** as validated; it does **not** validate DSH `0.2.1-rc.3`. The host still
+admits it because the package has no `engines.dsh` and its `@deepseek-ai/dsh-*` peer
+floor is evaluated with `includePrerelease: true` — *installable is not validated*.
+There are open community reports on the 0.2.1 line (issues #60 / #58). See
+[docs/compatibility.md](docs/compatibility.md) §13.
+
+### Installing the official plugin (optional)
+
+```bash
+npx @deepseek-ai/dsh plugin --profile <profile> add @tencent-connect/dsh-qqbot
+```
+
+Then bind it from the in-app **设置 → QQ 机器人** panel or the right-sidebar
+**QQ 机器人绑定** tab (0.5.1+ ships the in-app UI; older versions only print a
+terminal QR code). The official plugin is a separate project; this plugin only reads
+its binding status.
+
 ## Data safety
 
 - **Atomic single-file writes** (temp file + rename) and a **per-file lock** with
@@ -304,9 +392,10 @@ from your profile's `cordis.patch.yml`.
 ## Privacy
 
 - **No telemetry and no outbound network calls by default.** Host-side acceptance runs
-  showed zero network calls; the only client request target is the local DSH RPC. The
-  0.1.3 desktop E2E run exercised the real page and asserted zero page errors / uncaught
-  exceptions; it is not a packet-level network audit.
+  showed zero network calls; the only client request targets are the local DSH RPC and,
+  when the QQ tab is opened, the same-origin read-only `GET /qqbot/im-qqbot/bind` probe
+  — both loopback. The 0.1.3 desktop E2E run exercised the real page and asserted zero
+  page errors / uncaught exceptions; it is not a packet-level network audit.
 - **Model use is opt-in**: automatic extraction is rule-based and local; model-assisted
   extraction (`enableLlmExtraction`) is off and, when enabled, uses the provider you
   configured in DSH.
@@ -320,8 +409,8 @@ from your profile's `cordis.patch.yml`.
 
 | | |
 |---|---|
-| DSH runtime | `>=0.2.1-rc.2 <0.2.2` (`engines.dsh`; `0.2.0-rc.2` is **not** supported) |
-| Verified DSH version | `0.2.1-rc.2` (host + real headless Chrome acceptance) |
+| DSH runtime | `>=0.2.1-rc.3 <0.2.2` (`engines.dsh`; `0.2.0-rc.2` is **not** supported) |
+| Verified DSH version | `0.2.1-rc.3` — current desktop host; the plugin is loaded and serving RPC on it (see [docs/compatibility.md](docs/compatibility.md) §12) |
 | Node.js | `>=20` |
 | Platform | Windows (primary), Node path rules elsewhere |
 | npm package | `dsh-longterm-memory` — **0.1.4 published** (latest) |
@@ -358,10 +447,11 @@ zero-dependency CDP clients using Node's built-in `WebSocket`.
 ## Project status & limitations
 
 - **Preview**: API and storage format may still change; `0.1.0` was the first public
-  version, `0.1.4` is the current release.
+  version, and `0.1.5` (QQ integration) is the current release in this repository.
 - **npm published**: `dsh-longterm-memory@0.1.4` (2026-10-20); registry installation
-  verified. The npm `latest` dist-tag and the GitHub Release always point at the newest
-  version.
+  verified. `0.1.5` is published here as a GitHub Release asset
+  (`dsh-longterm-memory-0.1.5.tgz`); the npm `latest` dist-tag is bumped when npm
+  publishing is run for this version.
 - **Listed in the DSH Plugin Market**: the plugin is in the
   [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
   catalog (added 2026-10-19). Install it from the in-app **插件市场 / Plugin Market**;
@@ -383,7 +473,14 @@ zero-dependency CDP clients using Node's built-in `WebSocket`.
   tag; dsh-armory revalidates its catalog cache every few minutes (new installs fetch
   fresh).
 - **Desktop verified**: the full real-browser E2E suite passes against the running
-  desktop app (61/61 checks, all five tabs, real vault restored afterwards).
+  desktop app (61/61 checks, the five pre-existing tabs, real vault restored afterwards).
+- **QQ integration (0.1.5)**: the QQ tab, the linkage policy and the diagnostics are
+  documented in [docs/qq-integration.md](docs/qq-integration.md) and were verified on an
+  isolated DSH `0.2.1-rc.3` host with a real browser (see
+  [docs/evidence/qq-verification.md](docs/evidence/qq-verification.md)). They are **not**
+  part of the 61-check E2E suite yet. The official QQ plugin is not installed on this
+  machine, so only its `404` probe branch was observed; the `200` branch and the official
+  connector's actual behaviour on DSH `0.2.1-rc.3` are unverified.
 - **Known follow-ups**: in-memory Inbox candidates are drafts — they are not counted in
   `待确认数量` / the `Inbox/` folder until confirmed; they leave the Inbox when
   confirmed or rejected. A few concurrency and move-atomicity edge cases remain open;
@@ -400,6 +497,7 @@ zero-dependency CDP clients using Node's built-in `WebSocket`.
 | [docs/storage-format.md](docs/storage-format.md) | Markdown / frontmatter / index / journal formats |
 | [docs/privacy.md](docs/privacy.md) | Privacy and threat model |
 | [docs/compatibility.md](docs/compatibility.md) | Compatibility contract and evidence |
+| [docs/qq-integration.md](docs/qq-integration.md) | QQ integration tab, official-plugin detection, memory linkage, vault/profile modes |
 | [docs/verification.md](docs/verification.md) | Verification log and acceptance evidence |
 | [CHANGELOG.md](CHANGELOG.md) | Release notes for every published version |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Recovery and FAQ |

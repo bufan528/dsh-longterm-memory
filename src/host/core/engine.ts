@@ -321,6 +321,14 @@ export interface TurnInput {
   turn?: number
   /** Session working directory, when known. */
   cwd?: string
+  /**
+   * Force every candidate from this turn into the inbox instead of applying it.
+   *
+   * Set by the QQ linkage guard when the session is identified as a QQ channel and
+   * the configured write mode is "inbox-only": a QQ conversation must not turn
+   * into long-term memory without a human confirming it.
+   */
+  forceInbox?: boolean
 }
 
 export interface ExtractionOptions {

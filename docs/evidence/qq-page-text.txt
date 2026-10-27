@@ -1,0 +1,171 @@
+接入状态
+刷新状态
+未加载
+探测地址:
+/qqbot/im-qqbot/bind
+探测时间: 2026-10-27 13:41
+!
+同源 GET /qqbot/im-qqbot/bind 返回 404，且宿主插件清单确认未安装（宿主插件清单中没有 @tencent-connect/dsh-qqbot。）。
+官方插件未安装，或未在本 Profile 启用（探测路由只在插件加载时注册）。
+phase
+未知
+插件清单
+清单中未找到
+Profile
+qqv
+如需接入，请先在本 Profile 安装官方插件，安装后重新打开本页：
+npx @deepseek-ai/dsh plugin --profile qqv add @tencent-connect/dsh-qqbot
+i
+已知事实：npm latest 0.5.2；客户端 UI 自 0.5.1 起提供；cordis name im-qqbot；本页唯一的网络请求是只读探测 GET /qqbot/im-qqbot/bind。
+i
+本页只读取 phase 与 appId（非机密），不会请求或显示 AppSecret。
+记忆联动
+放弃修改
+保存联动配置
+保护模式
+关闭（保持既有行为）
+拒绝 QQ 会话读取记忆
+仅受信会话可读取
+QQ 候选记忆写回方式
+只进收件箱，人工确认
+按既有规则直接落盘
+i
+联动保护未启用：本插件行为与未接入 QQ 时完全一致，不拦截任何会话。
+标记来自 DSH 会话 header（origin / agentPreset / cwd）。未配置时没有任何会话会被识别为 QQ 或受信会话，绝不猜测。
+QQ 会话标记
+origin（一行一个）
+agentPreset（一行一个）
+cwd（一行一个，绝对路径）
+受信会话标记
+origin（一行一个）
+agentPreset（一行一个）
+cwd（一行一个，绝对路径）
+允许 QQ 会话调用记忆工具
+四个执行点的实际状态
+常驻记忆注入: 已注册
+每步检索: 未注册
+会话结束提取: 已注册
+记忆工具: 已注册
+常驻注入只有在宿主的提示词回调携带会话上下文时才能按会话拦截；宿主不支持时，本插件只能拦截每步检索、写回与工具。
+已注册工具
+memory_search, memory_get, memory_save, memory_forget
+后端运行说明（原文）
+!
+联动保护未启用：本插件的行为与未接入 QQ 时完全相同。
+!
+QQ 会话产生的候选记忆只进收件箱，需要人工确认后才成为长期记忆。
+执行点限制（原文）
+!
+standingContext: 常驻记忆注入已注册为按会话求值，但尚未观测到宿主传入会话上下文；在首次模型回合确认之前，该执行点不会按会话拦截。
+会话隔离与权限
+!
+QQ 私聊与群聊目前无法区分：官方插件 0.5.2 创建会话时不提供来源标识，本插件也不猜测。因此本页不做假的群聊隔离，只提供「QQ 通道」级策略，把私聊与群聊视为同一通道。
+当前策略下各类会话的判定
+样本
+实际判定
+命中标记
+读取记忆
+写回
+记忆工具
+QQ 通道（私聊/群聊不可区分）
+未识别会话
+无
+允许
+直接落盘
+可用
+受信会话
+未识别会话
+无
+允许
+直接落盘
+可用
+未识别来源的会话
+未识别会话
+无
+允许
+直接落盘
+可用
+!
+尚未配置 QQ 标记：目前没有任何会话会被识别为 QQ，这一行会按未识别会话处理。
+!
+尚未配置受信标记：这一行同样会按未识别会话处理。
+拦截计数（本次进程生命周期，重启归零）
+0
+常驻注入拦截
+0
+每步检索拦截
+0
+写入强制进收件箱
+0
+工具调用拦截
+最近会话判定样本
+暂无会话样本：样本只在真实会话经过四个执行点时产生，本页不伪造。
+记忆写入与收件箱
+打开收件箱
+QQ 会话沿用既有流程：会话结束提取候选 → 写入收件箱 → 人工确认 → 成为长期记忆。本页不改变这条流程。
+0
+收件箱待确认
+当前待确认 0 条
+当前写回方式
+只进收件箱，人工确认
+i
+inbox-only 由宿主端在写回执行点强制：策略启用且会话被识别为 QQ 时，候选记忆无法直接落盘。
+!
+联动未启用时，写回沿用设置页的既有规则；下面的说明只描述配置，不代表已经发生拦截。
+诊断
+重新诊断
+插件探测
+需注意
+同源 /qqbot/im-qqbot/bind 返回 404（路由不存在 = 插件未加载）
+后端 RPC
+正常
+qqLinkage 已返回配置、运行时与宿主事实；Vault：D:\dsh-memory-vault\.scratch\qq7-home\vault\DSH Memory
+宿主 Profile
+正常
+DSH_PROFILE=qqv；DSH_PROFILE_DIR=D:\dsh-memory-vault\.scratch\qq7-home\profiles\qqv
+能力
+需注意
+3/4 个执行点已注册
+策略是否在跑
+需注意
+保护模式为 off：不拦截任何会话
+插件清单
+需注意
+宿主 pluginInventory 报告 state=absent、phase=—（只能证明装没装/启没启用，不代表连接状态）
+宿主事实
+平台
+win32
+Node
+v24.21.0
+Profile
+qqv
+Profile 依据
+插件安装路径（最可信）
+DSH_HOME
+D:\dsh-memory-vault\.scratch\qq7-home
+Vault 路径
+D:\dsh-memory-vault\.scratch\qq7-home\vault\DSH Memory
+同一 Vault 与 Profile 的三种运行方式
+i
+同 Profile：官方 QQ 插件与本插件装在同一 Profile 时，QQ 会话与桌面会话共享同一 Vault 和同一套联动策略（本页的配置对两者都生效）。
+!
+独立 Profile：如果官方 QQ 插件装在另一个 Profile，需要在该 Profile 里也安装本插件并指向同一个 Vault 路径；本插件不会自动修改任何 Profile 的配置。并发写入依赖既有的 journal / 原子写机制。
+!
+配置不一致：两个 Profile 指向不同 Vault 时各自独立，记忆不共享。
+安全与凭据
+AppSecret 不经过本插件
+!
+官方插件会把 appId/appSecret 以明文 YAML 写入 <profile>/cordis.patch.yml（它自己的实现选择，没有使用系统密钥库）。本插件不读取、不保存、不回显任何凭据，也没有 Secret 输入框。
+官方包
+@tencent-connect/dsh-qqbot（cordis name im-qqbot，npm latest 0.5.2，客户端 UI 自 0.5.1 起）
+凭据文件（由官方插件写入）
+D:\dsh-memory-vault\.scratch\qq7-home\profiles\qqv/cordis.patch.yml
+兼容性：官方声明不等于本机验证
+i
+官方 package.json 的 dsh.compatibility.dshReleases 只记录了「已验证」的 0.1.0-rc.8 / 0.2.0-rc.2；0.2.1 线不在官方验证范围内。宿主安装门槛可能仍会放行（peer 范围宽松），但「能装」不等于「官方验证过」。
+i
+本插件仓库声明的宿主兼容范围是 0.2.1-rc.3（engines.dsh：>=0.2.1-rc.3 <0.2.2）。实际运行版本以宿主界面为准，本页不伪造版本号。
+i
+本插件不实现二维码绑定，也不调用官方的绑定 / 解绑 / 手动提交接口；唯一发起的网络请求是只读探测 GET /qqbot/im-qqbot/bind。
+!
+0.2.1 线存在公开的社区回归报告（上游 issue #58 / #60）；绑定或连接失败时，请先核对官方插件面板的状态。

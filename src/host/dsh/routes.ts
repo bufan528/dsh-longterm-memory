@@ -232,6 +232,10 @@ export async function dispatch(service: MemoryService, method: string, payload: 
       return service.previewRecall(optionalString(payload['query']) ?? '', typeof payload['limit'] === 'number' ? payload['limit'] : undefined)
     case 'previewStanding':
       return service.previewStandingSection()
+    case 'qqLinkage':
+      return service.qqLinkageReport()
+    case 'setQqLinkage':
+      return service.setQqLinkage(asRecord(payload['config']) as Parameters<MemoryService['setQqLinkage']>[0])
     default:
       throw new ServiceError(ERROR_CODES.notFound, `未知的接口方法：${method}`)
   }

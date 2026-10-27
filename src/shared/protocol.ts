@@ -19,6 +19,7 @@ import type {
   VaultInfo,
 } from './types.js'
 import type { IndexRecord, QueryFilters, SearchHit } from './search.js'
+import { DEFAULT_QQ_LINKAGE, type LinkageRuntimeStatus, type QqLinkageConfig } from './qq-linkage.js'
 
 /** Route prefix owned by this plugin. */
 export const ROUTE_PREFIX = '/dsh-longterm-memory/api'
@@ -52,6 +53,8 @@ export const RPC_METHODS = [
   'setSettings',
   'previewRecall',
   'previewStanding',
+  'qqLinkage',
+  'setQqLinkage',
 ] as const
 
 export type RpcMethod = (typeof RPC_METHODS)[number]
@@ -299,6 +302,14 @@ export interface PluginSettings {
   maxCandidatesPerTurn: number
   /** ISO instant of the last index rebuild. */
   lastIndexRebuild: string | null
+  /**
+   * QQ 接入与长期记忆的联动配置。
+   *
+   * 默认 `mode: 'off'`，即本插件的行为与未接入 QQ 时完全一致；策略一旦启用，
+   * 由宿主端在常驻注入、每步检索、写回与工具四个执行点真正执行，而不是只
+   * 隐藏界面开关。
+   */
+  qqLinkage: QqLinkageConfig
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -317,6 +328,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   sensitiveNeedsConfirmation: true,
   maxCandidatesPerTurn: 5,
   lastIndexRebuild: null,
+  qqLinkage: DEFAULT_QQ_LINKAGE,
 }
 
 export interface RpcRequestMap {
@@ -347,6 +359,8 @@ export interface RpcRequestMap {
   setSettings: Partial<PluginSettings>
   previewRecall: { query?: string; limit?: number }
   previewStanding: Record<string, never>
+  qqLinkage: Record<string, never>
+  setQqLinkage: { config: Partial<QqLinkageConfig> }
 }
 
 export interface RpcResultMap {
@@ -377,6 +391,8 @@ export interface RpcResultMap {
   setSettings: PluginSettings
   previewRecall: { text: string; usedTokens: number; includedIds: string[]; omitted: number }
   previewStanding: StandingPreview
+  qqLinkage: QqLinkageReport
+  setQqLinkage: QqLinkageReport
 }
 
 /**
@@ -404,6 +420,70 @@ export interface StandingPreview {
 
 export type RpcRequest<M extends RpcMethod> = RpcRequestMap[M]
 export type RpcResult<M extends RpcMethod> = RpcResultMap[M]
+
+/* ------------------------------------------------------- QQ 接入联动报告 */
+
+/** 宿主环境事实，用于诊断区如实展示「本插件跑在哪个运行环境里」。 */
+export interface QqHostFacts {
+  /** 本进程实际加载的 DSH Profile 名；无法判定时为 null。 */
+  profile: string | null
+  /** 该 Profile 的配置目录；无法判定时为 null。 */
+  profileDir: string | null
+  /**
+   * `profile` / `profileDir` 的证据来源：
+   * `module-path` = 从插件安装路径推导（最可信）；`env` = 退回环境变量；
+   * `unknown` = 两者都没有。
+   */
+  profileSource: 'module-path' | 'env' | 'unknown'
+  /** `DSH_HOME` 环境变量的值，未知时为 null。 */
+  dshHome: string | null
+  platform: string
+  nodeVersion: string
+}
+
+/** 四个执行点的实际注册情况。 */
+export interface QqEnforcementReport {
+  /** 常驻记忆注入已注册，且宿主的 `text` 回调携带会话上下文（可按会话拦截）。 */
+  standing: boolean
+  /** 每步检索已注册。 */
+  perStepRecall: boolean
+  /** 会话结束提取已注册。 */
+  extraction: boolean
+  /** 模型记忆工具已注册。 */
+  tools: boolean
+  registeredTools: string[]
+  notes: Record<string, string>
+}
+
+/** 最近观察到的一次会话判定，用来证明策略真的在跑。 */
+export interface QqSessionSample {
+  sessionId: string
+  channel: string
+  matchedBy: string | null
+  marker: string | null
+  reason: string
+  /** ISO 时间。 */
+  lastSeenAt: string
+}
+
+/** 各执行点的拦截计数（本次进程生命周期内，重启归零）。 */
+export interface QqLinkageCounters {
+  standingBlocked: number
+  recallBlocked: number
+  writesForcedInbox: number
+  toolsBlocked: number
+}
+
+export interface QqLinkageReport {
+  config: QqLinkageConfig
+  /** 策略在运行时到底能做到什么，来自 shared/qq-linkage 的同一套判定。 */
+  runtime: LinkageRuntimeStatus
+  enforcement: QqEnforcementReport
+  host: QqHostFacts
+  vaultPath: string | null
+  sessions: QqSessionSample[]
+  counters: QqLinkageCounters
+}
 
 /** Success/failure envelope used by every route response. */
 export type RpcEnvelope<M extends RpcMethod> =

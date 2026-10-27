@@ -19,6 +19,7 @@
 
 import type { MemoryService } from '../core/service.js'
 import { ServiceError } from '../core/service.js'
+import type { QqLinkageRuntime } from '../qq/linkage.js'
 import { MEMORY_TYPES, MEMORY_STATUSES, TYPE_DESCRIPTORS, type MemoryType } from '../../shared/types.js'
 import { scanSecrets } from '../core/engine.js'
 
@@ -87,8 +88,11 @@ const FORGET_DESCRIPTION = [
  *
  * Kept as a factory so the adapter can report exactly which tools were
  * registered, and so tests can call `execute` without a DSH host.
+ *
+ * @param linkage - QQ 联动运行时；提供时每个工具在执行前先做来源判定，识别为
+ *   QQ 通道且策略禁止的会话会收到一个普通工具错误，而不是拿到记忆内容。
  */
-export function buildToolDefinitions(service: MemoryService): ToolDefinition[] {
+export function buildToolDefinitions(service: MemoryService, linkage?: QqLinkageRuntime): ToolDefinition[] {
   return [
     {
       name: 'memory_search',
@@ -160,7 +164,8 @@ export function buildToolDefinitions(service: MemoryService): ToolDefinition[] {
           return [{ type: 'text', text: `Found ${String(payload.count)} memories:\n${lines.join('\n')}` }]
         },
       },
-      execute: async (args) => {
+      execute: async (args, exec) => {
+        assertToolsAllowed(linkage, exec)
         const input = asRecord(args)
         const query = typeof input['query'] === 'string' ? input['query'] : ''
         const types = stringArray(input['type'])
@@ -264,7 +269,8 @@ export function buildToolDefinitions(service: MemoryService): ToolDefinition[] {
           ]
         },
       },
-      execute: async (args) => {
+      execute: async (args, exec) => {
+        assertToolsAllowed(linkage, exec)
         const input = asRecord(args)
         const id = typeof input['id'] === 'string' ? input['id'].trim() : ''
         if (id.length === 0) throw new Error('memory_get requires a non-empty `id`')
@@ -342,6 +348,7 @@ export function buildToolDefinitions(service: MemoryService): ToolDefinition[] {
         },
       },
       execute: async (args, exec) => {
+        assertToolsAllowed(linkage, exec)
         const input = asRecord(args)
         const title = requireString(input['title'], 'title')
         const content = requireString(input['content'], 'content')
@@ -447,7 +454,8 @@ export function buildToolDefinitions(service: MemoryService): ToolDefinition[] {
           return [{ type: 'text', text: `Retired ${payload.id} with status ${payload.status}. The note is kept in the vault's archive.` }]
         },
       },
-      execute: async (args) => {
+      execute: async (args, exec) => {
+        assertToolsAllowed(linkage, exec)
         const input = asRecord(args)
         const id = requireString(input['id'], 'id')
         const reason = requireString(input['reason'], 'reason')
@@ -467,6 +475,20 @@ export function buildToolDefinitions(service: MemoryService): ToolDefinition[] {
 function asRecord(value: unknown): Record<string, unknown> {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return {}
   return value as Record<string, unknown>
+}
+
+/**
+ * QQ 联动工具拦截。
+ *
+ * 抛普通 Error 而不是 ServiceError：DSH 会把工具抛出的错误变成给模型看的
+ * 工具失败结果，模型因此能知道「这个会话不允许访问记忆」，而不是拿到内容。
+ */
+function assertToolsAllowed(linkage: QqLinkageRuntime | undefined, exec: ToolExecContext | undefined): void {
+  if (linkage === undefined) return
+  const verdict = linkage.tools(exec?.agent)
+  if (!verdict.decision.allowed) {
+    throw new Error(`memory tool refused for this session: ${verdict.decision.reason}`)
+  }
 }
 
 function stringArray(value: unknown): string[] | undefined {
@@ -519,7 +541,11 @@ export interface ToolRegistryLike {
  * @returns the tool names that registered, so the management page reports the
  *   truth rather than assuming the registration succeeded.
  */
-export function installTools(ctx: { get: (name: string) => unknown; effect: (fn: () => unknown, label?: string) => unknown; logger?: { warn: (message: string, ...rest: unknown[]) => void } }, service: MemoryService): { registered: string[]; notes: Record<string, string> } {
+export function installTools(
+  ctx: { get: (name: string) => unknown; effect: (fn: () => unknown, label?: string) => unknown; logger?: { warn: (message: string, ...rest: unknown[]) => void } },
+  service: MemoryService,
+  linkage?: QqLinkageRuntime,
+): { registered: string[]; notes: Record<string, string> } {
   const notes: Record<string, string> = {}
   const tools = (ctx.get('tools') ?? null) as ToolRegistryLike | null
   if (tools === null || typeof tools.register !== 'function') {
@@ -527,7 +553,7 @@ export function installTools(ctx: { get: (name: string) => unknown; effect: (fn:
     return { registered: [], notes }
   }
   const registered: string[] = []
-  const definitions = buildToolDefinitions(service)
+  const definitions = buildToolDefinitions(service, linkage)
   ctx.effect(
     () => {
       const disposers: unknown[] = []

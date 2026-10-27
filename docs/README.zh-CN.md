@@ -14,7 +14,7 @@
 <p align="center">
   <a href="https://github.com/bufan528/dsh-longterm-memory/stargazers"><img src="https://img.shields.io/github/stars/bufan528/dsh-longterm-memory?style=flat-square" alt="GitHub stars" /></a>
   <img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="MIT License" />
-  <img src="https://img.shields.io/badge/DSH-%3E%3D0.2.1--rc.2%20%3C0.2.2-7C3AED?style=flat-square" alt="DSH 0.2.1-rc.2" />
+  <img src="https://img.shields.io/badge/DSH-%3E%3D0.2.1--rc.3%20%3C0.2.2-7C3AED?style=flat-square" alt="DSH 0.2.1-rc.3" />
   <img src="https://img.shields.io/badge/node-%3E%3D20-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node >= 20" />
   <img src="https://img.shields.io/badge/status-preview-E5B650?style=flat-square" alt="Preview" />
   <a href="https://dsh.works/awesome-dsh-plugins/"><img src="https://img.shields.io/badge/listed_on-dsh.works-00c2e9?style=flat-square&labelColor=0d0d0d" alt="listed on dsh.works" /></a>
@@ -43,11 +43,21 @@
 > 插件，实时读取同一份目录，因此也可在 dshmarket 中直接发现与一键安装（无需单独提交）。
 > 也可执行 `dsh plugin add dsh-longterm-memory@latest`；
 > dsh.works 的条目同时供 **dsh-armory** 面板的「插件 → DSH 社区」市场展示与一键安装。
-> 桌面应用插件入口已在实际运行的桌面端完成端到端验证（五个页签 61/61 真实浏览器检查，
-> 真实 Vault，测试后已还原）。见 [安装](#安装)、[0.1.4 更新内容](#014-更新内容) 与
-> [项目状态与限制](#项目状态与限制)。
+> 桌面应用插件入口已在实际运行的桌面端完成端到端验证（既有的五个页签 61/61 真实浏览器
+> 检查，真实 Vault，测试后已还原）；0.1.5 的「QQ 接入」页另有隔离宿主上的真机验证，
+> 见 [docs/evidence/qq-verification.md](evidence/qq-verification.md)。见 [安装](#安装)、
+> [0.1.4 更新内容](#014-更新内容) 与 [项目状态与限制](#项目状态与限制)。
 
 ---
+
+## 0.1.5 更新内容
+
+**0.1.5** 新增第六个页签 **QQ 接入**（导航顺序
+`记忆总览 | 记忆检索 | 记忆管理 | 收件箱 | QQ 接入 | 设置`），以及可选的
+**QQ ↔ 长期记忆联动策略**（三种模式、四个执行点）与诊断卡片。详见
+[docs/qq-integration.md](qq-integration.md)。既有的 61 项真实浏览器 E2E 仍只覆盖此前
+五个页签；QQ 页签另在隔离的 DSH `0.2.1-rc.3` 宿主上完成真机验证
+（见 [docs/evidence/qq-verification.md](evidence/qq-verification.md)）。
 
 ## 0.1.4 更新内容
 
@@ -89,7 +99,7 @@
 
 | | |
 |---|---|
-| **一级侧边栏页面** | 注册 `sidebar.panellist` 一级入口与完整管理页（总览 / 检索 / 详情 / 管理 / 收件箱 / 设置），不是聊天标签页。 |
+| **一级侧边栏页面** | 注册 `sidebar.panellist` 一级入口与完整管理页（总览 / 检索 / 管理 / 收件箱 / QQ 接入 / 设置），不是聊天标签页。 |
 | **四个模型工具** | `memory_search`、`memory_get`、`memory_save`、`memory_forget`（保存前拒绝凭据类内容）。 |
 | **自动提取** | 在真实 `turn/end` 边界做**本地规则**候选提取；可选的模型辅助提取**默认关闭**。 |
 | **排序召回** | 基于 Markdown 的 BM25 风格词法排序，支持类别 / 状态 / 标签过滤与 token 预算。 |
@@ -99,6 +109,7 @@
 | **崩溃安全写入** | 单文件原子替换、文件锁、乐观 checksum 并发控制、持久化 journal outbox 与幂等恢复。 |
 | **Obsidian 兼容** | 仓库带 `.obsidian/`、`[[wikilinks]]`、稳定 frontmatter 与人类可读的 `Index/`。 |
 | **中英双语界面** | `language: zh | en`。 |
+| **可选的 QQ 接入页签** | 展示官方 `@tencent-connect/dsh-qqbot` 的接入状态、联动策略与诊断；不重新实现 QQ 协议、不复制官方连接代码、不接触凭据。 |
 | **零 `@deepseek-ai/*` 运行时依赖** | Host 只使用传入的 Cordis context，DSH 内部升级不会破坏 bundle。 |
 
 ### 界面
@@ -128,7 +139,7 @@ flowchart LR
 - **Host** 负责仓库、索引、journal 与提取；除非你显式开启模型辅助提取并配置自己的
   Provider，否则不会调用模型。
 - **管理页**通过仅回环的 RPC 面读写（`POST /dsh-longterm-memory/api/<method>`，
-  27 个方法），带浏览器信任栅栏（回环 / trusted hosts、`Origin`、`sec-fetch-site`）。
+  29 个方法），带浏览器信任栅栏（回环 / trusted hosts、`Origin`、`sec-fetch-site`）。
 - **召回**：`memory_search` 与自动注入共用同一引擎；显式召回可包含退役记忆（标注为
   历史），注入只用当前事实。`POST /api/previewStanding` 与 `POST /api/previewRecall`
   返回将注入的确切文本。
@@ -263,6 +274,68 @@ DSH Memory/
 | `sensitiveNeedsConfirmation` | `true` | 健康/财务/身份内容等待确认 |
 | `maxCandidatesPerTurn` | `5` | 每回合提取上限 |
 
+## QQ 接入（可选，0.1.5 起）
+
+第六个页签是 **QQ 接入**，导航顺序为
+`记忆总览 | 记忆检索 | 记忆管理 | 收件箱 | QQ 接入 | 设置`。它只做**状态展示、导航
+指引、联动策略与诊断**，不重新实现 QQ 协议，也不复制官方连接代码。
+
+### 页面做什么
+
+- 用同源 `GET /qqbot/im-qqbot/bind` 探测官方插件（4 秒超时）：`200` = 已加载
+  （`phase` 为 `bound` / `waiting` / `starting` / `saving` / `failed`），`404` = 未安装 /
+  未加载，其它 = **无法确认**。**不用** `ctx.get('im-qqbot')`——官方插件不注册任何
+  cordis 服务，加载了也只会拿到 `undefined`。
+- **不会替你打开官方绑定页**：宿主有通用的 main 页导航 API，但官方绑定 UI 在设置分区 /
+  右侧栏 Tab，第三方没有可靠的公开打开路径；因此只给准确指引：应用内
+  「设置 → QQ 机器人」或右侧栏「QQ 机器人绑定」。
+- **不生成二维码、不显示 AppSecret**（只显示官方状态路由自己回传的非机密 `appId`）。
+
+### 记忆联动
+
+默认关闭的四个执行点策略：
+
+| 模式 | 效果 |
+|---|---|
+| `off`（默认） | 与未接入 QQ 时完全相同 |
+| `deny-qq` | 命中你配置的 QQ 标记的会话不读取长期记忆 |
+| `allowlist` | 只有命中受信标记的会话才读取长期记忆 |
+
+四个执行点是：常驻提示词段、每步检索、回合结束写回（QQ 候选默认只进收件箱，除非
+`writeMode: direct`）与四个记忆工具（`allowTools` 默认 `false`）。QQ 会话只能靠**你
+声明**的 `origin` / `agentPreset` / `cwd` 标记识别（例如官方插件配置里的 `preset` /
+`cwd`）。**私聊与群聊无法区分**：官方插件内部知道 scope，但不写进 DSH 会话 header，
+因此本插件不做假的群聊隔离。详见 [docs/qq-integration.md](qq-integration.md) §5。
+
+### 凭据与 Profile 模式
+
+- 官方插件把 `appId` / `appSecret` 以**明文** YAML 写入
+  `<profile>/cordis.patch.yml`（无密钥库、无加密）。本插件不读取那份配置、不保存任何
+  凭据，`appSecret` 永不显示（页面只在已绑定时展示官方状态路由自己回传的非机密
+  `appId`），也不代理该文件。
+- **同 Profile**：QQ 会话与桌面会话共享同一 Vault（同一份记忆）——这正是需要
+  `deny-qq` / `allowlist` 的原因。
+- **独立 Profile**：在 QQ 的 profile 里也要安装本插件，并把两边 `vaultPath` 指向同一个
+  Vault；并发写入依赖既有的 journal / 原子写 / 文件锁机制。**本插件不自动修改任何
+  profile。**
+- **配置不一致**：`vaultPath` 不同就是两个互不共享的 Vault（不是 bug）。详见
+  [docs/qq-integration.md](qq-integration.md) §7。
+
+### 兼容性提醒
+
+官方 `@tencent-connect/dsh-qqbot` 只验证过 DSH `0.1.0-rc.8` 与 `0.2.0-rc.2`，
+**没有**验证 `0.2.1-rc.3`；宿主因 peer 范围会放行，但**能装 ≠ 官方验证**（0.2.1 线有
+open 的社区回归报告 issue #60 / #58）。见 [docs/compatibility.md](compatibility.md) §13。
+
+### 安装官方插件（可选）
+
+```bash
+npx @deepseek-ai/dsh plugin --profile <profile> add @tencent-connect/dsh-qqbot
+```
+
+然后在应用内「设置 → QQ 机器人」或右侧栏「QQ 机器人绑定」完成绑定（0.5.1+ 才有端内
+UI，旧版只有终端二维码）。官方插件是独立项目，本插件只读取它的绑定状态。
+
 ## 数据安全
 
 - **单文件原子写**（临时文件 + rename）与**按文件加锁**（含陈旧锁检测，失败时释放、
@@ -278,9 +351,10 @@ DSH Memory/
 
 ## 隐私
 
-- **默认无遥测、无外联。** Host 侧验收运行观察到 0 次网络调用；客户端唯一请求目标是
-  DSH 本机 RPC。0.1.3 的桌面端 E2E 运行了真实页面并断言无页面错误 / 无未捕获异常；
-  它不是包级别的网络抓包审计。
+- **默认无遥测、无外联。** Host 侧验收运行观察到 0 次网络调用；客户端请求目标只有
+  DSH 本机 RPC 与（打开 QQ 页时）同源只读探测 `GET /qqbot/im-qqbot/bind`，都是本机
+  回环。0.1.3 的桌面端 E2E 运行了真实页面并断言无页面错误 / 无未捕获异常；它不是
+  包级别的网络抓包审计。
 - **模型使用可选**：自动提取是本地规则；模型辅助提取默认关闭，开启后使用你在 DSH
   中配置的 Provider。
 - **凭据被拒绝**：密码 / API Key / 令牌 / 私钥类内容在进入仓库前被拦截；敏感类别需
@@ -292,8 +366,8 @@ DSH Memory/
 
 | | |
 |---|---|
-| DSH 运行时 | `>=0.2.1-rc.2 <0.2.2`（`engines.dsh`；**不支持** `0.2.0-rc.2`） |
-| 已验证 DSH 版本 | `0.2.1-rc.2`（Host + 真实 headless Chrome 验收） |
+| DSH 运行时 | `>=0.2.1-rc.3 <0.2.2`（`engines.dsh`；**不支持** `0.2.0-rc.2`） |
+| 已验证 DSH 版本 | `0.2.1-rc.3` —— 当前桌面宿主，插件已在其上真实加载并响应 RPC（见 [docs/compatibility.md](compatibility.md) §12） |
 | Node.js | `>=20` |
 | 平台 | Windows（主要），其他平台遵循 Node 路径规则 |
 | npm 包名 | `dsh-longterm-memory` —— **0.1.4 已发布**（latest） |
@@ -327,9 +401,11 @@ cookie，再用 `--cookie-file <name=value 文件>` 传入。
 
 ## 项目状态与限制
 
-- **预览版**：API 与存储格式仍可能变化；`0.1.0` 是首个公开版本，当前发布版为 `0.1.4`。
-- **npm 已发布**：`dsh-longterm-memory@0.1.4`（2026-10-20），注册表安装已验证。npm
-  的 `latest` dist-tag 与 GitHub Release 始终指向最新版本。
+- **预览版**：API 与存储格式仍可能变化；`0.1.0` 是首个公开版本，当前发布版为 `0.1.5`
+  （QQ 接入）。
+- **npm 已发布**：`dsh-longterm-memory@0.1.4`（2026-10-20），注册表安装已验证。`0.1.5`
+  以 GitHub Release 资产形式发布（`dsh-longterm-memory-0.1.5.tgz`）；npm 的 `latest`
+  dist-tag 在该版本执行 npm 发布后更新。
 - **已上架 DSH 插件市场**：条目位于
   [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
   目录（2026-10-19 收录）。可在应用内 **插件市场 / Plugin Market** 安装；后续版本通过
@@ -347,6 +423,11 @@ cookie，再用 `--cookie-file <name=value 文件>` 传入。
   dsh-armory 每隔几分钟重验缓存，新安装会直接拉取最新目录。
 - **桌面端已验证**：完整真实浏览器 E2E 已在运行中的桌面应用上通过（61/61 项，五个
   页签，真实 Vault，测试后已还原）。
+- **QQ 接入（0.1.5）**：QQ 页签、联动策略与诊断已写入
+  [docs/qq-integration.md](qq-integration.md)，并在隔离的 DSH `0.2.1-rc.3` 宿主上用真实
+  浏览器完成验证（见 [docs/evidence/qq-verification.md](evidence/qq-verification.md)）；
+  但**尚未**并入 61 项 E2E 套件。本机未安装官方 QQ 插件，探测只实测到 `404` 分支，
+  官方插件在 DSH `0.2.1-rc.3` 上的实际行为未验证。
 - **已知后续项**：内存收件箱候选是草稿——确认前不计入 `待确认数量` / `Inbox/` 目录，
   确认或拒绝后即离开收件箱。仍有少量并发与移动原子性边界；审查中发现的 frontmatter
   与锁问题已在 `0.1.0` 修复并由测试锁定。
@@ -361,6 +442,7 @@ cookie，再用 `--cookie-file <name=value 文件>` 传入。
 | [docs/storage-format.md](storage-format.md) | Markdown / frontmatter / 索引 / 日志格式 |
 | [docs/privacy.md](privacy.md) | 隐私与威胁模型 |
 | [docs/compatibility.md](compatibility.md) | 兼容性契约与证据 |
+| [docs/qq-integration.md](qq-integration.md) | QQ 接入页签、官方插件探测、记忆联动、Vault 与 Profile 模式 |
 | [docs/verification.md](verification.md) | 验证记录与验收证据 |
 | [CHANGELOG.md](../CHANGELOG.md) | 每个发布版本的更新记录 |
 | [docs/troubleshooting.md](troubleshooting.md) | 恢复步骤与常见问题 |

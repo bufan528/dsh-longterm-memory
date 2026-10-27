@@ -110,4 +110,10 @@ export const CLIENT_CSS = `
 .lmv-grow{flex:1 1 auto;min-width:0}
 .lmv-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .lmv-sep{color:var(--dsw-alias-label-tertiary,#8a8a8a)}
+.lmv-qq-group{display:flex;flex-direction:column;gap:8px;min-width:0}
+.lmv-qq-evidence{font-size:12px;color:var(--dsw-alias-label-secondary,#b8b8b8);overflow-wrap:anywhere;min-width:0}
+.lmv-qq-matrix-wrap{overflow-x:auto;min-width:0}
+.lmv-qq-matrix{display:grid;grid-template-columns:minmax(150px,1.3fr) minmax(100px,.9fr) minmax(130px,1.1fr) repeat(3,minmax(76px,.6fr));gap:6px 10px;align-items:center;min-width:560px;font-size:12px}
+.lmv-qq-matrix-head{font-size:11px;color:var(--dsw-alias-label-tertiary,#8a8a8a);white-space:nowrap}
+.lmv-qq-cell{min-width:0;overflow-wrap:anywhere}
 `
