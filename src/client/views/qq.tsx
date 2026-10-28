@@ -19,9 +19,23 @@ import type { ReactElement, ReactNode } from 'react'
 
 import { QQ_LINKAGE_MODES, QQ_WRITE_MODES } from '../../shared/qq-linkage.js'
 import type { QqLinkageConfig, QqLinkageMode, QqWriteMode } from '../../shared/qq-linkage.js'
+import { ERROR_CODES } from '../../shared/protocol.js'
 import type { QqLinkageReport } from '../../shared/protocol.js'
+import {
+  DEFAULT_QQBOT_MERGE_CONFIG,
+  QQBOT_MERGE_BUSY_POLICIES,
+  QQBOT_MERGE_REPLY_MODES,
+  normalizeMergeConfig,
+} from '../../shared/qqbot-merge-contract.js'
+import type {
+  QqbotMergeBusyPolicy,
+  QqbotMergeConfig,
+  QqbotMergeCounters,
+  QqbotMergeReplyMode,
+  QqbotMergeReport,
+} from '../../shared/qqbot-merge-contract.js'
 import type { VaultInfo } from '../../shared/types.js'
-import { call, errMessage, useAsync, useMutation } from '../api.js'
+import { call, errCode, errMessage, useAsync, useMutation } from '../api.js'
 import { useT } from '../i18n.js'
 import type { Translate } from '../i18n.js'
 import { usePage } from '../page-api.js'
@@ -53,7 +67,7 @@ import type {
   QqProbeOutcome,
 } from '../qq-channel.js'
 import type { OfficialPresence } from '../host-inventory.js'
-import { Badge, Button, Card, Checkbox, Empty, ErrorNotice, Field, KvList, Loading, Notice, Select, Stat, TextArea } from '../ui.js'
+import { Badge, Button, Card, Checkbox, Empty, ErrorNotice, Field, KvList, Loading, Notice, NumberInput, Select, Stat, TextArea } from '../ui.js'
 import type { BadgeKind } from '../util.js'
 import { formatTime, shortId } from '../util.js'
 
@@ -62,6 +76,18 @@ type MarkerGroup = 'qq' | 'trusted'
 
 /** 标记编辑时的一个字段。 */
 type MarkerField = keyof MarkerTexts
+
+/** 合并计数字段与对应的文案 key，按契约里的字段顺序展示。 */
+const MERGE_COUNTER_FIELDS: readonly { field: keyof QqbotMergeCounters; key: string }[] = [
+  { field: 'batchesMerged', key: 'qq.merge.counter.batchesMerged' },
+  { field: 'messagesSteered', key: 'qq.merge.counter.messagesSteered' },
+  { field: 'messagesFollowedUp', key: 'qq.merge.counter.messagesFollowedUp' },
+  { field: 'messagesOverflowed', key: 'qq.merge.counter.messagesOverflowed' },
+  { field: 'steerFallbacks', key: 'qq.merge.counter.steerFallbacks' },
+  { field: 'replyRewrites', key: 'qq.merge.counter.replyRewrites' },
+  { field: 'repliesCompleted', key: 'qq.merge.counter.repliesCompleted' },
+  { field: 'batchesAborted', key: 'qq.merge.counter.batchesAborted' },
+]
 
 /** 探测结论对应的徽标颜色。 */
 function probeBadgeKind(kind: QqProbeKind): BadgeKind {
@@ -423,7 +449,298 @@ function LinkageCard(props: {
   )
 }
 
-/** 第 3 张卡：会话隔离与权限（含「私聊/群聊不可区分」的如实说明）。 */
+/** 合并配置的字段组；是否可编辑由外层 fieldset 统一控制。 */
+function MergeFields(props: {
+  value: QqbotMergeConfig
+  onChange: (changes: Partial<QqbotMergeConfig>) => void
+}): ReactElement {
+  const translate = useT()
+  const value = props.value
+  return (
+    <>
+      <Checkbox
+        checked={value.enabled}
+        label={translate('qq.merge.enabled')}
+        onChange={(enabled) => {
+          props.onChange({ enabled })
+        }}
+      />
+      <div className="lmv-toolbar">
+        <Field label={translate('qq.merge.windowMs')}>
+          <NumberInput
+            min={100}
+            max={10000}
+            value={value.windowMs}
+            onChange={(windowMs) => {
+              props.onChange({ windowMs })
+            }}
+          />
+        </Field>
+        <Field label={translate('qq.merge.maxBatchMessages')}>
+          <NumberInput
+            min={1}
+            max={50}
+            value={value.maxBatchMessages}
+            onChange={(maxBatchMessages) => {
+              props.onChange({ maxBatchMessages })
+            }}
+          />
+        </Field>
+        <Field label={translate('qq.merge.maxBatchChars')}>
+          <NumberInput
+            min={200}
+            max={20000}
+            value={value.maxBatchChars}
+            onChange={(maxBatchChars) => {
+              props.onChange({ maxBatchChars })
+            }}
+          />
+        </Field>
+      </div>
+      <div className="lmv-toolbar">
+        <Field label={translate('qq.merge.busyPolicy')}>
+          <Select<QqbotMergeBusyPolicy>
+            value={value.busyPolicy}
+            options={QQBOT_MERGE_BUSY_POLICIES.map((policy) => ({ value: policy, label: translate(`qq.merge.busy.${policy}`) }))}
+            onChange={(busyPolicy) => {
+              props.onChange({ busyPolicy })
+            }}
+          />
+        </Field>
+        <Field label={translate('qq.merge.replyMode')}>
+          <Select<QqbotMergeReplyMode>
+            value={value.replyMode}
+            options={QQBOT_MERGE_REPLY_MODES.map((mode) => ({ value: mode, label: translate(`qq.merge.reply.${mode}`) }))}
+            onChange={(replyMode) => {
+              props.onChange({ replyMode })
+            }}
+          />
+        </Field>
+      </div>
+      <div className="lmv-wrap">
+        <Checkbox
+          checked={value.scope.c2c}
+          label={translate('qq.merge.scopeC2c')}
+          onChange={(c2c) => {
+            props.onChange({ scope: { ...value.scope, c2c } })
+          }}
+        />
+        <Checkbox
+          checked={value.scope.group}
+          label={translate('qq.merge.scopeGroup')}
+          onChange={(group) => {
+            props.onChange({ scope: { ...value.scope, group } })
+          }}
+        />
+      </div>
+    </>
+  )
+}
+
+/**
+ * 第 3 张卡：连续消息智能合并。
+ *
+ * 真相只来自运行中的 QQ Bot 扩展：`available: false` 时本卡只显示「未生效」与
+ * 原因，并渲染全部禁用的控件（默认值，不写入任何地方）；扩展在线时才允许编辑、
+ * 读取真实计数与最近一批合并结果。
+ */
+function MergeCard(props: {
+  report: QqbotMergeReport | null
+  loading: boolean
+  error: unknown
+  saving: boolean
+  saveError: unknown
+  onSave: (config: QqbotMergeConfig) => void
+  onRefresh: () => void
+}): ReactElement {
+  const translate = useT()
+  const [draft, setDraft] = useState<QqbotMergeConfig | null>(null)
+  const live = props.report
+  const status = live !== null && live.available ? live.status : null
+
+  useEffect(() => {
+    setDraft(status === null ? null : normalizeMergeConfig(status.config))
+  }, [status])
+
+  const current = status === null ? null : (draft ?? normalizeMergeConfig(status.config))
+  const compatible = live !== null && live.available ? live.compatible : false
+  const editable = status !== null && compatible
+  const dirty =
+    current !== null && status !== null && JSON.stringify(current) !== JSON.stringify(normalizeMergeConfig(status.config))
+  const missingRpc =
+    props.error !== null &&
+    (errCode(props.error) === ERROR_CODES.notFound ||
+      errCode(props.error) === ERROR_CODES.unsupported ||
+      (errCode(props.error) === ERROR_CODES.internal && errMessage(props.error).includes('HTTP 404')))
+  const batch = status === null ? null : status.lastBatch
+  const enabledNow = current !== null ? current.enabled : status !== null && status.config.enabled
+
+  return (
+    <Card
+      title={translate('qq.card.merge')}
+      actions={
+        <>
+          {dirty ? <span className="lmv-meta">{translate('qq.merge.dirty')}</span> : null}
+          <Button variant="ghost" disabled={props.loading} onClick={props.onRefresh}>
+            {translate('qq.merge.refresh')}
+          </Button>
+          {status === null || current === null ? null : (
+            <Button
+              variant="primary"
+              disabled={!editable || props.saving || !dirty}
+              onClick={() => {
+                props.onSave(normalizeMergeConfig(current))
+              }}
+            >
+              {translate('qq.merge.save')}
+            </Button>
+          )}
+        </>
+      }
+    >
+      {props.loading && live === null ? <Loading label={translate('qq.merge.loading')} /> : null}
+
+      {live === null && !props.loading ? (
+        <>
+          <div className="lmv-wrap">
+            <Badge kind="warn">{translate('qq.merge.badge.inactive')}</Badge>
+          </div>
+          <Notice kind="warn">
+            {missingRpc ? translate('qq.merge.rpcMissing') : translate('qq.merge.rpcFailed', { message: errMessage(props.error) })}
+          </Notice>
+        </>
+      ) : null}
+
+      {live !== null && !live.available ? (
+        <>
+          <div className="lmv-wrap">
+            <Badge kind="warn">{translate('qq.merge.badge.inactive')}</Badge>
+            <span className="lmv-meta">
+              {translate('qq.merge.officialVersion')}:{' '}
+              <span className="lmv-mono">{live.officialVersion ?? translate('qq.merge.unknownVersion')}</span>
+            </span>
+          </div>
+          <Notice kind="warn">{live.reason}</Notice>
+          <Notice>{translate('qq.merge.officialOnly')}</Notice>
+          <Notice>{translate('qq.merge.installHint')}</Notice>
+          <span className="lmv-meta">{translate('qq.merge.defaultsHint')}</span>
+          <fieldset className="lmv-fieldset" disabled>
+            <MergeFields
+              value={DEFAULT_QQBOT_MERGE_CONFIG}
+              onChange={() => {
+                /* 扩展不在线时不接受修改：控件全部禁用 */
+              }}
+            />
+          </fieldset>
+        </>
+      ) : null}
+
+      {live !== null && live.available ? (
+        <>
+          <div className="lmv-wrap">
+            <Badge kind={!compatible ? 'warn' : enabledNow ? 'ok' : 'plain'}>
+              {translate(
+                !compatible ? 'qq.merge.badge.incompatible' : enabledNow ? 'qq.merge.badge.enabled' : 'qq.merge.badge.disabled',
+              )}
+            </Badge>
+            <span className="lmv-meta">
+              {translate('qq.merge.appliedRevision')}: <span className="lmv-mono">{live.status.applied.revision}</span>
+            </span>
+            <span className="lmv-meta">
+              {translate('qq.merge.appliedAt')}: {formatTime(live.status.applied.appliedAt)}
+            </span>
+          </div>
+
+          {compatible ? null : (
+            <Notice kind="warn">
+              {translate('qq.merge.compatWarn', { note: live.compatibilityNote ?? translate('common.unknown') })}
+            </Notice>
+          )}
+
+          {current === null ? null : (
+            <fieldset className="lmv-fieldset" disabled={!editable}>
+              <MergeFields
+                value={current}
+                onChange={(changes) => {
+                  setDraft({ ...current, ...changes })
+                }}
+              />
+            </fieldset>
+          )}
+          {props.saveError === null ? null : <ErrorNotice error={props.saveError} />}
+
+          <hr className="lmv-hr" />
+          <span className="lmv-card-title">{translate('qq.merge.runtime')}</span>
+          <div className="lmv-wrap">
+            <Badge kind={live.status.runtime.steerSupported ? 'ok' : 'warn'}>
+              {translate(live.status.runtime.steerSupported ? 'qq.merge.steerSupportedYes' : 'qq.merge.steerSupportedNo')}
+            </Badge>
+          </div>
+          <KvList
+            items={[
+              {
+                key: translate('qq.merge.steerMechanism'),
+                value: <span className="lmv-mono">{live.status.runtime.steerMechanism}</span>,
+              },
+              {
+                key: translate('qq.merge.integration'),
+                value: <span className="lmv-mono">{live.status.runtime.integration}</span>,
+              },
+              { key: translate('qq.merge.runtimeNote'), value: live.status.runtime.note },
+            ]}
+          />
+
+          <hr className="lmv-hr" />
+          <span className="lmv-card-title">{translate('qq.merge.diagnostics')}</span>
+          <Notice>{translate('qq.merge.editorOnly')}</Notice>
+          <div className="lmv-grid">
+            <Stat label={translate('qq.merge.activeBatches')} value={live.status.applied.activeBatches} />
+            <Stat label={translate('qq.merge.pendingMessages')} value={live.status.applied.pendingMessages} />
+          </div>
+
+          <span className="lmv-field-label">{translate('qq.merge.counters')}</span>
+          <div className="lmv-grid">
+            {MERGE_COUNTER_FIELDS.map((entry) => (
+              <Stat key={entry.field} label={translate(entry.key)} value={live.status.counters[entry.field]} />
+            ))}
+          </div>
+
+          <span className="lmv-field-label">{translate('qq.merge.lastBatch')}</span>
+          {batch === null ? (
+            <Empty>{translate('qq.merge.lastBatchEmpty')}</Empty>
+          ) : (
+            <div className="lmv-row">
+              <span className="lmv-row-main">
+                <span className="lmv-meta">
+                  <Badge kind={batch.ok ? 'ok' : 'error'}>
+                    {batch.ok ? translate('qq.merge.batchOk') : translate('qq.merge.batchFailed', { reason: batch.error ?? translate('common.unknown') })}
+                  </Badge>
+                  <span>
+                    {translate('qq.merge.lastBatchAt')}: {formatTime(batch.at)}
+                  </span>
+                  <span className="lmv-mono">{shortId(batch.sessionKey, 40)}</span>
+                </span>
+                <span className="lmv-meta">
+                  <span>
+                    {translate('qq.merge.lastBatchMode')}: {translate(`qq.merge.batchMode.${batch.mode}`)}
+                  </span>
+                  <span>
+                    {translate('qq.merge.lastBatchCount')}: {batch.count}
+                  </span>
+                  <span>
+                    {translate('qq.merge.lastBatchChars')}: {batch.chars}
+                  </span>
+                </span>
+              </span>
+            </div>
+          )}
+        </>
+      ) : null}
+    </Card>
+  )
+}
+
+/** 第 4 张卡：会话隔离与权限（含「私聊/群聊不可区分」的如实说明）。 */
 function IsolationCard(props: { report: QqLinkageReport }): ReactElement {
   const translate = useT()
   const samples = buildIsolationSamples(props.report.config)
@@ -523,7 +840,7 @@ function IsolationCard(props: { report: QqLinkageReport }): ReactElement {
   )
 }
 
-/** 第 4 张卡：记忆写入与收件箱。 */
+/** 第 5 张卡：记忆写入与收件箱。 */
 function InboxCard(props: { report: QqLinkageReport; vault: VaultInfo; onOpenInbox: () => void }): ReactElement {
   const translate = useT()
   const config = props.report.config
@@ -564,7 +881,7 @@ function InboxCard(props: { report: QqLinkageReport; vault: VaultInfo; onOpenInb
   )
 }
 
-/** 第 5 张卡：诊断（五类真实结果 + 同一 Vault 与 Profile 的说明）。 */
+/** 第 6 张卡：诊断（五类真实结果 + 同一 Vault 与 Profile 的说明）。 */
 function DiagnosticsCard(props: {
   probe: QqProbeOutcome | null
   presence: OfficialPresence | null
@@ -649,7 +966,7 @@ function DiagnosticsCard(props: {
   )
 }
 
-/** 第 6 张卡：安全与凭据。 */
+/** 第 7 张卡：安全与凭据。 */
 function SecurityCard(props: { report: QqLinkageReport | null }): ReactElement {
   const translate = useT()
   const profileDir = props.report === null ? null : props.report.host.profileDir
@@ -696,11 +1013,15 @@ export function QqView(props: { vault: VaultInfo }): ReactElement {
   const probe = useAsync(() => probeOfficialChannelDetailed(), [])
   const report = useAsync(() => call('qqLinkage', {}), [])
   const save = useMutation((config: Partial<QqLinkageConfig>) => call('setQqLinkage', { config }))
+  const merge = useAsync(() => call('qqMerge', {}), [])
+  const mergeSave = useMutation((config: Partial<QqbotMergeConfig>) => call('setQqMerge', { config }))
   const [updated, setUpdated] = useState<QqLinkageReport | null>(null)
+  const [mergeUpdated, setMergeUpdated] = useState<QqbotMergeReport | null>(null)
   const [draft, setDraft] = useState<QqLinkageConfig | null>(null)
   const [texts, setTexts] = useState<LinkageMarkerTexts | null>(null)
 
   const live = updated ?? report.data
+  const mergeLive = mergeUpdated ?? merge.data
 
   useEffect(() => {
     const loaded = report.data
@@ -747,6 +1068,25 @@ export function QqView(props: { vault: VaultInfo }): ReactElement {
     setTexts(linkageMarkersToText(live.config))
   }
 
+  const doSaveMerge = (config: QqbotMergeConfig): void => {
+    void (async () => {
+      try {
+        const result = await mergeSave.run(config)
+        if (result !== undefined) {
+          setMergeUpdated(result)
+          page.toast(translate('qq.merge.saved'), 'ok')
+        }
+      } catch {
+        /* rendered from the mutation state */
+      }
+    })()
+  }
+
+  const refreshMerge = (): void => {
+    setMergeUpdated(null)
+    merge.reload()
+  }
+
   const rerun = (): void => {
     probe.reload()
     setUpdated(null)
@@ -778,19 +1118,32 @@ export function QqView(props: { vault: VaultInfo }): ReactElement {
           <Loading />
         </Card>
       ) : (
+        <LinkageCard
+          report={live}
+          draft={draft}
+          texts={texts}
+          dirty={dirty}
+          saving={save.busy}
+          saveError={save.error}
+          onPatch={patchConfig}
+          onMarkerChange={patchMarkers}
+          onSave={doSave}
+          onReset={doReset}
+        />
+      )}
+
+      <MergeCard
+        report={mergeLive}
+        loading={merge.loading}
+        error={merge.error}
+        saving={mergeSave.busy}
+        saveError={mergeSave.error}
+        onSave={doSaveMerge}
+        onRefresh={refreshMerge}
+      />
+
+      {live === null || draft === null || texts === null ? null : (
         <>
-          <LinkageCard
-            report={live}
-            draft={draft}
-            texts={texts}
-            dirty={dirty}
-            saving={save.busy}
-            saveError={save.error}
-            onPatch={patchConfig}
-            onMarkerChange={patchMarkers}
-            onSave={doSave}
-            onReset={doReset}
-          />
           <IsolationCard report={live} />
           <InboxCard report={live} vault={props.vault} onOpenInbox={page.openInbox} />
         </>

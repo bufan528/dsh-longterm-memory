@@ -27,8 +27,10 @@ import {
 } from '../../shared/types.js'
 import { newMemoryId, nowIso } from '../../shared/validate.js'
 import { normalizeQqLinkage, QQ_LINKAGE_MODES, QQ_WRITE_MODES, type QqLinkageConfig } from '../../shared/qq-linkage.js'
+import type { QqbotMergeConfig, QqbotMergeReport } from '../../shared/qqbot-merge-contract.js'
 import type { QqHostFacts, QqLinkageReport } from '../../shared/protocol.js'
 import { QqLinkageRuntime } from '../qq/linkage.js'
+import { MergeBridgeError, QqbotMergeBridge } from '../qq/merge-bridge.js'
 import {
   INDEX_FORMAT_VERSION,
   checksum,
@@ -197,6 +199,13 @@ export class MemoryService {
    * 上保存的策略会立刻在四个执行点生效；计数与样本只存在内存里，从不写盘。
    */
   readonly linkage: QqLinkageRuntime
+  /**
+   * 「连续消息智能合并」跨插件桥。
+   *
+   * 真实执行者在独立扩展 `dsh-qqbot-merge` 里；这里只消费它提供的 `qqbotMerge`
+   * 服务。扩展缺席时报告 `available: false`，页面据此显示 BLOCKED，绝不伪造开关。
+   */
+  readonly qqMerge: QqbotMergeBridge
 
   constructor(deps: ServiceDeps = {}) {
     this.deps = deps
@@ -206,6 +215,15 @@ export class MemoryService {
     }
     this.linkage = new QqLinkageRuntime({
       config: () => this.settings.qqLinkage,
+      ...(deps.logger === undefined ? {} : { logger: deps.logger }),
+    })
+    this.qqMerge = new QqbotMergeBridge({
+      profileDir: () => {
+        const derived = deriveProfileFromModulePath(deps.modulePath)
+        if (derived !== null) return derived.dir
+        const fromEnv = typeof process === 'undefined' ? undefined : process.env['DSH_PROFILE_DIR']
+        return typeof fromEnv === 'string' && fromEnv.length > 0 ? fromEnv : null
+      },
       ...(deps.logger === undefined ? {} : { logger: deps.logger }),
     })
     this.recomputeSettings()
@@ -511,6 +529,36 @@ export class MemoryService {
     const merged = mergeQqLinkage(normalizeQqLinkage(this.settings.qqLinkage), patch)
     await this.setSettings({ qqLinkage: merged })
     return this.qqLinkageReport()
+  }
+
+  /* ------------------------------------------- QQ 连续消息智能合并（跨插件） */
+
+  /**
+   * 读取「连续消息智能合并」的真实状态。
+   *
+   * 数据全部来自运行中的 QQ 扩展（`qqbotMerge` 服务）；扩展不在时返回
+   * `available: false` + 原因，页面据此显示 BLOCKED，而不是显示一个假开关。
+   */
+  async qqMergeReport(): Promise<QqbotMergeReport> {
+    return this.qqMerge.report()
+  }
+
+  /**
+   * 把合并配置写入运行中的 QQ 扩展。
+   *
+   * 扩展不在时直接拒绝（`unsupported`）：在 Memory Vault 里存一个值而没有任何
+   * 运行时会读取它，是最容易骗过用户的做法，这里显式禁止。
+   */
+  async setQqMerge(patch: Partial<QqbotMergeConfig>): Promise<QqbotMergeReport> {
+    try {
+      return await this.qqMerge.setConfig(patch)
+    } catch (error) {
+      if (error instanceof MergeBridgeError) {
+        const code = error.code === ERROR_CODES.unsupported ? ERROR_CODES.unsupported : error.code === ERROR_CODES.invalid ? ERROR_CODES.invalid : ERROR_CODES.internal
+        throw new ServiceError(code, error.message)
+      }
+      throw error
+    }
   }
 
   /* -------------------------------------------------------------- discovery */

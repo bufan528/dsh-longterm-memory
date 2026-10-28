@@ -33,10 +33,9 @@
   <a href="../README.md"><strong>English</strong></a>
 </p>
 
-> **项目状态（2026-10-27）**：`dsh-longterm-memory@0.1.5` 是最新发布版（
-> [GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest)，
-> 附不带版本号的 `dsh-longterm-memory.tgz`）；npm 上最新已发布版本仍是 `0.1.4`，
-> 并且**已进入两个社区目录**：
+> **项目状态（2026-10-28）**：`dsh-longterm-memory@0.1.6` 已发布到 npm，并附带在
+> [最新 GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest)
+> 中（含不带版本号的 `dsh-longterm-memory.tgz`），并且**已进入两个社区目录**：
 > [DSH 插件市场](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
 > （2026-10-19 收录）和
 > [dsh.works 社区注册表](https://dsh.works/awesome-dsh-plugins/)
@@ -51,6 +50,19 @@
 > [0.1.4 更新内容](#014-更新内容) 与 [项目状态与限制](#项目状态与限制)。
 
 ---
+
+## 0.1.6 更新内容
+
+**0.1.6** 新增 **QQ 连续消息智能合并**（非打断式 steering + 同一轮单条回复）的
+**控制面**：「QQ 接入」页新增第 7 张卡片，可配置合并窗口（默认 800ms）、私聊/群聊策略、
+运行中消息处理方式（非打断式续航并入 / 排队到下一轮）与回复方式（同一条消息持续修订 /
+按步骤逐条发送），并展示运行期真实计数与最近批次。
+
+该开关只在**运行中的 QQ Bot 扩展**真正提供 `qqbotMerge` 服务时才可编辑；当前官方
+`@tencent-connect/dsh-qqbot` 0.5.3 没有任何扩展点，因此页面会如实显示 **未生效**、控件全部
+禁用、写入被后端拒绝——不会出现「显示已启用但实际无效」的开关。执行侧实现位于本仓库
+`extensions/dsh-qqbot-merge`（官方 0.5.3 的 MIT 维护分支，**未**随 npm 包安装）。详见
+[docs/qq-merge.md](qq-merge.md)。
 
 ## 0.1.5 更新内容
 
@@ -174,9 +186,8 @@ Vault**，在插件卡片上安装/更新，按提示重启应用。应用内市
 dsh plugin --profile web add dsh-longterm-memory@latest
 ```
 
-> 最新 **npm** 版本：`dsh-longterm-memory@0.1.4`。使用 `@latest`（或省略版本号）可确保
-> 每次都安装最新**已发布**版。最新 **GitHub** 版本为 `v0.1.5`；在 0.1.5 发布到 npm
-> 之前，请用下面的方式 C 从 tarball 安装。
+> 最新 **npm** 版本：`dsh-longterm-memory@0.1.6`。使用 `@latest`（或省略版本号）可确保
+> 每次都安装最新**已发布**版。最新 **GitHub** 版本为 `v0.1.6`；两者是同一份构建。
 
 ### 方式 C —— 下载最新打包 tarball（无需构建）
 
@@ -212,11 +223,11 @@ dsh plugin --profile web add .\dsh-longterm-memory.tgz
 ```bash
 npm install
 npm run build
-npm pack                     # 产出 dsh-longterm-memory-0.1.5.tgz
+npm pack                     # 产出 dsh-longterm-memory-0.1.6.tgz
 
 $env:DSH_HOME = "<临时目录>"              # PowerShell
 # export DSH_HOME="<临时目录>"            # bash
-dsh plugin --profile lmv add .\dsh-longterm-memory-0.1.5.tgz
+dsh plugin --profile lmv add .\dsh-longterm-memory-0.1.6.tgz
 
 dsh --profile lmv --no-open --port 0
 ```
@@ -386,8 +397,8 @@ UI，旧版只有终端二维码）。官方插件是独立项目，本插件只
 | 已验证 DSH 版本 | `0.2.1-rc.3` —— 当前桌面宿主，插件已在其上真实加载并响应 RPC（见 [docs/compatibility.md](compatibility.md) §12） |
 | Node.js | `>=20` |
 | 平台 | Windows（主要），其他平台遵循 Node 路径规则 |
-| npm 包名 | `dsh-longterm-memory` —— **npm 已发布 0.1.4**；**0.1.5** 为最新 GitHub Release |
-| 下载方式 | [最新 GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest) 的固定别名 `dsh-longterm-memory.tgz`（含 `.sha256`），或 npm `@latest`（0.1.4） |
+| npm 包名 | `dsh-longterm-memory` —— **npm 与 GitHub 均已发布 0.1.6** |
+| 下载方式 | [最新 GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest) 的固定别名 `dsh-longterm-memory.tgz`（含 `.sha256`），或 npm `@latest`（0.1.6） |
 | DSH 插件市场 | **已上架** [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)（2026-10-19 收录）；更新跟随 npm `latest` |
 | dshmarket（应用内市场） | **已收录**，通过与上面相同的 [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/) 目录；2026-10-21 线上注册表核对为 `0.1.4` + 5 张截图（无需单独向 dshmarket 提交） |
 | dsh.works 注册表 | **已收录 + verified**（[dshworks/awesome-dsh-plugins](https://dsh.works/awesome-dsh-plugins/)，2026-10-19）；供 **dsh-armory** 面板的「插件 → DSH 社区」市场展示与一键安装 |
@@ -417,11 +428,11 @@ cookie，再用 `--cookie-file <name=value 文件>` 传入。
 
 ## 项目状态与限制
 
-- **预览版**：API 与存储格式仍可能变化；`0.1.0` 是首个公开版本，当前发布版为 `0.1.5`
-  （QQ 接入）。
-- **npm 已发布**：`dsh-longterm-memory@0.1.4`（2026-10-20），注册表安装已验证。`0.1.5`
-  以 GitHub Release 资产形式发布（`dsh-longterm-memory-0.1.5.tgz`）；npm 的 `latest`
-  dist-tag 在该版本执行 npm 发布后更新。
+- **预览版**：API 与存储格式仍可能变化；`0.1.0` 是首个公开版本，当前发布版为 `0.1.6`
+  （QQ 连续消息智能合并控制面）。
+- **npm 已发布**：`dsh-longterm-memory@0.1.6`（2026-10-28）；npm `latest` 指向该版本，
+  注册表安装已验证。同一份构建附带在最新 GitHub Release
+  （`dsh-longterm-memory-0.1.6.tgz` 与固定别名 `dsh-longterm-memory.tgz`，均含 `.sha256`）。
 - **已上架 DSH 插件市场**：条目位于
   [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
   目录（2026-10-19 收录）。可在应用内 **插件市场 / Plugin Market** 安装；后续版本通过
@@ -467,3 +478,4 @@ cookie，再用 `--cookie-file <name=value 文件>` 传入。
 ## 许可证
 
 [MIT](../LICENSE)
+

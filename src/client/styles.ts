@@ -116,4 +116,7 @@ export const CLIENT_CSS = `
 .lmv-qq-matrix{display:grid;grid-template-columns:minmax(150px,1.3fr) minmax(100px,.9fr) minmax(130px,1.1fr) repeat(3,minmax(76px,.6fr));gap:6px 10px;align-items:center;min-width:560px;font-size:12px}
 .lmv-qq-matrix-head{font-size:11px;color:var(--dsw-alias-label-tertiary,#8a8a8a);white-space:nowrap}
 .lmv-qq-cell{min-width:0;overflow-wrap:anywhere}
+.lmv-fieldset{margin:0;padding:0;border:0;min-width:0;display:flex;flex-direction:column;gap:10px}
+.lmv-fieldset[disabled]{opacity:.55}
+.lmv-fieldset[disabled] .lmv-check{cursor:not-allowed}
 `

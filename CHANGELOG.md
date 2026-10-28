@@ -4,6 +4,40 @@ All notable changes to **DSH Memory Vault (`dsh-longterm-memory`)** are document
 here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.6] - 2026-10-28
+
+### Added
+
+- **连续消息智能合并（QQ）— 控制面。** The QQ tab gains a seventh card that manages
+  whether consecutive QQ messages are merged into the running task. It is driven by a
+  versioned cross-plugin contract (`qqbot-merge@v1`, `src/shared/qqbot-merge-contract.ts`)
+  and two new RPC methods (`qqMerge` / `setQqMerge`, RPC surface 29 → 31).
+- **The switch cannot lie.** Configuration is only written when a running QQ extension
+  actually provides the `qqbotMerge` cordis service. When the official
+  `@tencent-connect/dsh-qqbot` 0.5.3 is running (it provides no services and has no
+  extension points), the page shows **未生效 / BLOCKED**, keeps every control disabled and
+  `setQqMerge` fails with `unsupported` — instead of storing a value that no runtime reads.
+- **`extensions/dsh-qqbot-merge`** — a maintained MIT fork of `dsh-qqbot` 0.5.3 that
+  implements the execution side: non-interrupting `agent.steer()` batching (800 ms quiet
+  window by default), `agent/turn-stopping` continuation, and single-message reply
+  revision (one QQ message updated across model steps, completed once at turn end).
+  Not published or installed by this repository; see `docs/qq-merge.md`.
+
+### Documentation
+
+- `docs/qq-merge.md` (architecture, contract, lifecycle, manual enable/rollback),
+  `docs/evidence/qqbot-0.5.3-message-flow.md`,
+  `docs/evidence/dsh-agent-api-steering.md`,
+  `docs/evidence/qqbot-merge-implementation.md`,
+  `docs/evidence/qq-merge-verification.md` (isolated-host A/B acceptance).
+
+### Verified / not verified
+
+- Verified on two isolated DSH 0.2.1-rc.3 hosts: BLOCKED state with official 0.5.3, and
+  live contract + persisted config with the extension installed.
+- **Not verified:** a real QQ conversation (replacing the user's running QQ plugin was
+  explicitly out of scope), so the user-visible single-message behaviour remains BLOCKED.
+
 ## [0.1.5] - 2026-10-27
 
 ### Added

@@ -20,6 +20,7 @@ import type {
 } from './types.js'
 import type { IndexRecord, QueryFilters, SearchHit } from './search.js'
 import { DEFAULT_QQ_LINKAGE, type LinkageRuntimeStatus, type QqLinkageConfig } from './qq-linkage.js'
+import type { QqbotMergeConfig, QqbotMergeReport } from './qqbot-merge-contract.js'
 
 /** Route prefix owned by this plugin. */
 export const ROUTE_PREFIX = '/dsh-longterm-memory/api'
@@ -55,6 +56,8 @@ export const RPC_METHODS = [
   'previewStanding',
   'qqLinkage',
   'setQqLinkage',
+  'qqMerge',
+  'setQqMerge',
 ] as const
 
 export type RpcMethod = (typeof RPC_METHODS)[number]
@@ -361,6 +364,8 @@ export interface RpcRequestMap {
   previewStanding: Record<string, never>
   qqLinkage: Record<string, never>
   setQqLinkage: { config: Partial<QqLinkageConfig> }
+  qqMerge: Record<string, never>
+  setQqMerge: { config: Partial<QqbotMergeConfig> }
 }
 
 export interface RpcResultMap {
@@ -393,6 +398,8 @@ export interface RpcResultMap {
   previewStanding: StandingPreview
   qqLinkage: QqLinkageReport
   setQqLinkage: QqLinkageReport
+  qqMerge: QqbotMergeReport
+  setQqMerge: QqbotMergeReport
 }
 
 /**

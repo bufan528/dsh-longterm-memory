@@ -105,6 +105,15 @@ export function apply(ctx: CordisContextLike, config?: unknown): void {
     })
   })
 
+  // -------------------------------------------------------- QQ merge bridge
+  // Optional cross-plugin contract: the independent `dsh-qqbot-merge` extension
+  // provides a `qqbotMerge` service. When it is absent (e.g. the official
+  // @tencent-connect/dsh-qqbot 0.5.3 is running), the callback never fires and
+  // the QQ page reports "not applied / BLOCKED" instead of faking a switch.
+  ctx.inject(['qqbotMerge'], (scoped) => {
+    service.qqMerge.attach(scoped.get('qqbotMerge'))
+  })
+
   // ---------------------------------------------------------- prompt section
   if (settings.enablePromptSection !== false) {
     ctx.inject(['systemPrompt'], (scoped) => {
