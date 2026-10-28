@@ -1,3 +1,5 @@
+> **迁移说明（2026-10-28）**：本文件记录的是该扩展在 Memory Vault 仓库内开发时的状态。它现已迁出为独立仓库 [bufan528/dsh-qqbot-merge](https://github.com/bufan528/dsh-qqbot-merge) 并发布为 npm 包 `dsh-qqbot-merge@0.1.0`；下文 `extensions/dsh-qqbot-merge` 路径为历史路径，源码以独立仓库为准。
+
 # `dsh-qqbot-merge` 实现与证据（官方 0.5.3 fork：连续消息智能合并 + 同轮单条回复）
 
 | 项 | 值 |
@@ -454,3 +456,4 @@ npx @deepseek-ai/dsh plugin --profile desktop add @tencent-connect/dsh-qqbot@0.5
 >   # 与 extensions/dsh-qqbot-merge/$f 做换行归一后逐字节比较 → IDENTICAL
 > }
 > ```
+

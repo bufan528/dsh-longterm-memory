@@ -19,7 +19,7 @@
 | 官方插件能否被第三方扩展 | **不能**：全 dist 无 `ctx.provide` / `ctx.set` / `onExpose`，只导出 `name/inject/Config/apply`；唯一 HTTP 面是绑定页 | `docs/evidence/qqbot-0.5.3-message-flow.md` §6 |
 | 宿主是否支持真正的中途并入 | **支持**：`agent.steer(input)` 把消息写入 inbox 的 `next-step`，在**当前轮的下一个 step 边界**消费；轮次收尾时 `next-step` 非空会让**同一 turn 继续跑一步**；`agent/turn-stopping` 是官方「让轮次继续」的正式机制 | `docs/evidence/dsh-agent-api-steering.md` §0 条 1–5 |
 | 每 step 一条回复的问题 | 官方出站每个 `assistant/message` 就 `flush → finish → StreamSession.complete()` 并删 buffer，下一步重新 `openStream`（新 msg_seq）→ 一轮 N step = N 条 QQ 消息 | `dist/transport/outbound.js:117-134`、`streaming-writer.js:48-69`；SDK `streaming.d.ts` |
-| 我们做了什么 | 维护分支 **`dsh-qqbot-merge`**（官方 0.5.3 源码 + 约 35 行核心 patch + merge 模块）实现 steer 合并与单条回复修订，并对外 `provide('qqbotMerge')`；Memory Vault 的「QQ 接入」页通过**版本化契约**消费它 | `extensions/dsh-qqbot-merge/`、`src/shared/qqbot-merge-contract.ts` |
+| 我们做了什么 | 维护分支 **`dsh-qqbot-merge`**（官方 0.5.3 源码 + 约 35 行核心 patch + merge 模块）实现 steer 合并与单条回复修订，并对外 `provide('qqbotMerge')`；Memory Vault 的「QQ 接入」页通过**版本化契约**消费它 | [`dsh-qqbot-merge`](https://github.com/bufan528/dsh-qqbot-merge)（独立插件/npm 包）、`src/shared/qqbot-merge-contract.ts` |
 | 现在生效了吗 | **没有**：真实 profile 仍运行官方 0.5.3（没有 `qqbotMerge` 服务），所以页面如实显示 **未生效 / BLOCKED**，所有开关禁用。安装扩展并重启后才能启用 | `tests/integration/qq-merge-bridge.test.ts`、真实宿主 RPC |
 
 > 重要：**不允许**把「官方 0.5.3 的排队合并」说成已经实现了智能合并。官方能力边界见
@@ -106,7 +106,7 @@ QQ 用户连续发消息
 
 ## 4. 跨插件契约（`qqbot-merge@v1`）
 
-真相来源：扩展包 `extensions/dsh-qqbot-merge/src/merge/contract.ts`；Memory Vault 侧镜像
+真相来源：独立插件 [`dsh-qqbot-merge`](https://github.com/bufan528/dsh-qqbot-merge) 的 `src/merge/contract.ts`；Memory Vault 侧镜像
 在 `src/shared/qqbot-merge-contract.ts`，两边通过 `version` 互相校验。
 
 ### 4.1 服务 `qqbotMerge`
@@ -179,7 +179,7 @@ steerFallbacks / replyRewrites / repliesCompleted / batchesAborted）、`lastBat
 |---|---|---|
 | 官方链路与 API 证据 | **COMPLETED** | 两份证据文档，逐条源码/行号（[qqbot 0.5.3](evidence/qqbot-0.5.3-message-flow.md)、[Agent API](evidence/dsh-agent-api-steering.md)） |
 | 跨插件契约 + Memory Vault 控制面 | **COMPLETED** | 14 项契约/桥测试（`tests/integration/qq-merge-bridge.test.ts`）；Memory Vault 全套 **709 项**测试通过 |
-| 扩展实现（steer / 统一回复 / 服务） | **COMPLETED（代码级）** | `extensions/dsh-qqbot-merge`：`tsc` 0 error；**210 项**扩展测试通过；`npm pack` 282 files / 1,109,795 B |
+| 扩展实现（steer / 统一回复 / 服务） | **COMPLETED（代码级）** | 独立插件 [`dsh-qqbot-merge`](https://github.com/bufan528/dsh-qqbot-merge)：`tsc` 0 error；**210 项**测试通过；已发布 npm `dsh-qqbot-merge@0.1.0` |
 | 隔离宿主上的契约联调（真实 cordis） | **COMPLETED** | 两个隔离 profile（`qqA` 官方 0.5.3 / `qqB` 扩展 0.1.0）真机启动 DSH 0.2.1-rc.3；见 §6.1、§6.2 |
 | **真实 QQ 会话端到端**（用户连发消息 → 同一条回复） | **BLOCKED** | 需要把扩展安装到**正在运行的** QQ Bot profile 并重启 DSH；本任务授权边界明确禁止替换用户正在运行的插件、禁止改真实 Profile。另外同一 `appId` 不能同时建立两条网关连接，无法并行验证 |
 
@@ -209,7 +209,7 @@ Badge **未生效**、显示检测到的官方版本 `0.5.3`、原文原因、�
 
 同一隔离 `DSH_HOME`，profile `qqB`，bundles 换成 **`dsh-qqbot-merge@0.1.0`**（未配置 QQ
 凭据——故意如此，避免用真实 `appId` 建立第二条网关连接；扩展在凭据判断**之前**就 provide
-`qqbotMerge`，见 `extensions/dsh-qqbot-merge/dist/index.js`）。
+`qqbotMerge`，见独立插件的 `dist/index.js`）。
 
 ```json
 POST /api/qqMerge →
@@ -250,27 +250,30 @@ steering**；可编辑 enabled / windowMs / 批量上限 / 私聊·群聊 / busy
 
 ## 7. 授权后如何启用（人工步骤）
 
+执行侧是**独立插件** [`dsh-qqbot-merge`](https://github.com/bufan528/dsh-qqbot-merge)
+（npm 包 `dsh-qqbot-merge@0.1.0`），它替换官方 QQ 插件（两者不能共存）。
+
 ```powershell
-# 1) 构建并打包扩展（在仓库内）
-cd extensions\dsh-qqbot-merge
-npm install
-npm run build
-npm pack            # -> dsh-qqbot-merge-0.1.0.tgz
+# 1) 备份 profile 配置（回滚用）
+Copy-Item "$env:USERPROFILE\.dsh\profiles\desktop\package.json" "$env:USERPROFILE\.dsh\profiles\desktop\package.json.bak"
+Copy-Item "$env:USERPROFILE\.dsh\profiles\desktop\cordis.patch.yml" "$env:USERPROFILE\.dsh\profiles\desktop\cordis.patch.yml.bak"
 
-# 2) 用扩展替换官方插件（替换前先备份 profile 的 package.json / cordis.patch.yml）
-#    - profile: %USERPROFILE%\.dsh\profiles\desktop
-#    - 从 dependencies 移除 @tencent-connect/dsh-qqbot，加入 dsh-qqbot-merge
-#    - bundles 列表里把 "@tencent-connect/dsh-qqbot" 换成 "dsh-qqbot-merge"
-#    - 保留 cordis.patch.yml 里已有的 im-qqbot appId/appSecret 配置（插件 id 不变，仍是 im-qqbot）
+# 2) 安装独立插件并移除官方插件
+dsh plugin --profile desktop add dsh-qqbot-merge
 dsh plugin --profile desktop remove @tencent-connect/dsh-qqbot
-dsh plugin --profile desktop add .\dsh-qqbot-merge-0.1.0.tgz
 
-# 3) 重启 DSH 桌面端
-# 4) 打开 长期记忆 → QQ 接入 → 「连续消息智能合并」，启用并保存；
-#    页面应显示 已生效 revision / appliedAt，并在发消息时看到 counters 增长
+# 3) 编辑 profile 的 package.json：bundles 里把 "@tencent-connect/dsh-qqbot" 换成 "dsh-qqbot-merge"
+#    编辑 cordis.patch.yml：把原 `im-qqbot` 行的 appId/appSecret 移到 `qqbot-merge` 行
+#    （或删除凭据后重启，走重新扫码绑定；不要把凭据同时留在两行）
+
+# 4) 重启 DSH 桌面端
+# 5) 打开 长期记忆 → QQ 接入 → 「连续消息智能合并」，启用并保存；
+#    页面应显示 已生效 revision / appliedAt；随后连发消息观察 counters 与回复形态
 ```
 
-回滚：把 profile 的 `dependencies` / `bundles` 换回 `@tencent-connect/dsh-qqbot@0.5.3`，重启。
+回滚：把 `package.json` / `cordis.patch.yml` 恢复成备份（即换回
+`@tencent-connect/dsh-qqbot@0.5.3`），重启 DSH 即可。
+
 
 ---
 
@@ -284,4 +287,8 @@ dsh plugin --profile desktop add .\dsh-qqbot-merge-0.1.0.tgz
 4. **上游漂移**：fork 基于 0.5.3；上游后续版本若改动链路，需要重新 rebase。
 5. **官方注释不准确**：`maxProcessingMs` 的 abort 并不会中断 LLM（`handleInbound` 不读
    `ctx.signal`），本功能不依赖它。
+
+
+
+
 

@@ -1,3 +1,5 @@
+> **迁移说明（2026-10-28）**：被测扩展现已迁出为独立仓库 [bufan528/dsh-qqbot-merge](https://github.com/bufan528/dsh-qqbot-merge) 并发布为 npm 包 `dsh-qqbot-merge@0.1.0`；下文路径为当时（仍在 `extensions/` 下）的记录。
+
 # 连续消息智能合并：验收证据（隔离宿主 A/B）
 
 | 项 | 值 |
@@ -110,4 +112,5 @@ POST /api/setQqMerge {"config":{"enabled":true,"windowMs":900}}
 原因：需要把扩展装到**正在运行的** QQ Bot profile 并重启 DSH，这属于用户明确保留的授权边界；
 且同一 `appId` 不能同时建立两条 QQ 网关连接，无法与真实运行实例并行验证。
 启用步骤与回滚见 [`docs/qq-merge.md`](../qq-merge.md) §7。
+
 

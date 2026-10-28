@@ -57,13 +57,18 @@
 
 ## What's new
 
+**0.1.7** moves the QQ merge execution side out of this repository: it is now the separate
+plugin [`dsh-qqbot-merge`](https://github.com/bufan528/dsh-qqbot-merge) (npm
+`dsh-qqbot-merge`), while this plugin keeps the QQ tab's control plane. No runtime code
+changed; install/migrate/rollback is documented in [docs/qq-merge.md](docs/qq-merge.md) §7.
+
 **0.1.6** adds **连续消息智能合并 / consecutive-message merging** for QQ:
 messages a user sends while a task is running are merged (800 ms quiet window) and handed
 to the *same* running agent via `agent.steer()`, and the reply is revised in place so one
 turn produces one QQ message. The switch lives in the QQ tab but only becomes editable when
 a running QQ extension provides the `qqbotMerge` service; with the official
 `@tencent-connect/dsh-qqbot` 0.5.3 the card shows **未生效 / BLOCKED** instead of a fake
-toggle. Execution side: `extensions/dsh-qqbot-merge` (maintained MIT fork of dsh-qqbot
+toggle. Execution side: the separate plugin [`dsh-qqbot-merge`](https://github.com/bufan528/dsh-qqbot-merge) (maintained MIT fork of dsh-qqbot
 0.5.3, not installed by this repository). See [docs/qq-merge.md](docs/qq-merge.md).
 
 **0.1.5** adds a sixth tab, **QQ integration**
@@ -532,4 +537,6 @@ zero-dependency CDP clients using Node's built-in `WebSocket`.
 ## License
 
 [MIT](LICENSE)
+
+
 

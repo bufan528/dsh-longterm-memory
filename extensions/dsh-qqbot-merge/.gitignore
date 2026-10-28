@@ -1,7 +1,0 @@
-node_modules/
-dist/
-lib/
-.env
-.dsh-sessions/
-*.tsbuildinfo
-cordis.dev.yml

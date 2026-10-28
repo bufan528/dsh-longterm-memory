@@ -4,6 +4,19 @@ All notable changes to **DSH Memory Vault (`dsh-longterm-memory`)** are document
 here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.7] - 2026-10-28
+
+### Changed
+
+- **The QQ merge execution side is now its own plugin, not vendored here.** The maintained
+  fork of `dsh-qqbot` 0.5.3 was moved out of this repository to
+  **[bufan528/dsh-qqbot-merge](https://github.com/bufan528/dsh-qqbot-merge)** and published
+  as npm **`dsh-qqbot-merge@0.1.0`**. This repository keeps only the QQ tab's control plane
+  (one card + `qqbot-merge@v1` contract + bridge + 2 RPCs) and links to the plugin for the
+  execution side. The 0.1.6 history still contains the in-tree fork; no history rewrite was
+  performed. `docs/qq-merge.md` §7 now documents install/migrate/rollback against the
+  published package.
+
 ## [0.1.6] - 2026-10-28
 
 ### Added
@@ -17,11 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `@tencent-connect/dsh-qqbot` 0.5.3 is running (it provides no services and has no
   extension points), the page shows **未生效 / BLOCKED**, keeps every control disabled and
   `setQqMerge` fails with `unsupported` — instead of storing a value that no runtime reads.
-- **`extensions/dsh-qqbot-merge`** — a maintained MIT fork of `dsh-qqbot` 0.5.3 that
-  implements the execution side: non-interrupting `agent.steer()` batching (800 ms quiet
-  window by default), `agent/turn-stopping` continuation, and single-message reply
-  revision (one QQ message updated across model steps, completed once at turn end).
-  Not published or installed by this repository; see `docs/qq-merge.md`.
+- **QQ merge execution side** — a maintained MIT fork of `dsh-qqbot` 0.5.3 that implements
+  non-interrupting `agent.steer()` batching (800 ms quiet window by default),
+  `agent/turn-stopping` continuation, and single-message reply revision (one QQ message
+  updated across model steps, completed once at turn end). It was developed in-tree during
+  0.1.6 and moved to the separate `dsh-qqbot-merge` project/npm package in 0.1.7; see
+  `docs/qq-merge.md`.
 
 ### Documentation
 

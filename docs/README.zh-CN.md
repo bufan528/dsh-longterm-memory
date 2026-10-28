@@ -51,6 +51,13 @@
 
 ---
 
+## 0.1.7 更新内容
+
+**0.1.7` 把 QQ 连续消息合并的**执行侧**移出本仓库**：它现在是独立插件
+[`dsh-qqbot-merge`](https://github.com/bufan528/dsh-qqbot-merge)（npm 包 `dsh-qqbot-merge`），
+本插件只保留 QQ 页签的控制面。无运行时行为变化；安装/迁移/回滚见
+[docs/qq-merge.md](qq-merge.md) §7。
+
 ## 0.1.6 更新内容
 
 **0.1.6** 新增 **QQ 连续消息智能合并**（非打断式 steering + 同一轮单条回复）的
@@ -61,7 +68,7 @@
 该开关只在**运行中的 QQ Bot 扩展**真正提供 `qqbotMerge` 服务时才可编辑；当前官方
 `@tencent-connect/dsh-qqbot` 0.5.3 没有任何扩展点，因此页面会如实显示 **未生效**、控件全部
 禁用、写入被后端拒绝——不会出现「显示已启用但实际无效」的开关。执行侧实现位于本仓库
-`extensions/dsh-qqbot-merge`（官方 0.5.3 的 MIT 维护分支，**未**随 npm 包安装）。详见
+独立插件 [`dsh-qqbot-merge`](https://github.com/bufan528/dsh-qqbot-merge)（官方 0.5.3 的 MIT 维护分支，**未**随本 npm 包安装）。详见
 [docs/qq-merge.md](qq-merge.md)。
 
 ## 0.1.5 更新内容
@@ -478,4 +485,6 @@ cookie，再用 `--cookie-file <name=value 文件>` 传入。
 ## 许可证
 
 [MIT](../LICENSE)
+
+
 
