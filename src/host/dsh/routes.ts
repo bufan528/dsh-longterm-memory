@@ -236,10 +236,6 @@ export async function dispatch(service: MemoryService, method: string, payload: 
       return service.qqLinkageReport()
     case 'setQqLinkage':
       return service.setQqLinkage(asRecord(payload['config']) as Parameters<MemoryService['setQqLinkage']>[0])
-    case 'qqMerge':
-      return service.qqMergeReport()
-    case 'setQqMerge':
-      return service.setQqMerge(asRecord(payload['config']) as Parameters<MemoryService['setQqMerge']>[0])
     default:
       throw new ServiceError(ERROR_CODES.notFound, `未知的接口方法：${method}`)
   }

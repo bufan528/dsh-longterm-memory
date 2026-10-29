@@ -34,7 +34,7 @@
   <a href="docs/README.zh-CN.md"><strong>简体中文</strong></a>
 </p>
 
-> **Project status (2026-10-28).** `dsh-longterm-memory@0.1.6` is published on npm and
+> **Project status (2026-10-29).** `dsh-longterm-memory@0.1.8` is published on npm and
 > attached to the
 > [latest GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest)
 > (with a version-agnostic `dsh-longterm-memory.tgz` asset), and the plugin is **listed in
@@ -57,19 +57,10 @@
 
 ## What's new
 
-**0.1.7** moves the QQ merge execution side out of this repository: it is now the separate
-plugin [`dsh-qqbot-merge`](https://github.com/bufan528/dsh-qqbot-merge) (npm
-`dsh-qqbot-merge`), while this plugin keeps the QQ tab's control plane. No runtime code
-changed; install/migrate/rollback is documented in [docs/qq-merge.md](docs/qq-merge.md) §7.
-
-**0.1.6** adds **连续消息智能合并 / consecutive-message merging** for QQ:
-messages a user sends while a task is running are merged (800 ms quiet window) and handed
-to the *same* running agent via `agent.steer()`, and the reply is revised in place so one
-turn produces one QQ message. The switch lives in the QQ tab but only becomes editable when
-a running QQ extension provides the `qqbotMerge` service; with the official
-`@tencent-connect/dsh-qqbot` 0.5.3 the card shows **未生效 / BLOCKED** instead of a fake
-toggle. Execution side: the separate plugin [`dsh-qqbot-merge`](https://github.com/bufan528/dsh-qqbot-merge) (maintained MIT fork of dsh-qqbot
-0.5.3, not installed by this repository). See [docs/qq-merge.md](docs/qq-merge.md).
+**0.1.8** removes an experimental QQ message-merge control surface from the QQ tab. The tab
+is back to what this plugin owns: connection status, memory-linkage policy, session
+isolation, inbox wiring, diagnostics and security. No other behaviour changes; existing
+memory data, index, tools, prompt injection and all other tabs are untouched.
 
 **0.1.5** adds a sixth tab, **QQ integration**
 (`记忆总览 | 记忆检索 | 记忆管理 | 收件箱 | QQ 接入 | 设置`), plus an optional
@@ -204,9 +195,9 @@ Market page: <https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/>
 dsh plugin --profile web add dsh-longterm-memory@latest
 ```
 
-> Latest **npm** release: `dsh-longterm-memory@0.1.6`. Use `@latest` (or omit the
+> Latest **npm** release: `dsh-longterm-memory@0.1.8`. Use `@latest` (or omit the
 > version) so an installation always fetches the newest published version. The newest
-> **GitHub** release is `v0.1.6`; both point at the same build.
+> **GitHub** release is `v0.1.8`; both point at the same build.
 
 ### Option C — download the latest packaged tarball (no build required)
 
@@ -244,12 +235,12 @@ profile cannot touch your daily DSH profile:
 # 1. Build and pack
 npm install
 npm run build
-npm pack                     # -> dsh-longterm-memory-0.1.6.tgz
+npm pack                     # -> dsh-longterm-memory-0.1.8.tgz
 
 # 2. Install into an isolated profile
 $env:DSH_HOME = "<temporary dir>"                # PowerShell
 # export DSH_HOME="<temporary dir>"              # bash
-dsh plugin --profile lmv add .\dsh-longterm-memory-0.1.6.tgz
+dsh plugin --profile lmv add .\dsh-longterm-memory-0.1.8.tgz
 
 # 3. Start
 dsh --profile lmv --no-open --port 0
@@ -444,8 +435,8 @@ its binding status.
 | Verified DSH version | `0.2.1-rc.3` — current desktop host; the plugin is loaded and serving RPC on it (see [docs/compatibility.md](docs/compatibility.md) §12) |
 | Node.js | `>=20` |
 | Platform | Windows (primary), Node path rules elsewhere |
-| npm package | `dsh-longterm-memory` — **0.1.6 published** on npm and GitHub |
-| Downloads | [Latest GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest) — stable alias `dsh-longterm-memory.tgz` (+ `.sha256`), or npm `@latest` (0.1.6) |
+| npm package | `dsh-longterm-memory` — **0.1.8 published** on npm and GitHub |
+| Downloads | [Latest GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest) — stable alias `dsh-longterm-memory.tgz` (+ `.sha256`), or npm `@latest` (0.1.8) |
 | DSH Plugin Market | **Listed** in [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/) since 2026-10-19; updates follow the npm `latest` tag |
 | dshmarket (in-app market) | **Listed** through the same [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/) catalog; the live registry checks showed `0.1.4` with 5 screenshots on 2026-10-21 (no separate dshmarket submission) |
 | dsh.works registry | **Listed + verified** in [dshworks/awesome-dsh-plugins](https://dsh.works/awesome-dsh-plugins/) since 2026-10-19; surfaced by the **插件 → DSH 社区** market in the [dsh-armory](https://github.com/2026heshao/dsh-armory) dashboard |
@@ -478,10 +469,10 @@ zero-dependency CDP clients using Node's built-in `WebSocket`.
 ## Project status & limitations
 
 - **Preview**: API and storage format may still change; `0.1.0` was the first public
-  version, and `0.1.6` (QQ message merging) is the current release.
-- **npm published**: `dsh-longterm-memory@0.1.6` (2026-10-28); the npm `latest` dist-tag
+  version, and `0.1.8` is the current release.
+- **npm published**: `dsh-longterm-memory@0.1.8` (2026-10-29); the npm `latest` dist-tag
   points at it and registry installation is verified. The same build is attached to the
-  latest GitHub Release (`dsh-longterm-memory-0.1.6.tgz` plus the version-agnostic
+  latest GitHub Release (`dsh-longterm-memory-0.1.8.tgz` plus the version-agnostic
   `dsh-longterm-memory.tgz` and their `.sha256` files).
 - **Listed in the DSH Plugin Market**: the plugin is in the
   [awesome-dsh-plugin](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
@@ -537,6 +528,8 @@ zero-dependency CDP clients using Node's built-in `WebSocket`.
 ## License
 
 [MIT](LICENSE)
+
+
 
 
 

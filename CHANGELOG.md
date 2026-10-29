@@ -4,53 +4,20 @@ All notable changes to **DSH Memory Vault (`dsh-longterm-memory`)** are document
 here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.1.7] - 2026-10-28
+## [0.1.8] - 2026-10-29
 
-### Changed
+### Removed
 
-- **The QQ merge execution side is now its own plugin, not vendored here.** The maintained
-  fork of `dsh-qqbot` 0.5.3 was moved out of this repository to
-  **[bufan528/dsh-qqbot-merge](https://github.com/bufan528/dsh-qqbot-merge)** and published
-  as npm **`dsh-qqbot-merge@0.1.0`**. This repository keeps only the QQ tab's control plane
-  (one card + `qqbot-merge@v1` contract + bridge + 2 RPCs) and links to the plugin for the
-  execution side. The 0.1.6 history still contains the in-tree fork; no history rewrite was
-  performed. `docs/qq-merge.md` §7 now documents install/migrate/rollback against the
-  published package.
+- **Experimental QQ message-merge control surface.** The QQ tab no longer carries a merge
+  settings card, its cross-plugin contract/bridge, or the two related RPC methods. The tab
+  is back to what this plugin owns: connection status, memory-linkage policy, session
+  isolation, inbox wiring, diagnostics and security.
 
-## [0.1.6] - 2026-10-28
+### Verified
 
-### Added
+- `npm run check` green: build + typecheck + lint + 46 files / tests (all existing memory,
+  index, tools, prompt-injection and QQ-tab behaviour unchanged).
 
-- **连续消息智能合并（QQ）— 控制面。** The QQ tab gains a seventh card that manages
-  whether consecutive QQ messages are merged into the running task. It is driven by a
-  versioned cross-plugin contract (`qqbot-merge@v1`, `src/shared/qqbot-merge-contract.ts`)
-  and two new RPC methods (`qqMerge` / `setQqMerge`, RPC surface 29 → 31).
-- **The switch cannot lie.** Configuration is only written when a running QQ extension
-  actually provides the `qqbotMerge` cordis service. When the official
-  `@tencent-connect/dsh-qqbot` 0.5.3 is running (it provides no services and has no
-  extension points), the page shows **未生效 / BLOCKED**, keeps every control disabled and
-  `setQqMerge` fails with `unsupported` — instead of storing a value that no runtime reads.
-- **QQ merge execution side** — a maintained MIT fork of `dsh-qqbot` 0.5.3 that implements
-  non-interrupting `agent.steer()` batching (800 ms quiet window by default),
-  `agent/turn-stopping` continuation, and single-message reply revision (one QQ message
-  updated across model steps, completed once at turn end). It was developed in-tree during
-  0.1.6 and moved to the separate `dsh-qqbot-merge` project/npm package in 0.1.7; see
-  `docs/qq-merge.md`.
-
-### Documentation
-
-- `docs/qq-merge.md` (architecture, contract, lifecycle, manual enable/rollback),
-  `docs/evidence/qqbot-0.5.3-message-flow.md`,
-  `docs/evidence/dsh-agent-api-steering.md`,
-  [`dsh-qqbot-merge` implementation record](https://github.com/bufan528/dsh-qqbot-merge/blob/main/docs/IMPLEMENTATION.md),
-  `docs/evidence/qq-merge-verification.md` (isolated-host A/B acceptance).
-
-### Verified / not verified
-
-- Verified on two isolated DSH 0.2.1-rc.3 hosts: BLOCKED state with official 0.5.3, and
-  live contract + persisted config with the extension installed.
-- **Not verified:** a real QQ conversation (replacing the user's running QQ plugin was
-  explicitly out of scope), so the user-visible single-message behaviour remains BLOCKED.
 
 ## [0.1.5] - 2026-10-27
 
