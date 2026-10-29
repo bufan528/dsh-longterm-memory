@@ -4,7 +4,7 @@
 > 核验与实现时间：2026-10-27
 > 相关证据：[官方 0.5.3 消息链路](evidence/qqbot-0.5.3-message-flow.md) ·
 > [DSH Agent API（steer/followup/生命周期）](evidence/dsh-agent-api-steering.md) ·
-> [扩展实现记录](evidence/qqbot-merge-implementation.md)（由扩展包维护）
+> [实现记录（独立插件仓库）](https://github.com/bufan528/dsh-qqbot-merge/blob/main/docs/IMPLEMENTATION.md)
 
 本文件回答三件事：**为什么必须做扩展而不是排队**、**实现由哪几层组成**、**当前到底哪部分真的生效**。
 
@@ -287,6 +287,7 @@ dsh plugin --profile desktop remove @tencent-connect/dsh-qqbot
 4. **上游漂移**：fork 基于 0.5.3；上游后续版本若改动链路，需要重新 rebase。
 5. **官方注释不准确**：`maxProcessingMs` 的 abort 并不会中断 LLM（`handleInbound` 不读
    `ctx.signal`），本功能不依赖它。
+
 
 
 

@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `docs/qq-merge.md` (architecture, contract, lifecycle, manual enable/rollback),
   `docs/evidence/qqbot-0.5.3-message-flow.md`,
   `docs/evidence/dsh-agent-api-steering.md`,
-  `docs/evidence/qqbot-merge-implementation.md`,
+  [`dsh-qqbot-merge` implementation record](https://github.com/bufan528/dsh-qqbot-merge/blob/main/docs/IMPLEMENTATION.md),
   `docs/evidence/qq-merge-verification.md` (isolated-host A/B acceptance).
 
 ### Verified / not verified
@@ -176,3 +176,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   settings), token-budgeted recall, durable journal with a crash-safe outbox,
   deterministic extraction and dedupe/merge rules, bilingual UI (zh/en), and
   rebuildable index.
+
