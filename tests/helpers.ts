@@ -20,6 +20,10 @@ export async function makeTempRoot(label: string): Promise<string> {
 }
 
 export async function cleanup(root: string): Promise<void> {
+  // A sandboxed runner refuses bulk recursive deletes (the guard trips at ~50
+  // removals in one turn). Keeping the temp roots is harmless — they live under
+  // `tests/../.scratch` — so an opt-out is available instead of a flaky suite.
+  if (process.env['DSH_MEMORY_KEEP_TMP'] === '1') return
   // Windows can hold a transient handle on a just-written file; retry briefly.
   for (let attempt = 0; attempt < 5; attempt += 1) {
     try {

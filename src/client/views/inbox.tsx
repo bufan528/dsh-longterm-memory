@@ -2,6 +2,10 @@
  * Candidates and inbox (收件箱): the pending extracted memories with per-item
  * confirm/reject, plus the manual add form.
  *
+ * Clearing the queue is the job of this page, so the eight-field manual form
+ * stays collapsed until asked for — otherwise a queue of twelve candidates sits
+ * under a wall of empty inputs.
+ *
  * @module dsh-longterm-memory/client/views/inbox
  */
 
@@ -14,7 +18,7 @@ import type { Confidence, MemoryType } from '../../shared/types.js'
 import { call, useAsync, useMutation } from '../api.js'
 import { useT } from '../i18n.js'
 import { usePage } from '../page-api.js'
-import { Badge, Button, Card, Checkbox, Empty, ErrorNotice, Field, Loading, Notice, NumberInput, Select, TextArea, TextInput } from '../ui.js'
+import { Badge, Button, Card, Checkbox, Collapse, Empty, ErrorNotice, Field, Icon, Loading, Notice, NumberInput, Select, TextArea, TextInput } from '../ui.js'
 import { clampImportance, confidenceKind, confidenceLabel, decisionLabel, formatTime, splitList, typeLabel } from '../util.js'
 
 /** Render the inbox pane. */
@@ -36,6 +40,7 @@ export function InboxView(): ReactElement {
   const [tagsText, setTagsText] = useState('')
   const [evidence, setEvidence] = useState('')
   const [reason, setReason] = useState('')
+  const [addOpen, setAddOpen] = useState(false)
 
   const refresh = (): void => {
     candidates.reload()
@@ -92,11 +97,20 @@ export function InboxView(): ReactElement {
   return (
     <div className="lmv-main">
       <Card
-        title={translate('inbox.title')}
+        title={
+          <>
+            <Icon name="inbox" />
+            {translate('inbox.title')}
+          </>
+        }
         actions={
-          <Button variant="ghost" onClick={candidates.reload}>
-            {translate('common.refresh')}
-          </Button>
+          <>
+            {pending.length === 0 ? null : <Badge kind="warn">{String(pending.length)}</Badge>}
+            <Button variant="ghost" onClick={candidates.reload}>
+              <Icon name="refresh" size={13} />
+              {translate('common.refresh')}
+            </Button>
+          </>
         }
       >
         {candidates.loading ? <Loading /> : null}
@@ -105,7 +119,7 @@ export function InboxView(): ReactElement {
         {reject.error === null ? null : <ErrorNotice error={reject.error} />}
 
         {candidates.loading || candidates.error !== null ? null : pending.length === 0 ? (
-          <Empty>{translate('inbox.empty')}</Empty>
+          <Empty icon="inbox" title={translate('inbox.empty')} hint={translate('inbox.emptyHint')} />
         ) : (
           <div className="lmv-list">
             {pending.map((candidate) => (
@@ -159,58 +173,85 @@ export function InboxView(): ReactElement {
         )}
       </Card>
 
-      <Card title={translate('inbox.add')}>
-        <span className="lmv-prose-p">{translate('inbox.addHint')}</span>
-        <div className="lmv-toolbar">
-          <Checkbox checked={asMemory} label={asMemory ? translate('inbox.addModeMemory') : translate('inbox.addModeCandidate')} onChange={setAsMemory} />
-          <Field label={translate('edit.type')}>
-            <Select<MemoryType>
-              value={type}
-              options={MEMORY_TYPES.map((value) => ({ value, label: typeLabel(value) }))}
-              onChange={setType}
-            />
-          </Field>
-          <Field label={translate('edit.confidence')}>
-            <Select<Confidence>
-              value={confidence}
-              options={CONFIDENCE_LEVELS.map((value) => ({ value, label: confidenceLabel(value) }))}
-              onChange={setConfidence}
-            />
-          </Field>
-          <Field label={translate('edit.importance')}>
-            <NumberInput value={importance} min={0} max={100} onChange={setImportance} />
-          </Field>
-        </div>
-
-        <Field label={translate('inbox.formTitle')}>
-          <TextInput value={title} block onChange={setTitle} />
-        </Field>
-        <Field label={translate('inbox.formSummary')}>
-          <TextArea value={summary} rows={6} onChange={setSummary} />
-        </Field>
-        <div className="lmv-toolbar">
-          <Field label={`${translate('inbox.formTags')} ${translate('common.comma')}`}>
-            <TextInput value={tagsText} block onChange={setTagsText} />
-          </Field>
-          <Field label={translate('inbox.formEvidence')}>
-            <TextInput value={evidence} block onChange={setEvidence} />
-          </Field>
-          <Field label={translate('inbox.formReason')}>
-            <TextInput value={reason} block onChange={setReason} />
-          </Field>
-        </div>
-
-        {writeError === null ? null : <ErrorNotice error={writeError} />}
-
-        <div className="lmv-wrap">
-          <Button
-            variant="primary"
-            disabled={addCandidate.busy || saveMemory.busy}
-            onClick={() => void submit()}
-          >
+      <Card
+        title={
+          <>
+            <Icon name="plus" />
             {translate('inbox.add')}
+          </>
+        }
+        actions={
+          <Button
+            variant="ghost"
+            ariaExpanded={addOpen}
+            onClick={() => setAddOpen((open) => !open)}
+          >
+            <Icon name={addOpen ? 'close' : 'plus'} size={13} />
+            {addOpen ? translate('common.less') : translate('common.more')}
           </Button>
-        </div>
+        }
+      >
+        {/* Always mounted: the form slides open instead of popping in. */}
+        <Collapse open={addOpen}>
+          <div className="lmv-stack lmv-fade">
+            <span className="lmv-subhead">{translate('inbox.addHint')}</span>
+            <div className="lmv-toolbar">
+              <Checkbox
+                checked={asMemory}
+                label={asMemory ? translate('inbox.addModeMemory') : translate('inbox.addModeCandidate')}
+                onChange={setAsMemory}
+              />
+              <Field label={translate('edit.type')}>
+                <Select<MemoryType>
+                  value={type}
+                  options={MEMORY_TYPES.map((value) => ({ value, label: typeLabel(value) }))}
+                  onChange={setType}
+                />
+              </Field>
+              <Field label={translate('edit.confidence')}>
+                <Select<Confidence>
+                  value={confidence}
+                  options={CONFIDENCE_LEVELS.map((value) => ({ value, label: confidenceLabel(value) }))}
+                  onChange={setConfidence}
+                />
+              </Field>
+              <Field label={translate('edit.importance')}>
+                <NumberInput value={importance} min={0} max={100} onChange={setImportance} />
+              </Field>
+            </div>
+
+            <Field label={translate('inbox.formTitle')}>
+              <TextInput value={title} block onChange={setTitle} />
+            </Field>
+            <Field label={translate('inbox.formSummary')}>
+              <TextArea value={summary} rows={6} onChange={setSummary} />
+            </Field>
+            <div className="lmv-toolbar">
+              <Field label={`${translate('inbox.formTags')} ${translate('common.comma')}`}>
+                <TextInput value={tagsText} block onChange={setTagsText} />
+              </Field>
+              <Field label={translate('inbox.formEvidence')}>
+                <TextInput value={evidence} block onChange={setEvidence} />
+              </Field>
+              <Field label={translate('inbox.formReason')}>
+                <TextInput value={reason} block onChange={setReason} />
+              </Field>
+            </div>
+
+            {writeError === null ? null : <ErrorNotice error={writeError} />}
+
+            <div className="lmv-wrap">
+              <Button
+                variant="primary"
+                disabled={addCandidate.busy || saveMemory.busy}
+                onClick={() => void submit()}
+              >
+                {translate('inbox.add')}
+              </Button>
+            </div>
+          </div>
+        </Collapse>
+        {addOpen ? null : <span className="lmv-subhead">{translate('inbox.addHint')}</span>}
       </Card>
     </div>
   )

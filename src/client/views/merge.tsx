@@ -12,7 +12,7 @@ import type { ReactElement } from 'react'
 
 import { call, useAsync, useMutation } from '../api.js'
 import { useT } from '../i18n.js'
-import { Button, ErrorNotice, Field, Loading, Modal, Notice, TextInput } from '../ui.js'
+import { Button, Badge, ErrorNotice, Field, Loading, Modal, Notice, TextInput } from '../ui.js'
 
 /** Render the merge dialog for `props.ids`. */
 export function MergeDialog(props: { ids: readonly string[]; onClose: () => void; onDone: (id: string) => void }): ReactElement {
@@ -68,25 +68,30 @@ export function MergeDialog(props: { ids: readonly string[]; onClose: () => void
       {titles.error === null ? null : <ErrorNotice error={titles.error} onRetry={titles.reload} />}
 
       <div className="lmv-list">
-        {(titles.data ?? ids.map((id) => ({ id, title: id }))).map((item) => (
-          <label key={item.id} className="lmv-row">
-            <input
-              type="radio"
-              name="lmv-merge-survivor"
-              checked={survivor === item.id}
-              onChange={() => {
-                setSurvivor(item.id)
-              }}
-            />
-            <span className="lmv-row-main">
-              <span className="lmv-row-title">{item.title}</span>
-              <span className="lmv-meta">
-                <span className="lmv-mono">{item.id}</span>
-                <span>{survivor === item.id ? translate('merge.survivor') : translate('merge.folded')}</span>
+        {(titles.data ?? ids.map((id) => ({ id, title: id }))).map((item) => {
+          const on = survivor === item.id
+          return (
+            <label key={item.id} className={`lmv-row${on ? ' lmv-row-on' : ''}`}>
+              <input
+                type="radio"
+                name="lmv-merge-survivor"
+                checked={on}
+                onChange={() => {
+                  setSurvivor(item.id)
+                }}
+              />
+              <span className="lmv-row-main">
+                <span className="lmv-row-title">{item.title}</span>
+                <span className="lmv-meta">
+                  <span className="lmv-mono">{item.id}</span>
+                </span>
               </span>
-            </span>
-          </label>
-        ))}
+              <Badge kind={on ? 'brand' : 'plain'}>
+                {on ? translate('merge.survivor') : translate('merge.folded')}
+              </Badge>
+            </label>
+          )
+        })}
       </div>
 
       <Field label={translate('merge.reason')}>

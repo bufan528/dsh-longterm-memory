@@ -19,7 +19,7 @@ import type { ReactElement, ReactNode } from 'react'
 
 import { QQ_LINKAGE_MODES, QQ_WRITE_MODES } from '../../shared/qq-linkage.js'
 import type { QqLinkageConfig, QqLinkageMode, QqWriteMode } from '../../shared/qq-linkage.js'
-import type { QqLinkageReport } from '../../shared/protocol.js'
+import type { QqLinkageReport, OwnerPairCodeWire } from '../../shared/protocol.js'
 import type { VaultInfo } from '../../shared/types.js'
 import { call, errMessage, useAsync, useMutation } from '../api.js'
 import { useT } from '../i18n.js'
@@ -53,7 +53,7 @@ import type {
   QqProbeOutcome,
 } from '../qq-channel.js'
 import type { OfficialPresence } from '../host-inventory.js'
-import { Badge, Button, Card, Checkbox, Empty, ErrorNotice, Field, KvList, Loading, Notice, Select, Stat, TextArea } from '../ui.js'
+import { Badge, Button, Card, Checkbox, Empty, ErrorNotice, Field, Icon, KvList, Loading, Notice, Select, Stat, TextArea } from '../ui.js'
 import type { BadgeKind } from '../util.js'
 import { formatTime, shortId } from '../util.js'
 
@@ -139,7 +139,7 @@ function ProbeCard(props: {
 
   return (
     <Card
-      title={translate('qq.card.status')}
+      title={<><Icon name="qq" />{translate('qq.card.status')}</>}
       actions={
         <Button variant="ghost" disabled={props.loading} onClick={props.onRefresh}>
           {translate('qq.status.refresh')}
@@ -259,7 +259,7 @@ function LinkageCard(props: {
 
   return (
     <Card
-      title={translate('qq.card.linkage')}
+      title={<><Icon name="sharing" />{translate('qq.card.linkage')}</>}
       actions={
         <>
           {props.dirty ? <span className="lmv-meta">{translate('qq.linkage.dirty')}</span> : null}
@@ -433,7 +433,7 @@ function IsolationCard(props: { report: QqLinkageReport }): ReactElement {
   const trustedSample = samples.find((sample) => sample.id === 'trusted')
 
   return (
-    <Card title={translate('qq.card.isolation')}>
+    <Card title={<><Icon name="shield" />{translate('qq.card.isolation')}</>}>
       <Notice kind="warn">{translate('qq.isolation.warning')}</Notice>
 
       <span className="lmv-card-title">{translate('qq.isolation.table')}</span>
@@ -534,7 +534,7 @@ function InboxCard(props: { report: QqLinkageReport; vault: VaultInfo; onOpenInb
 
   return (
     <Card
-      title={translate('qq.card.inbox')}
+      title={<><Icon name="inbox" />{translate('qq.card.inbox')}</>}
       actions={
         <Button variant="primary" onClick={props.onOpenInbox}>
           {translate('qq.inbox.open')}
@@ -617,7 +617,7 @@ function DiagnosticsCard(props: {
 
   return (
     <Card
-      title={translate('qq.card.diagnostics')}
+      title={<><Icon name="diagnostics" />{translate('qq.card.diagnostics')}</>}
       actions={
         <Button variant="ghost" onClick={props.onRerun}>
           {translate('qq.diag.rerun')}
@@ -654,7 +654,7 @@ function SecurityCard(props: { report: QqLinkageReport | null }): ReactElement {
   const translate = useT()
   const profileDir = props.report === null ? null : props.report.host.profileDir
   return (
-    <Card title={translate('qq.card.security')}>
+    <Card title={<><Icon name="privacy" />{translate('qq.card.security')}</>}>
       <span className="lmv-card-title">{translate('qq.security.secretTitle')}</span>
       <Notice kind="warn">{translate('qq.security.secretBody')}</Notice>
       <KvList
@@ -685,6 +685,122 @@ function SecurityCard(props: { report: QqLinkageReport | null }): ReactElement {
       </Notice>
       <Notice>{translate('qq.security.noQr', { route: OFFICIAL_BIND_ROUTE })}</Notice>
       <Notice kind="warn">{translate('qq.security.community')}</Notice>
+    </Card>
+  )
+}
+
+/** 第 0 张卡：跨端身份绑定（一次性配对码 + 解绑）。 */
+function OwnerBindingCard(props: { onChanged?: () => void }): ReactElement {
+  const translate = useT()
+  const page = usePage()
+  const status = useAsync(() => call('ownerBindingStatus', {}), [])
+  const createCode = useMutation(() => call('ownerBindingCreatePairCode', {}))
+  const unbind = useMutation(() => call('ownerBindingUnbind', {}))
+  const [issued, setIssued] = useState<OwnerPairCodeWire | null>(null)
+
+  const refresh = (): void => {
+    setIssued(null)
+    status.reload()
+    props.onChanged?.()
+  }
+
+  const doCreate = (): void => {
+    void (async () => {
+      const result = await createCode.run()
+      if (result !== null && result !== undefined) {
+        setIssued(result)
+        if (result.code) page.toast(translate('qq.owner.pairShown'), 'ok')
+        else page.toast(result.error ?? translate('qq.owner.codeEmpty'), 'error')
+      }
+    })()
+  }
+
+  const doUnbind = (): void => {
+    void (async () => {
+      const result = await unbind.run()
+      if (result !== null && result !== undefined) {
+        setIssued(null)
+        page.toast(translate('qq.owner.unbindDone'), 'ok')
+        status.reload()
+        props.onChanged?.()
+      }
+    })()
+  }
+
+  const data = status.data
+
+  return (
+    <Card title={<><Icon name="persona" />{translate('qq.card.ownerBinding')}</>}>
+      {status.error === null ? null : <ErrorNotice error={status.error} onRetry={status.reload} />}
+      {status.loading && data === null ? <Loading label={translate('state.loadingPage')} /> : null}
+      {data === null ? null : (
+        <>
+          {!data.available ? <Notice kind="warn">{translate('qq.owner.unavailable')}</Notice> : null}
+          <div className="lmv-wrap">
+            <Badge kind={data.bound ? 'ok' : 'plain'}>
+              {translate(data.bound ? 'qq.owner.bound' : 'qq.owner.unbound')}
+            </Badge>
+          </div>
+          <KvList
+            items={[
+              ...(data.ownerId
+                ? [{ key: translate('qq.owner.ownerId'), value: <span className="lmv-mono">{data.ownerId}</span> }]
+                : []),
+              ...(data.qq
+                ? [
+                    {
+                      key: translate('qq.owner.qqAccount'),
+                      value: (
+                        <span className="lmv-mono">
+                          {data.qq.appIdMasked} / {data.qq.openidMasked}
+                        </span>
+                      ),
+                    },
+                    { key: translate('qq.owner.boundAt'), value: formatTime(data.qq.boundAt) },
+                  ]
+                : []),
+            ]}
+          />
+          <span className="lmv-prose-p">{translate('qq.owner.pairHint')}</span>
+          <span className="lmv-prose-p">{translate('qq.owner.privacy')}</span>
+
+          {issued?.code ? (
+            <Notice kind="ok">
+              <div className="lmv-list">
+                <div className="lmv-row">
+                  <span className="lmv-row-main">
+                    <span className="lmv-row-title">
+                      {translate('qq.owner.pairCode')}: <span className="lmv-mono">{issued.code}</span>
+                    </span>
+                    <span className="lmv-meta">
+                      {translate('qq.owner.pairExpires')}: {issued.expiresAt ? formatTime(issued.expiresAt) : '—'}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </Notice>
+          ) : null}
+
+          <div className="lmv-wrap">
+            <Button
+              variant="primary"
+              disabled={!data.available || createCode.busy}
+              onClick={doCreate}
+            >
+              {createCode.busy ? '…' : translate('qq.owner.generate')}
+            </Button>
+            <Button variant="danger" disabled={!data.bound || unbind.busy} onClick={doUnbind}>
+              {unbind.busy ? '…' : translate('qq.owner.unbind')}
+            </Button>
+            <Button variant="ghost" onClick={refresh}>
+              {translate('qq.status.refresh')}
+            </Button>
+          </div>
+          {createCode.error === null ? null : <ErrorNotice error={createCode.error} />}
+          {unbind.error === null ? null : <ErrorNotice error={unbind.error} />}
+          {data.bound ? <Notice kind="warn">{translate('qq.owner.unbindConfirm')}</Notice> : null}
+        </>
+      )}
     </Card>
   )
 }
@@ -757,6 +873,7 @@ export function QqView(props: { vault: VaultInfo }): ReactElement {
 
   return (
     <div className="lmv-main">
+      <OwnerBindingCard onChanged={rerun} />
       <ProbeCard
         probe={probe.data}
         loading={probe.loading}
@@ -766,7 +883,7 @@ export function QqView(props: { vault: VaultInfo }): ReactElement {
       />
 
       {live === null ? (
-        <Card title={translate('qq.card.linkage')}>
+        <Card title={<><Icon name="sharing" />{translate('qq.card.linkage')}</>}>
           {report.error === null ? (
             <Loading label={translate('state.loadingPage')} />
           ) : (
@@ -774,7 +891,7 @@ export function QqView(props: { vault: VaultInfo }): ReactElement {
           )}
         </Card>
       ) : draft === null || texts === null ? (
-        <Card title={translate('qq.card.linkage')}>
+        <Card title={<><Icon name="sharing" />{translate('qq.card.linkage')}</>}>
           <Loading />
         </Card>
       ) : (

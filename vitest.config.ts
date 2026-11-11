@@ -1,6 +1,8 @@
 import path from 'node:path'
 import { defineConfig } from 'vitest/config'
 
+const testRoot = path.resolve(process.cwd(), '.scratch')
+
 export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
@@ -9,7 +11,7 @@ export default defineConfig({
     // filesystem timing cannot make an unrelated suite flaky.
     fileParallelism: false,
     testTimeout: 30_000,
-    env: { DSH_MEMORY_TEST_ROOT: path.resolve(process.cwd(), '.scratch') },
+    env: { DSH_MEMORY_TEST_ROOT: testRoot },
     hookTimeout: 30_000,
     reporters: ['default'],
   },

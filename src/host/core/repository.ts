@@ -85,7 +85,9 @@ export interface ScanResult {
 }
 
 const SCAN_EXTENSIONS = ['.md'] as const
-const SCAN_SKIP_DIRS = ['.git', 'node_modules', '.obsidian', '.dsh-memory'] as const
+// `Companion/` is product configuration, not fact memory: it must never appear
+// in the searchable index or be rewritten by extraction (design §七).
+const SCAN_SKIP_DIRS = ['.git', 'node_modules', '.obsidian', '.dsh-memory', VAULT_DIRS.companion, VAULT_DIRS.reminders] as const
 
 /**
  * Walk the vault and parse every memory note.
@@ -118,7 +120,8 @@ export async function scanVault(root: string): Promise<ScanResult> {
         ignored += 1
         continue
       }
-      if (relativePath.startsWith('.dsh-memory/') || relativePath.startsWith('.obsidian/')) {
+      if (relativePath.startsWith('.dsh-memory/') || relativePath.startsWith('.obsidian/')
+        || relativePath.startsWith(`${VAULT_DIRS.companion}/`) || relativePath.startsWith(`${VAULT_DIRS.reminders}/`)) {
         ignored += 1
         continue
       }

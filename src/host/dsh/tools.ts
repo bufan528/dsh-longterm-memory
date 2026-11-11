@@ -20,7 +20,17 @@
 import type { MemoryService } from '../core/service.js'
 import { ServiceError } from '../core/service.js'
 import type { QqLinkageRuntime } from '../qq/linkage.js'
-import { MEMORY_TYPES, MEMORY_STATUSES, TYPE_DESCRIPTORS, type MemoryType } from '../../shared/types.js'
+import { createOwnerGate, sessionIdOfAgent, type QqbotContextGateLike } from '../owner-gate.js'
+import {
+  DEFAULT_VISIBILITY,
+  MEMORY_TYPES,
+  MEMORY_STATUSES,
+  TYPE_DESCRIPTORS,
+  type MemoryChannel,
+  type MemoryType,
+  type MemoryVisibility,
+} from '../../shared/types.js'
+import { visibilitiesFor, type OwnerAccessDecision } from '../../shared/owner-access.js'
 import { scanSecrets } from '../core/engine.js'
 
 /** Minimal JSON value type used by tool render output. */
@@ -46,11 +56,14 @@ export interface ToolExecContext {
   agent?: {
     session?: {
       id?: string
-      header?: { cwd?: string }
+      header?: { cwd?: string; origin?: string }
     }
   }
   signal?: AbortSignal
 }
+
+/** Owner 门禁回调：始终返回 decision；allowed=false 拒绝。WP-2A-R1 不再返回 null。 */
+export type OwnerGateForAgent = (agent: unknown) => OwnerAccessDecision
 
 /** Names of the tools this plugin registers. */
 export const TOOL_NAMES = ['memory_search', 'memory_get', 'memory_save', 'memory_forget'] as const
@@ -92,7 +105,11 @@ const FORGET_DESCRIPTION = [
  * @param linkage - QQ 联动运行时；提供时每个工具在执行前先做来源判定，识别为
  *   QQ 通道且策略禁止的会话会收到一个普通工具错误，而不是拿到记忆内容。
  */
-export function buildToolDefinitions(service: MemoryService, linkage?: QqLinkageRuntime): ToolDefinition[] {
+export function buildToolDefinitions(
+  service: MemoryService,
+  linkage?: QqLinkageRuntime,
+  ownerGate?: OwnerGateForAgent,
+): ToolDefinition[] {
   return [
     {
       name: 'memory_search',
@@ -165,7 +182,8 @@ export function buildToolDefinitions(service: MemoryService, linkage?: QqLinkage
         },
       },
       execute: async (args, exec) => {
-        assertToolsAllowed(linkage, exec)
+        const owner = assertToolsAllowed(linkage, exec, ownerGate)
+        const scope = scopeOf(owner)
         const input = asRecord(args)
         const query = typeof input['query'] === 'string' ? input['query'] : ''
         const types = stringArray(input['type'])
@@ -186,6 +204,9 @@ export function buildToolDefinitions(service: MemoryService, linkage?: QqLinkage
                 : { statuses: ['active'] }
               : { statuses }),
             ...(tag === undefined ? {} : { tags: [tag] }),
+            // Applied here, not in the model's arguments: the model cannot ask
+            // for a scope it was not granted.
+            ...(scope === undefined ? {} : { visibilities: scope }),
           },
         })
 
@@ -270,11 +291,19 @@ export function buildToolDefinitions(service: MemoryService, linkage?: QqLinkage
         },
       },
       execute: async (args, exec) => {
-        assertToolsAllowed(linkage, exec)
+        const owner = assertToolsAllowed(linkage, exec, ownerGate)
+        const scope = scopeOf(owner)
         const input = asRecord(args)
         const id = typeof input['id'] === 'string' ? input['id'].trim() : ''
         if (id.length === 0) throw new Error('memory_get requires a non-empty `id`')
         const response = await service.get(id)
+        // Filtering search results is not enough: an id can be guessed or carried
+        // over from another interface. The read itself must re-check the scope.
+        if (scope !== undefined && !scope.includes(response.memory.visibility ?? DEFAULT_VISIBILITY)) {
+          // Answer exactly like a missing id. Saying "exists but forbidden" would
+          // let a session enumerate the vault one id at a time.
+          throw new Error(`memory_get: no memory with id ${JSON.stringify(id)}`)
+        }
         return {
           id: response.memory.id,
           title: response.memory.title,
@@ -348,7 +377,7 @@ export function buildToolDefinitions(service: MemoryService, linkage?: QqLinkage
         },
       },
       execute: async (args, exec) => {
-        assertToolsAllowed(linkage, exec)
+        const owner = assertToolsAllowed(linkage, exec, ownerGate)
         const input = asRecord(args)
         const title = requireString(input['title'], 'title')
         const content = requireString(input['content'], 'content')
@@ -382,6 +411,13 @@ export function buildToolDefinitions(service: MemoryService, linkage?: QqLinkage
         // was written as `active`, so a low-confidence claim became current fact.
         const status: 'pending' | 'active' = confidence === 'low' ? 'pending' : 'active'
 
+        // Scope is decided by which interface is asking, never by a tool argument.
+        // A QQ session writes `qq-private` and a desktop session writes
+        // `desktop-private`; nothing this tool writes becomes shared by default.
+        // Widening is an explicit human action in the management UI.
+        const channel: MemoryChannel = owner?.channel ?? 'desktop'
+        const visibility: MemoryVisibility = channel === 'qq' ? 'qq-private' : DEFAULT_VISIBILITY
+
         const saved = await service.save({
           status,
           type,
@@ -391,6 +427,8 @@ export function buildToolDefinitions(service: MemoryService, linkage?: QqLinkage
           confidence,
           importance,
           pinned: input['pin'] === true,
+          visibility,
+          sourceChannels: [channel],
           evidence:
             typeof input['evidence'] === 'string' && input['evidence'].trim().length > 0
               ? input['evidence'].trim()
@@ -455,11 +493,21 @@ export function buildToolDefinitions(service: MemoryService, linkage?: QqLinkage
         },
       },
       execute: async (args, exec) => {
-        assertToolsAllowed(linkage, exec)
+        const owner = assertToolsAllowed(linkage, exec, ownerGate)
+        const scope = scopeOf(owner)
         const input = asRecord(args)
         const id = requireString(input['id'], 'id')
         const reason = requireString(input['reason'], 'reason')
         const status = input['status'] === 'stale' ? 'stale' : 'archived'
+        // Retiring is a destructive write, so it needs the same scope check as
+        // reading: otherwise one interface could archive the other's private
+        // memories by id.
+        if (scope !== undefined) {
+          const existing = await service.get(id).catch(() => null)
+          if (existing === null || !scope.includes(existing.memory.visibility ?? DEFAULT_VISIBILITY)) {
+            throw new Error(`memory_forget: no memory with id ${JSON.stringify(id)}`)
+          }
+        }
         try {
           await service.setStatus(id, status, `模型调用 memory_forget：${reason}`)
         } catch (error) {
@@ -483,12 +531,46 @@ function asRecord(value: unknown): Record<string, unknown> {
  * 抛普通 Error 而不是 ServiceError：DSH 会把工具抛出的错误变成给模型看的
  * 工具失败结果，模型因此能知道「这个会话不允许访问记忆」，而不是拿到内容。
  */
-function assertToolsAllowed(linkage: QqLinkageRuntime | undefined, exec: ToolExecContext | undefined): void {
-  if (linkage === undefined) return
+/**
+ * A gate decision that has already passed: `allowed` is true, so `channel` is a
+ * concrete interface and callers can build a scope without re-checking.
+ */
+type GrantedOwner = Extract<OwnerAccessDecision, { allowed: true }>
+
+function assertToolsAllowed(
+  linkage: QqLinkageRuntime | undefined,
+  exec: ToolExecContext | undefined,
+  ownerGate?: OwnerGateForAgent,
+): GrantedOwner | null {
+  let decision: GrantedOwner | null = null
+  if (ownerGate !== undefined) {
+    // WP-2A-R1：门禁始终返回 decision；null/undefined 视为拒绝（fail-closed）
+    const owner = ownerGate(exec?.agent)
+    if (owner === null || owner === undefined || !owner.allowed) {
+      throw new Error(
+        `memory tool refused for this session: ${owner?.reason ?? '缺少来源证明，拒绝个人记忆访问'}`,
+      )
+    }
+    decision = owner
+  }
+  if (linkage === undefined) return decision
   const verdict = linkage.tools(exec?.agent)
   if (!verdict.decision.allowed) {
     throw new Error(`memory tool refused for this session: ${verdict.decision.reason}`)
   }
+  return decision
+}
+
+/**
+ * The read scope for this call, or `undefined` when no gate is installed.
+ *
+ * `undefined` keeps the historical "no restriction" behaviour for callers that
+ * run without an owner gate (unit tests, management surfaces). A real session
+ * always goes through the gate, so it always gets a concrete array — possibly
+ * empty, which the filter treats as "nothing readable".
+ */
+function scopeOf(decision: GrantedOwner | null): string[] | undefined {
+  return decision === null ? undefined : visibilitiesFor(decision)
 }
 
 function stringArray(value: unknown): string[] | undefined {
@@ -552,8 +634,31 @@ export function installTools(
     notes['tools'] = '宿主未提供 ctx.tools，模型无法主动调用记忆工具（自动提取与提示词注入不受影响）。'
     return { registered: [], notes }
   }
+  const ownerGate: OwnerGateForAgent = (agent) => {
+    const gate = createOwnerGate(
+      () => {
+        try {
+          return ctx.get('qqbotContext') as QqbotContextGateLike | undefined
+        } catch {
+          return undefined
+        }
+      },
+      {
+        // WP-NEXT-01F: authorized production enable (Stage F)
+        qqPersonalMemory: true,
+        getIngress: () => {
+          try {
+            return ctx.get('hostPluginIngress') as never
+          } catch {
+            return undefined
+          }
+        },
+      },
+    )
+    return gate({ sessionId: sessionIdOfAgent(agent) })
+  }
   const registered: string[] = []
-  const definitions = buildToolDefinitions(service, linkage)
+  const definitions = buildToolDefinitions(service, linkage, ownerGate)
   ctx.effect(
     () => {
       const disposers: unknown[] = []

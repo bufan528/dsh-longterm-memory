@@ -22,6 +22,8 @@
 
 import type { PluginSettings } from '../../shared/protocol.js'
 import { renderRetiredNotice, type RetiredMemory } from '../../shared/retraction.js'
+import { visibilitiesFor, type OwnerAccessDecision } from '../../shared/owner-access.js'
+import { createOwnerGate, sessionIdOfAgent, type QqbotContextGateLike } from '../owner-gate.js'
 import type { MemoryService } from '../core/service.js'
 import type { QqLinkageRuntime } from '../qq/linkage.js'
 
@@ -115,20 +117,32 @@ export function installStandingSection(
     text: (context?: unknown): string => {
       try {
         if (!service.isReady()) return ''
+        const agent = readValue(context, 'agent')
+        const hasAgent = agent !== undefined && agent !== null
+
+        // A call without context (e.g. the management page preview) only checks
+        // what the block looks like; it is not a session and must not be counted
+        // as a gate decision. It also browses the whole vault by design.
+        if (!hasAgent) return service.standing().text
+
         if (linkage !== undefined) {
-          const agent = readValue(context, 'agent')
-          if (agent !== undefined && agent !== null) linkage.markStandingContextSeen()
-          // 没有 context 的调用（例如管理页的预览请求）不算一次会话判定：
-          // 它只验证「这段文本长什么样」，不应该被计入拦截。
-          if (agent !== undefined && agent !== null) {
-            const verdict = linkage.standing(agent)
-            if (!verdict.decision.allowed) {
-              ctx.logger?.info('dsh-longterm-memory: standing memory withheld (%s)', verdict.decision.reason)
-              return ''
-            }
+          linkage.markStandingContextSeen()
+          const verdict = linkage.standing(agent)
+          if (!verdict.decision.allowed) {
+            ctx.logger?.info('dsh-longterm-memory: standing memory withheld (%s)', verdict.decision.reason)
+            return ''
           }
         }
-        return service.standing().text
+
+        // 跨端身份：fail-closed — 门禁始终返回 decision，无「跳过=放行」
+        const ownerDecision = ownerAccessForAgent(ctx, agent)
+        if (!ownerDecision.allowed) {
+          ctx.logger?.info('dsh-longterm-memory: standing memory withheld (%s)', ownerDecision.reason)
+          return ''
+        }
+
+        // 身份已判定；这里只把结果翻译成可见范围，检索层不参与授权判断。
+        return service.standing({ visibilities: visibilitiesFor(ownerDecision) }).text
       } catch (error) {
         ctx.logger?.warn('dsh-longterm-memory: standing section failed: %o', error)
         return ''
@@ -250,12 +264,27 @@ function handleSessionEvent(
           ctx.logger?.info('dsh-longterm-memory: QQ session write forced to inbox (%s)', verdict.decision.reason)
         }
       }
+      // Owner 门禁：fail-closed — 未绑定/缺来源/服务缺失 → 强制收件箱
+      const ownerWrite = ownerAccessForSession(ctx, session, sessionId)
+      if (!ownerWrite.allowed) {
+        forceInbox = true
+        ctx.logger?.info('dsh-longterm-memory: write forced to inbox (%s)', ownerWrite.reason)
+      }
+      // Channel comes from the gate's decision, never from cwd/preset. A
+      // QQ-originated turn always parks its candidates in the review queue,
+      // independent of the (write-side) qqLinkage mode (design §六 / WP-2 B).
+      const sourceChannel = ownerWrite.allowed ? ownerWrite.channel : undefined
+      if (sourceChannel === 'qq') {
+        forceInbox = true
+        ctx.logger?.info('dsh-longterm-memory: QQ-originated turn forced to inbox')
+      }
       const result = await service.processTurn({
         userText: buffer.userText.join('\n'),
         assistantText: buffer.assistantText.join('\n'),
         sessionId,
         ...(turn === undefined ? {} : { turn }),
         ...(buffer.cwd === undefined ? {} : { cwd: buffer.cwd }),
+        ...(sourceChannel === undefined ? {} : { sourceChannel }),
         ...(forceInbox ? { forceInbox: true } : {}),
       })
       if (result.applied.length > 0 || result.pending.length > 0) {
@@ -329,6 +358,12 @@ export function installPerStepRecall(
           return decision
         }
       }
+      // Owner 门禁：与 standing 同源，fail-closed
+      const ownerDecision = ownerAccessForAgent(ctx, agent)
+      if (!ownerDecision.allowed) {
+        ctx.logger?.info('dsh-longterm-memory: per-step recall withheld (%s)', ownerDecision.reason)
+        return decision
+      }
       const claimed = Array.isArray(decision.messages) ? decision.messages : []
 
       // --- retraction of earlier injections -------------------------------------
@@ -361,7 +396,8 @@ export function installPerStepRecall(
       const query = claimed.map(messageText).filter((text) => text.length > 0).join('\n')
       if (query.trim().length === 0) return retired.length > 0 ? { ...decision, messages } : decision
       // Disk-verified: an unverifiable candidate is dropped, never injected.
-      const recalled = await service.recallForInjection(query)
+      // The scope was already decided above; the retrieval layer only filters.
+      const recalled = await service.recallForInjection(query, visibilitiesFor(ownerDecision))
       // Defence in depth: even if a future change made the service return retired
       // entries, an automatic path must never splice them. `historyOnly` marks
       // exactly that fallback, so treat it as "nothing to inject".
@@ -528,4 +564,64 @@ function clip(text: string): string {
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * 通过统一 Owner Gate 判定个人记忆访问（WP-2A-R1）。
+ *
+ * 始终返回 ALLOW/DENY decision；不存在「null=跳过门禁」分支。
+ */
+function ownerAccessForAgent(
+  ctx: CordisLike,
+  agent: unknown,
+): OwnerAccessDecision {
+  const gate = createOwnerGate(
+    () => {
+      try {
+        return ctx.get('qqbotContext') as QqbotContextGateLike | undefined
+      } catch {
+        return undefined
+      }
+    },
+    {
+      // WP-NEXT-01F: authorized production enable (Stage F)
+      qqPersonalMemory: true,
+      getIngress: () => {
+        try {
+          return ctx.get('hostPluginIngress') as never
+        } catch {
+          return undefined
+        }
+      },
+    },
+  )
+  return gate({ sessionId: sessionIdOfAgent(agent) })
+}
+
+/** turn/end 写回路径：同一套门禁。 */
+function ownerAccessForSession(
+  ctx: CordisLike,
+  _session: unknown,
+  sessionId: string,
+): OwnerAccessDecision {
+  const gate = createOwnerGate(
+    () => {
+      try {
+        return ctx.get('qqbotContext') as QqbotContextGateLike | undefined
+      } catch {
+        return undefined
+      }
+    },
+    {
+      qqPersonalMemory: true,
+      getIngress: () => {
+        try {
+          return ctx.get('hostPluginIngress') as never
+        } catch {
+          return undefined
+        }
+      },
+    },
+  )
+  return gate({ sessionId })
 }

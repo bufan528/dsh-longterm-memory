@@ -4,7 +4,53 @@ All notable changes to **DSH Memory Vault (`dsh-longterm-memory`)** are document
 here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **伙伴中心（Life Agent）.** An eighth first-level tab with eight panes — overview, persona,
+  sharing, review, stickers, reminders, privacy, diagnostics — backed by Vault-owned stores
+  (`companion@v1`, `sticker-library@v1`, `reminder-service@v1`). Stickers and reminders moved
+  out of the QQ plugin so the PC page no longer depends on another plugin being installed;
+  QQ keeps delivery, Vault keeps the rows.
+- **Persona documents with voice anchors.** `Companion/` gains optional `scenario`,
+  `catchphrases`, `avoid` and `examples` fields (numbered `example1_user` / `example1_assistant`
+  keys, so the file stays one-field-per-line in Obsidian). Six presets ship with three example
+  dialogues each; applying one is a two-step confirmation because it overwrites every field.
+  `companionFillAnchors` fills only empty slots and never rewrites user text.
+- **Persona preview.** The examples are rendered as a two-sided conversation, with
+  catchphrases and forbidden phrases as chips, so the voice can be judged before saving.
+- **Sticker previews.** New `stickerThumb` RPC returns a `data:` URL for one sticker
+  (640 KiB cap, MIME allow-list, `basename` path check, bounded LRU). Ids are SHA-256, so a
+  cached preview can never go stale.
+- **Natural-language reminder capture.** `src/client/reminder-parse.ts` (pure function) resolves
+  `3小时后` / `明天下午三点` / `周五晚8点` / `11月20日` / `9点半` into an instant, shows the guess
+  as a chip, and never guesses when no time was found. Reminders are grouped by the user's own
+  local midnight: overdue / today / next seven days / later / settled.
+
+### Changed
+
+- **The entire management UI was rebuilt** against two explicit references: the Apple HIG
+  (one primary action per view, content before chrome, depth through surfaces rather than
+  outlines) and Disney's animation principles (press-scale as anticipation, a blurred backdrop
+  as staging, spring overshoot on entry only, secondary action on lift, nothing over 400 ms,
+  full cancellation under `prefers-reduced-motion`). `styles.ts` is now layered as
+  tokens → shell → card → controls → surfaces → feedback → companion → motion and derives every
+  translucent colour with `color-mix()`, which the existing bundle test requires.
+- Overview became a status band plus an attention strip, a ledger and a proportional
+  category bar; search hides its seven filters behind one disclosure that reports how many are
+  on; settings splits fourteen controls into four groups with a sticky save bar; detail reads
+  content first and groups its actions; the inbox keeps its manual form collapsed.
+
+### Verified
+
+- `npx tsc --noEmit` clean; `client-bundle` + `i18n-parity` + `dispatch-validation` green;
+  `check-rpc-contract` reports 49 host methods and every Life-page call has a branch.
+- As always, the panel needs a full DeepSeek Harness restart: the client bundle is read from
+  disk on demand, but the host keeps its modules in memory.
+
 ## [0.1.8] - 2026-10-29
+
 
 ### Removed
 

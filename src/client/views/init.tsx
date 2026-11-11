@@ -6,6 +6,10 @@
  * what Obsidian installs were found, why the host decided what it decided, the
  * warnings worth reading, the candidate paths to adopt, and a manual path box.
  *
+ * Because adopting a path is this page's only real job, the candidate list is
+ * the interactive element — the whole row is the control, not a button parked at
+ * its right edge.
+ *
  * @module dsh-longterm-memory/client/views/init
  */
 
@@ -15,7 +19,7 @@ import type { ReactElement } from 'react'
 import { call, useAsync, useMutation } from '../api.js'
 import { t, useT } from '../i18n.js'
 import { usePage } from '../page-api.js'
-import { Button, Card, ErrorNotice, Field, KvList, Loading, Notice, TextInput } from '../ui.js'
+import { Badge, Button, Card, ErrorNotice, Field, Icon, KvList, Loading, Notice, TextInput } from '../ui.js'
 
 /** Render the first-run flow. */
 export function InitView(props: { onReady: () => void }): ReactElement {
@@ -49,9 +53,40 @@ export function InitView(props: { onReady: () => void }): ReactElement {
 
   return (
     <div className="lmv-main">
-      <Card title={translate('init.title')}>
-        <p className="lmv-prose-p">{translate('init.intro')}</p>
+      <section className="lmv-hero">
+        <div className="lmv-hero-main">
+          <span className="lmv-kicker">{translate('init.title')}</span>
+          <span className="lmv-hero-path">{translate('init.intro')}</span>
+          <div className="lmv-hero-facts">
+            {report === null ? null : (
+              <>
+                <Badge kind="plain">{environmentLabel}</Badge>
+                <Badge kind={report.filesystem ? 'ok' : 'error'}>
+                  {translate('init.filesystem')}: {report.filesystem ? translate('common.yes') : translate('common.no')}
+                </Badge>
+                <Badge kind={report.obsidian.detected ? 'brand' : 'plain'}>
+                  Obsidian: {report.obsidian.detected ? translate('common.yes') : translate('common.no')}
+                </Badge>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="lmv-hero-actions">
+          <Button variant="ghost" disabled={discovery.loading} onClick={discovery.reload}>
+            <Icon name="refresh" size={13} />
+            {translate('common.refresh')}
+          </Button>
+        </div>
+      </section>
 
+      <Card
+        title={
+          <>
+            <Icon name="diagnostics" />
+            {translate('init.environment')}
+          </>
+        }
+      >
         {discovery.loading ? <Loading label={translate('common.loading')} /> : null}
         {discovery.error === null ? null : <ErrorNotice error={discovery.error} onRetry={discovery.reload} />}
 
@@ -60,14 +95,6 @@ export function InitView(props: { onReady: () => void }): ReactElement {
             <KvList
               items={[
                 { key: translate('init.environment'), value: environmentLabel },
-                {
-                  key: translate('init.filesystem'),
-                  value: report.filesystem ? translate('common.yes') : translate('common.no'),
-                },
-                {
-                  key: translate('init.obsidianDetected'),
-                  value: report.obsidian.detected ? translate('common.yes') : translate('common.no'),
-                },
                 {
                   key: translate('init.obsidianConfig'),
                   value: report.obsidian.configPath === null ? translate('common.none') : report.obsidian.configPath,
@@ -83,9 +110,8 @@ export function InitView(props: { onReady: () => void }): ReactElement {
               ]}
             />
 
-            <Field label={translate('init.rationale')}>
-              <p className="lmv-prose-p">{report.rationale}</p>
-            </Field>
+            <span className="lmv-field-label">{translate('init.rationale')}</span>
+            <p className="lmv-prose-p">{report.rationale}</p>
 
             {report.warnings.length === 0 ? null : (
               <div className="lmv-list">
@@ -96,58 +122,74 @@ export function InitView(props: { onReady: () => void }): ReactElement {
                 ))}
               </div>
             )}
-
-            <div className="lmv-field">
-              <span className="lmv-field-label">{translate('init.candidates')}</span>
-              {report.candidates.length === 0 ? (
-                <Notice>{translate('init.noCandidates')}</Notice>
-              ) : (
-                <div className="lmv-list">
-                  {report.candidates.map((candidate) => (
-                    <div key={candidate} className="lmv-row">
-                      <span className="lmv-row-main">
-                        <span className="lmv-mono">{candidate}</span>
-                      </span>
-                      <Button
-                        variant={effective === candidate ? 'primary' : 'default'}
-                        onClick={() => {
-                          setChosen(candidate)
-                          setManual('')
-                        }}
-                      >
-                        {effective === candidate ? translate('common.selected') : translate('common.apply')}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <Field label={translate('init.manual')}>
-              <TextInput
-                value={manual}
-                block
-                placeholder={translate('init.manualPlaceholder')}
-                onChange={(value) => {
-                  setManual(value)
-                  setChosen(null)
-                }}
-              />
-            </Field>
-
-            {initialize.error === null ? null : <ErrorNotice error={initialize.error} />}
-
-            <div className="lmv-wrap">
-              <Button variant="primary" disabled={initialize.busy} onClick={() => void run()}>
-                {initialize.busy ? translate('init.working') : translate('init.initialize')}
-              </Button>
-              <span className="lmv-meta">
-                {effective.length === 0 ? translate('init.needsChoice') : `${translate('init.ready')}: ${effective}`}
-              </span>
-            </div>
           </>
         )}
       </Card>
+
+      {report === null ? null : (
+        <Card
+          title={
+            <>
+              <Icon name="overview" />
+              {translate('init.candidates')}
+            </>
+          }
+          actions={<Badge kind="plain">{String(report.candidates.length)}</Badge>}
+        >
+          {report.candidates.length === 0 ? (
+            <Notice>{translate('init.noCandidates')}</Notice>
+          ) : (
+            <div className="lmv-list">
+              {report.candidates.map((candidate) => {
+                const on = effective === candidate
+                return (
+                  <button
+                    key={candidate}
+                    type="button"
+                    className={`lmv-row lmv-row-click${on ? ' lmv-row-on' : ''}`}
+                    onClick={() => {
+                      setChosen(candidate)
+                      setManual('')
+                    }}
+                  >
+                    <span className="lmv-inline lmv-mono lmv-grow">
+                      <Icon name={on ? 'check' : 'chevron'} size={13} />
+                      {candidate}
+                    </span>
+                    {on ? <Badge kind="brand">{translate('init.chosen')}</Badge> : null}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          <Field label={translate('init.manual')}>
+            <TextInput
+              value={manual}
+              block
+              placeholder={translate('init.manualPlaceholder')}
+              onChange={(value) => {
+                setManual(value)
+                setChosen(null)
+              }}
+            />
+          </Field>
+
+          {initialize.error === null ? null : <ErrorNotice error={initialize.error} />}
+
+          <div className="lmv-wrap">
+            <Button variant="primary" disabled={initialize.busy || effective.length === 0} onClick={() => void run()}>
+              <Icon name="check" size={14} />
+              {initialize.busy ? translate('init.working') : translate('init.initialize')}
+            </Button>
+            <span className="lmv-meta">
+              {effective.length === 0
+                ? translate('init.needsChoice')
+                : `${translate('init.ready')}: ${effective}`}
+            </span>
+          </div>
+        </Card>
+      )}
     </div>
   )
 }

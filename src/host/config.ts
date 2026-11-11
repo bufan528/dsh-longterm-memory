@@ -36,6 +36,11 @@ export const pluginConfigSchema = z
     enablePromptSection: z.boolean().optional(),
     standingBudgetTokens: z.number().int().min(0).max(20000).optional(),
     standingMaxItems: z.number().int().min(0).max(200).optional(),
+    // 表现层开关：只决定「怎么表达」，不参与任何权限判定。
+    standingSemanticGroups: z.boolean().optional(),
+    standingTimeHints: z.boolean().optional(),
+    standingQualityGate: z.boolean().optional(),
+    standingCurrentWindowDays: z.number().int().min(1).max(3650).optional(),
     recallBudgetTokens: z.number().int().min(0).max(20000).optional(),
     recallMaxItems: z.number().int().min(0).max(200).optional(),
     enablePerStepRecall: z.boolean().optional(),

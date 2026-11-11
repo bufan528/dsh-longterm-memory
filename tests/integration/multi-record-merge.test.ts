@@ -8,17 +8,19 @@
  * @module tests/integration/multi-record-merge.test.ts
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { cleanup, makeTempRoot } from '../helpers.js'
+import { buildServiceModule, removeServiceModule } from '../support/build-service-module.js'
 import { MemoryService } from '../../src/host/core/service.js'
 
 let root: string
 let vault: string
 let service: MemoryService
+let serviceModule: string
 
 const meta = () => join(vault, '.dsh-memory')
 const pendingDir = () => join(meta(), 'journal-pending')
@@ -69,6 +71,14 @@ async function monthEventCount(id: string): Promise<number> {
 }
 
 
+beforeAll(async () => {
+  serviceModule = await buildServiceModule()
+})
+
+afterAll(async () => {
+  await removeServiceModule()
+})
+
 beforeEach(async () => {
   root = await makeTempRoot('multi-record-merge')
   vault = join(root, 'DSH Memory')
@@ -102,7 +112,7 @@ describe('merge: operation plan is durable before domain writes', () => {
   it('killed after the survivor write → recovery finishes the merge', async () => {
     const marker = 'MERGE-CRASH-8002'
     const child = await new Promise<{ code: number | null; signal: NodeJS.Signals | null; confirmed: boolean; stderr: string }>((resolvePromise) => {
-      const process_ = spawn(process.execPath, [CHILD, vault, 'after-survivor', marker, 'merge'], { cwd: process.cwd(), env: { ...process.env }, stdio: ['ignore', 'ignore', 'pipe'] })
+      const process_ = spawn(process.execPath, [CHILD, vault, 'after-survivor', marker, 'merge'], { cwd: process.cwd(), env: { ...process.env, DSH_CHILD_SERVICE_MODULE: serviceModule }, stdio: ['ignore', 'ignore', 'pipe'] })
       let stderr = ''
       process_.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8') })
       process_.on('close', (code, signal) => resolvePromise({ code, signal, confirmed: existsSync(join(vault, '.crash-after-survivor')), stderr }))
@@ -160,7 +170,7 @@ async function restorePending(): Promise<void> {
 
 async function runMergeCrash(phase: 'after-survivor' | 'after-other' | 'after-commit', marker: string): Promise<{ code: number | null; signal: NodeJS.Signals | null; confirmed: boolean; stderr: string }> {
   return await new Promise((resolvePromise) => {
-    const child = spawn(process.execPath, [CHILD, vault, phase, marker, 'merge'], { cwd: process.cwd(), env: { ...process.env }, stdio: ['ignore', 'ignore', 'pipe'] })
+    const child = spawn(process.execPath, [CHILD, vault, phase, marker, 'merge'], { cwd: process.cwd(), env: { ...process.env, DSH_CHILD_SERVICE_MODULE: serviceModule }, stdio: ['ignore', 'ignore', 'pipe'] })
     let stderr = ''
     child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8') })
     child.on('close', (code, signal) => resolvePromise({ code, signal, confirmed: existsSync(join(vault, `.crash-${phase}`)), stderr }))
@@ -218,7 +228,7 @@ describe('R33: remaining merge fault windows', () => {
 
 async function runRecoverCrash(phase: 'after-survivor' | 'after-other' | 'after-commit', marker: string): Promise<{ code: number | null; signal: NodeJS.Signals | null; confirmed: boolean; stderr: string }> {
   return await new Promise((resolvePromise) => {
-    const child = spawn(process.execPath, [CHILD, vault, phase, marker, 'recover'], { cwd: process.cwd(), env: { ...process.env }, stdio: ['ignore', 'ignore', 'pipe'] })
+    const child = spawn(process.execPath, [CHILD, vault, phase, marker, 'recover'], { cwd: process.cwd(), env: { ...process.env, DSH_CHILD_SERVICE_MODULE: serviceModule }, stdio: ['ignore', 'ignore', 'pipe'] })
     let stderr = ''
     child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8') })
     child.on('close', (code, signal) => resolvePromise({ code, signal, confirmed: existsSync(join(vault, `.crash-${phase}`)), stderr }))

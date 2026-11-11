@@ -174,6 +174,8 @@ describe('source-level rendering covers every owned field', () => {
       importance: 40,
       pinned: false,
       sourceSessions: ['session-1'],
+      sourceChannels: ['desktop' as const],
+      visibility: 'desktop-private' as const,
       supersedes: [],
       supersededBy: 'mem_2',
       conflictsWith: ['mem_3'],

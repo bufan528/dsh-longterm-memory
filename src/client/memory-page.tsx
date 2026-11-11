@@ -5,6 +5,10 @@
  * It owns the section switch, the shared multi-selection, the toast queue and
  * the first-run gate, and hands each section a `PageApi` through context.
  *
+ * Layout follows the macOS settings idiom rather than a web dashboard: a large
+ * title with a one-line status capsule row, a segmented section control, and a
+ * single scrolling content column. Only one thing animates per navigation.
+ *
  * @module dsh-longterm-memory/client/memory-page
  */
 
@@ -12,11 +16,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import { call, useAsync } from './api.js'
+import { CLIENT_BUILD_ID } from './build-info.js'
 import type { SlotProps } from './context.js'
 import { setLanguage, useT } from './i18n.js'
 import { PageContext } from './page-api.js'
 import type { PageApi, ToastKind } from './page-api.js'
-import { Badge, Button, ErrorNotice, Loading } from './ui.js'
+import { Button, ErrorNotice, Icon, Loading, StatPill } from './ui.js'
+import type { IconName } from './ui.js'
 import { DetailView } from './views/detail.js'
 import { InboxView } from './views/inbox.js'
 import { InitView } from './views/init.js'
@@ -25,8 +31,9 @@ import { OverviewView } from './views/overview.js'
 import { QqView } from './views/qq.js'
 import { SearchView } from './views/search.js'
 import { SettingsView } from './views/settings-view.js'
+import { LifeView } from './views/life.js'
 
-type Section = 'overview' | 'search' | 'manage' | 'inbox' | 'qq' | 'settings'
+type Section = 'overview' | 'search' | 'manage' | 'inbox' | 'qq' | 'life' | 'settings'
 
 interface Toast {
   id: number
@@ -34,13 +41,14 @@ interface Toast {
   kind: ToastKind
 }
 
-const SECTIONS: readonly { key: Section; labelKey: string }[] = [
-  { key: 'overview', labelKey: 'nav.overview' },
-  { key: 'search', labelKey: 'nav.search' },
-  { key: 'manage', labelKey: 'nav.manage' },
-  { key: 'inbox', labelKey: 'nav.inbox' },
-  { key: 'qq', labelKey: 'nav.qq' },
-  { key: 'settings', labelKey: 'nav.settings' },
+const SECTIONS: readonly { key: Section; labelKey: string; icon: IconName }[] = [
+  { key: 'overview', labelKey: 'nav.overview', icon: 'overview' },
+  { key: 'search', labelKey: 'nav.search', icon: 'search' },
+  { key: 'manage', labelKey: 'nav.manage', icon: 'manage' },
+  { key: 'inbox', labelKey: 'nav.inbox', icon: 'inbox' },
+  { key: 'qq', labelKey: 'nav.qq', icon: 'qq' },
+  { key: 'life', labelKey: 'nav.life', icon: 'life' },
+  { key: 'settings', labelKey: 'nav.settings', icon: 'settings' },
 ]
 
 let toastSeq = 0
@@ -123,11 +131,19 @@ export function MemoryPage(_props: SlotProps): ReactElement {
           <header className="lmv-head">
             <div className="lmv-head-titles">
               <h1 className="lmv-title">{translate('page.title')}</h1>
-              <span className="lmv-subtitle">{translate('page.subtitle')}</span>
+              <span className="lmv-subtitle">
+                <span>{translate('page.subtitle')}</span>
+                <span className="lmv-dot" aria-hidden="true">·</span>
+                <span className="lmv-build" title={translate('page.buildHint')}>
+                  {translate('page.build')} {CLIENT_BUILD_ID}
+                </span>
+              </span>
             </div>
           </header>
           <div className="lmv-body">
-            <InitView onReady={status.reload} />
+            <div className="lmv-fade">
+              <InitView onReady={status.reload} />
+            </div>
           </div>
           <Toasts toasts={toasts} />
         </div>
@@ -148,6 +164,8 @@ export function MemoryPage(_props: SlotProps): ReactElement {
       <InboxView />
     ) : section === 'qq' ? (
       <QqView vault={vault} />
+    ) : section === 'life' ? (
+      <LifeView onChanged={refreshStatus} />
     ) : (
       <SettingsView vault={vault} onChanged={refreshStatus} />
     )
@@ -159,47 +177,73 @@ export function MemoryPage(_props: SlotProps): ReactElement {
           <div className="lmv-head-titles">
             <h1 className="lmv-title">{translate('page.title')}</h1>
             <span className="lmv-subtitle">
-              {translate('page.subtitle')} · <span className="lmv-mono">{vault.path}</span>
+              <span>{translate('page.subtitle')}</span>
+              <span className="lmv-dot" aria-hidden="true">·</span>
+              <span className="lmv-path" title={vault.path}>{vault.path}</span>
+              <span className="lmv-dot" aria-hidden="true">·</span>
+              <span className="lmv-build" title={translate('page.buildHint')}>
+                {translate('page.build')} {CLIENT_BUILD_ID}
+              </span>
             </span>
           </div>
           <div className="lmv-head-actions">
-            <Badge kind="brand">
-              {translate('overview.total')}: {vault.stats.total}
-            </Badge>
-            <Badge kind="brand">
-              {translate('overview.pending')}: {vault.stats.pending}
-            </Badge>
-            <Badge kind={vault.stats.conflicts > 0 ? 'error' : 'plain'}>
-              {translate('overview.problems')}: {vault.stats.conflicts}
-            </Badge>
-            <Badge kind={vault.index.healthy ? 'ok' : 'warn'}>
-              {vault.index.healthy ? translate('overview.indexHealthyYes') : translate('overview.indexHealthyNo')}
-            </Badge>
-            <Button variant="ghost" onClick={refreshStatus}>
-              {translate('common.refresh')}
+            <div className="lmv-health">
+              <StatPill label={translate('overview.total')} value={vault.stats.total} />
+              <StatPill
+                label={translate('overview.pending')}
+                value={vault.stats.pending}
+                tone={vault.stats.pending > 0 ? 'warn' : 'plain'}
+              />
+              <StatPill
+                label={translate('overview.problems')}
+                value={vault.stats.conflicts}
+                tone={vault.stats.conflicts > 0 ? 'error' : 'plain'}
+              />
+              <StatPill
+                label={vault.index.healthy ? translate('overview.indexHealthyYes') : translate('overview.indexHealthyNo')}
+                value={<Icon name={vault.index.healthy ? 'check' : 'bolt'} size={13} />}
+                tone={vault.index.healthy ? 'ok' : 'warn'}
+              />
+            </div>
+            <Button
+              variant="ghost"
+              title={translate('common.refresh')}
+              ariaLabel={translate('common.refresh')}
+              onClick={refreshStatus}
+            >
+              <Icon name="refresh" />
             </Button>
           </div>
         </header>
 
         <nav className="lmv-nav" aria-label={translate('page.title')}>
-          {SECTIONS.map((entry) => (
-            <button
-              key={entry.key}
-              type="button"
-              className={`lmv-nav-btn${selectedId === null && section === entry.key ? ' lmv-nav-btn-on' : ''}`}
-              aria-current={selectedId === null && section === entry.key}
-              onClick={() => {
-                setSelectedId(null)
-                setSection(entry.key)
-              }}
-            >
-              {translate(entry.labelKey)}
-              {entry.key === 'inbox' && vault.stats.pending > 0 ? ` (${String(vault.stats.pending)})` : ''}
-            </button>
-          ))}
+          {SECTIONS.map((entry) => {
+            const active = selectedId === null && section === entry.key
+            const pending = entry.key === 'inbox' ? vault.stats.pending : 0
+            return (
+              <button
+                key={entry.key}
+                type="button"
+                className={`lmv-nav-btn${active ? ' lmv-nav-btn-on' : ''}`}
+                aria-current={active ? 'page' : undefined}
+                onClick={() => {
+                  setSelectedId(null)
+                  setSection(entry.key)
+                }}
+              >
+                <Icon name={entry.icon} />
+                <span>{translate(entry.labelKey)}</span>
+                {pending > 0 ? <span className="lmv-nav-count">{pending}</span> : null}
+              </button>
+            )
+          })}
         </nav>
 
-        <div className="lmv-body">{sectionBody}</div>
+        <div className="lmv-body">
+          <div className="lmv-fade" key={selectedId ?? section}>
+            {sectionBody}
+          </div>
+        </div>
         <Toasts toasts={toasts} />
       </div>
     </PageContext.Provider>
@@ -213,7 +257,8 @@ function Toasts(props: { toasts: readonly Toast[] }): ReactElement | null {
     <div className="lmv-toasts" role="status" aria-live="polite">
       {props.toasts.map((item) => (
         <div key={item.id} className={`lmv-toast${item.kind === 'info' ? '' : ` lmv-toast-${item.kind}`}`}>
-          {item.message}
+          <Icon name={item.kind === 'ok' ? 'check' : item.kind === 'error' ? 'bolt' : 'spark'} />
+          <span className="lmv-grow">{item.message}</span>
         </div>
       ))}
     </div>

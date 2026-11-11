@@ -13,15 +13,19 @@ import { execFile } from 'node:child_process'
 import { join, resolve } from 'node:path'
 import {
   CONFIDENCE_LEVELS,
+  DEFAULT_VISIBILITY,
   MEMORY_STATUSES,
   MEMORY_TYPES,
   TYPE_DESCRIPTORS,
+  isMemoryVisibility,
   type Confidence,
+  type MemoryChannel,
   type JournalEntry,
   type Memory,
   type MemoryCandidate,
   type MemoryStatus,
   type MemoryType,
+  type MemoryVisibility,
   type VaultDiscovery,
   type VaultInfo,
 } from '../../shared/types.js'
@@ -54,6 +58,8 @@ import {
   type SearchResponse,
   type StatusResponse,
   type SyncIndexResponse,
+  type VisibilityReviewResponse,
+  type VisibilityReviewRow,
   type WireHit,
   toWireHit,
 } from '../../shared/protocol.js'
@@ -306,6 +312,7 @@ export class MemoryService {
     await this.recoverOperations()
     
     await this.loadOrRebuildIndex()
+    await this.loadCandidates()
     // Read the user's stored choices before writing anything back, so a fresh
     // activation cannot overwrite them with this run's defaults.
     await this.loadPersistedSettings()
@@ -975,6 +982,11 @@ export class MemoryService {
       importance: clamp(request.importance, 0, 100),
       pinned: request.pinned ?? (existing?.pinned ?? false),
       sourceSessions: request.sourceSessions ?? [],
+      // Provenance accumulates: a memory that both interfaces have touched says so.
+      sourceChannels: [...new Set([...(previousMemory?.sourceChannels ?? []), ...(request.sourceChannels ?? [])])],
+      // Access never widens implicitly: an explicit request wins, then the stored
+      // value, then the restrictive default.
+      visibility: request.visibility ?? previousMemory?.visibility ?? DEFAULT_VISIBILITY,
       supersedes: previousMemory?.supersedes ?? [],
       conflictsWith: previousMemory?.conflictsWith ?? [],
       aliases: request.aliases ?? previousMemory?.aliases ?? [],
@@ -1089,10 +1101,27 @@ export class MemoryService {
     return { repairs: result.repairs, warnings: [] }
   }
 
-  async confirm(id: string, reason = '用户确认该记忆有效'): Promise<{ id: string }> {
+  /**
+   * Confirm a queued candidate (or a pending note). `visibility` is the only
+   * way a QQ-originated memory becomes `shared`, and it must be passed
+   * explicitly by the management UI — confirming without it keeps the
+   * conservative `qq-private` scope. Silent widening is exactly the leak
+   * design §六 forbids.
+   */
+  async confirm(
+    id: string,
+    reason = '用户确认该记忆有效',
+    visibility?: MemoryVisibility,
+  ): Promise<{ id: string }> {
+    if (visibility !== undefined && !isMemoryVisibility(visibility)) {
+      throw new ServiceError(ERROR_CODES.invalid, `未知共享范围：${String(visibility)}`)
+    }
     const candidate = this.candidates.find((entry) => entry.id === id)
-    if (candidate !== undefined) return await this.confirmCandidate(candidate, reason)
-    return this.transition(id, 'active', reason)
+    const result = candidate !== undefined
+      ? await this.confirmCandidate(candidate, reason, visibility)
+      : await this.transition(id, 'active', reason, visibility)
+    await this.persistCandidates()
+    return result
   }
 
   /**
@@ -1111,12 +1140,25 @@ export class MemoryService {
    *
    * The candidate then leaves the Inbox in every successful branch.
    */
-  private async confirmCandidate(candidate: MemoryCandidate, reason: string): Promise<{ id: string }> {
+  private async confirmCandidate(
+    candidate: MemoryCandidate,
+    reason: string,
+    visibility?: MemoryVisibility,
+  ): Promise<{ id: string }> {
     if (this.repository === null) throw new ServiceError(ERROR_CODES.internal, '仓库不可用。')
     const { index } = this.requireIndex()
     const comparison = compareCandidate(candidate, viewsFromIndex(index))
     const confidence: Confidence = candidate.confidence === 'low' ? 'medium' : candidate.confidence
-    const confirmed: MemoryCandidate = { ...candidate, confidence, decision: comparison.decision }
+    // An explicit review decision wins; otherwise keep the candidate's own
+    // conservative scope. Never invent `shared`.
+    const scope = visibility ?? (isMemoryVisibility(candidate.visibility) ? candidate.visibility : DEFAULT_VISIBILITY)
+    const confirmed: MemoryCandidate = {
+      ...candidate,
+      confidence,
+      decision: comparison.decision,
+      visibility: scope,
+      sourceChannels: [...(candidate.sourceChannels ?? [])],
+    }
 
     const targetId =
       comparison.decision.action === 'update'
@@ -1137,8 +1179,11 @@ export class MemoryService {
           // refuses to rewrite multi-line scalars. The candidate's provenance is
           // preserved through `sourceSessions` and the journal instead.
           sourceSessions: [...new Set([...before.sourceSessions, ...confirmed.sourceSessions])],
+          sourceChannels: [...new Set([...before.sourceChannels, ...(confirmed.sourceChannels ?? [])])],
           tags: [...new Set([...before.tags, ...confirmed.tags])],
           confidence: before.confidence === 'low' ? 'medium' : before.confidence,
+          // Only an explicit review decision may widen an existing memory.
+          visibility: visibility ?? before.visibility,
           updatedAt: nowIso(),
         }
         await this.repository.save(next)
@@ -1156,7 +1201,7 @@ export class MemoryService {
       }
     }
 
-    const memory = this.memoryFromCandidate(confirmed, 'active')
+    const memory = this.memoryFromCandidate(confirmed, 'active', scope)
     if (comparison.decision.action === 'conflict') memory.conflictsWith = [comparison.decision.targetId]
     await this.repository.save(memory)
     await this.repository.journal({
@@ -1178,7 +1223,12 @@ export class MemoryService {
     return this.transition(id, status, reason ?? `用户将状态改为 ${status}`)
   }
 
-  private async transition(id: string, status: MemoryStatus, reason: string): Promise<{ id: string }> {
+  private async transition(
+    id: string,
+    status: MemoryStatus,
+    reason: string,
+    visibility?: MemoryVisibility,
+  ): Promise<{ id: string }> {
     const { index } = this.requireIndex()
     if (this.repository === null) throw new ServiceError(ERROR_CODES.internal, '仓库不可用。')
     const record = index.records.get(id)
@@ -1187,7 +1237,12 @@ export class MemoryService {
     if (loaded === null) throw new ServiceError(ERROR_CODES.notFound, `记忆文件无法加载：${id}。`)
 
     const before = loaded.memory
-    const next: Memory = { ...before, status, updatedAt: nowIso() }
+    const next: Memory = {
+      ...before,
+      status,
+      updatedAt: nowIso(),
+      ...(visibility === undefined ? {} : { visibility }),
+    }
     // Confirming a low-confidence memory is an explicit act of trust.
     if (status === 'active' && before.confidence === 'low') next.confidence = 'medium'
     await this.commitSingleSave(id, loaded, next, statusToOp(status), reason)
@@ -1208,6 +1263,62 @@ export class MemoryService {
   }
 
   /**
+   * WP-6 sharing review (design §六: "旧记忆的迁移不能默认全部设置为 shared").
+   * Read-only listing for the opt-in wizard. There is deliberately NO bulk
+   * endpoint — every row must be confirmed on its own.
+   */
+  visibilityReview(): VisibilityReviewResponse {
+    const { index } = this.requireIndex()
+    const byVisibility: Record<MemoryVisibility, number> = {
+      shared: 0,
+      'desktop-private': 0,
+      'qq-private': 0,
+    }
+    const rows: VisibilityReviewRow[] = []
+    for (const record of index.records.values()) {
+      const value = record.visibility
+      const visibility: MemoryVisibility = isMemoryVisibility(value) ? value : DEFAULT_VISIBILITY
+      byVisibility[visibility] += 1
+      rows.push({
+        id: record.id,
+        title: record.title,
+        type: (MEMORY_TYPES as readonly string[]).includes(record.type)
+          ? record.type as MemoryType : 'knowledge',
+        status: (MEMORY_STATUSES as readonly string[]).includes(record.status)
+          ? record.status as MemoryStatus : 'active',
+        visibility,
+        sourceChannels: Array.isArray(record.sourceChannels)
+          ? record.sourceChannels.filter((c): c is MemoryChannel => c === 'desktop' || c === 'qq')
+          : [],
+        updatedAt: record.updatedAt,
+      })
+    }
+    rows.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt) || a.id.localeCompare(b.id))
+    return { rows, byVisibility }
+  }
+
+  /** Opt-in, single-record visibility change. `shared` is never a default. */
+  async setVisibility(
+    id: string,
+    visibility: MemoryVisibility,
+    reason = '用户在管理中心逐条调整共享范围',
+  ): Promise<{ id: string; changed: boolean }> {
+    if (!isMemoryVisibility(visibility)) {
+      throw new ServiceError(ERROR_CODES.invalid, `未知共享范围：${String(visibility)}`)
+    }
+    const { index } = this.requireIndex()
+    if (this.repository === null) throw new ServiceError(ERROR_CODES.internal, '仓库不可用。')
+    if (index.records.get(id) === undefined) throw new ServiceError(ERROR_CODES.notFound, `未找到记忆 ${id}。`)
+    const loaded = await this.repository.load(id)
+    if (loaded === null) throw new ServiceError(ERROR_CODES.notFound, `记忆文件无法加载：${id}。`)
+    const before = loaded.memory
+    if (before.visibility === visibility) return { id, changed: false }
+    const next: Memory = { ...before, visibility, updatedAt: nowIso() }
+    await this.commitSingleSave(id, loaded, next, 'update', `${reason}（${before.visibility} → ${visibility}）`)
+    return { id, changed: true }
+  }
+
+  /**
    * Delete a memory. `confirm` must be literally `true`; the UI only sends it
    * after a second confirmation, and this method refuses anything else so a
    * programming mistake cannot destroy data silently.
@@ -1219,10 +1330,12 @@ export class MemoryService {
     if (this.repository === null) throw new ServiceError(ERROR_CODES.internal, '仓库不可用。')
     await this.removeWithIntent(id, reason)
     this.candidates = this.candidates.filter((candidate) => candidate.id !== id)
+    await this.persistCandidates()
     return { id }
   }
 
   async reject(id: string, reason = '用户拒绝该候选记忆', keepFile = false): Promise<{ id: string }> {
+   try {
     const candidate = this.candidates.find((entry) => entry.id === id)
     if (candidate !== undefined) {
       // A rejected candidate is not a memory file: dropping it from the Inbox is
@@ -1243,6 +1356,9 @@ export class MemoryService {
     if (this.repository === null) throw new ServiceError(ERROR_CODES.internal, '仓库不可用。')
     await this.removeWithIntent(id, reason)
     return { id }
+   } finally {
+    await this.persistCandidates()
+   }
   }
 
   /** Fold several memories into one survivor. */
@@ -1493,12 +1609,30 @@ export class MemoryService {
 
   /* --------------------------------------------------------- recall & turns */
 
-  /** Standing facts for the system prompt. */
-  standing(): ReturnType<typeof standingFacts> {
+  /**
+   * Standing facts for the system prompt.
+   *
+   * Presentation options come from settings, so a person can turn the semantic
+   * layout, the freshness annotations or the quality filter off one at a time and
+   * compare — without a rebuild. `now` is left to the caller's clock in production
+   * and injected by tests.
+   */
+  standing(options: { now?: Date; visibilities?: string[] } = {}): ReturnType<typeof standingFacts> {
     const { index } = this.requireIndex()
     return standingFacts(index, {
       budgetTokens: this.settings.standingBudgetTokens,
       maxItems: this.settings.standingMaxItems,
+      language: this.settings.language,
+      grouped: this.settings.standingSemanticGroups !== false,
+      timeHints: this.settings.standingTimeHints !== false,
+      qualityGate: this.settings.standingQualityGate !== false,
+      ...(this.settings.standingCurrentWindowDays === undefined
+        ? {}
+        : { currentWindowDays: this.settings.standingCurrentWindowDays }),
+      // Callers that omit it are vault-browsing surfaces (management UI), which
+      // legitimately see everything. Model-facing paths always pass it.
+      ...(options.visibilities === undefined ? {} : { visibilities: options.visibilities }),
+      ...(options.now === undefined ? {} : { now: options.now }),
     })
   }
 
@@ -1524,8 +1658,11 @@ export class MemoryService {
    * not match is dropped rather than injected: refusing to inject something we
    * cannot confirm is the safe side of the contract "Markdown is authoritative".
    */
-  async recallForInjection(query: string): Promise<ReturnType<typeof renderHits>> {
-    const result = this.recall(query, { mode: 'injection' })
+  async recallForInjection(query: string, visibilities?: string[]): Promise<ReturnType<typeof renderHits>> {
+    const result = this.recall(query, {
+      mode: 'injection',
+      ...(visibilities === undefined ? {} : { visibilities }),
+    })
     if (result.hits.length === 0 || this.index === null || this.root === null) {
       return renderHits([], { query, budgetTokens: this.settings.recallBudgetTokens, maxItems: this.settings.recallMaxItems }, CURRENT_PURPOSE)
     }
@@ -1556,7 +1693,10 @@ export class MemoryService {
     if (fresh.length === result.hits.length) return renderHits(result.hits, { query, budgetTokens: this.settings.recallBudgetTokens, maxItems: this.settings.recallMaxItems }, CURRENT_PURPOSE)
     return renderHits(fresh, { query, budgetTokens: this.settings.recallBudgetTokens, maxItems: this.settings.recallMaxItems }, CURRENT_PURPOSE)
   }
-  recall(query: string, options: { mode?: 'explicit' | 'injection' } = {}): ReturnType<typeof retrieveForTask> {
+  recall(
+    query: string,
+    options: { mode?: 'explicit' | 'injection'; visibilities?: string[] } = {},
+  ): ReturnType<typeof retrieveForTask> {
     const { index } = this.requireIndex()
     const mode = options.mode ?? 'explicit'
     return retrieveForTask(index, {
@@ -1564,6 +1704,7 @@ export class MemoryService {
       budgetTokens: this.settings.recallBudgetTokens,
       maxItems: this.settings.recallMaxItems,
       includeNonCurrent: mode === 'explicit',
+      ...(options.visibilities === undefined ? {} : { visibilities: options.visibilities }),
     })
   }
 
@@ -1578,6 +1719,71 @@ export class MemoryService {
       includeNonCurrent: (optionsForPreview.mode ?? 'injection') === 'explicit',
     })
     return { text: result.text, usedTokens: result.usedTokens || estimateTokens(result.text), includedIds: result.includedIds, omitted: result.omitted }
+  }
+
+  /**
+   * Review-queue persistence (design WP-2 场景 B / M-02 / M-10).
+   *
+   * Candidates used to live only in memory, so a QQ-originated candidate vanished
+   * on Host restart before the user could review it — the PC Inbox would show
+   * nothing even though the conversation happened. Markdown remains the sole
+   * source of truth for *memories*; this file is only the pre-memory review
+   * queue, so it is derived data and is rebuildable/losable without corrupting
+   * the vault. An unreadable or invalid value falls back conservatively:
+   * never to `shared`, never to an invented channel.
+   */
+  private async loadCandidates(): Promise<void> {
+    if (this.layout === null) return
+    const raw = await readTextIfExists(this.layout.candidates)
+    if (raw === null) return
+    try {
+      const parsed = JSON.parse(raw) as unknown
+      const rows = parsed !== null && typeof parsed === 'object'
+        && Array.isArray((parsed as Record<string, unknown>)['candidates'])
+        ? (parsed as Record<string, unknown>)['candidates'] as unknown[] : []
+      const restored: MemoryCandidate[] = []
+      const seen = new Set<string>()
+      for (const row of rows) {
+        if (row === null || typeof row !== 'object') continue
+        const c = row as Record<string, unknown>
+        if (typeof c['id'] !== 'string' || typeof c['title'] !== 'string'
+          || typeof c['summary'] !== 'string' || typeof c['type'] !== 'string'
+          || !Array.isArray(c['sourceSessions']) || c['decision'] === undefined) continue
+        if (seen.has(c['id'])) continue
+        seen.add(c['id'])
+        // A queued candidate has NOT been reviewed, so `shared` is never a
+        // legitimate persisted value for it: only confirm() may widen a memory.
+        // Treat shared/unknown/missing as the restrictive default rather than
+        // trusting a possibly hand-edited or tampered queue file.
+        const visibility: MemoryVisibility = c['visibility'] === 'qq-private'
+          ? 'qq-private'
+          : DEFAULT_VISIBILITY
+        const sourceChannels = Array.isArray(c['sourceChannels'])
+          ? (c['sourceChannels'] as unknown[]).filter((v): v is MemoryChannel => v === 'desktop' || v === 'qq')
+          : []
+        restored.push({
+          ...(c as unknown as MemoryCandidate),
+          visibility,
+          sourceChannels: [...new Set(sourceChannels)],
+        })
+      }
+      this.candidates = restored
+    } catch (error) {
+      this.deps.logger?.warn('dsh-longterm-memory: review queue unreadable, starting empty: %o', error)
+    }
+  }
+
+  private async persistCandidates(): Promise<void> {
+    if (this.layout === null) return
+    try {
+      await writeFileAtomic(
+        this.layout.candidates,
+        `${JSON.stringify({ schemaVersion: 1, candidates: this.candidates }, null, 2)}\n`,
+      )
+    } catch (error) {
+      // A failed queue write must not destroy an already-committed memory.
+      this.deps.logger?.warn('dsh-longterm-memory: review queue write failed: %o', error)
+    }
   }
 
   listCandidates(): MemoryCandidate[] {
@@ -1617,8 +1823,13 @@ export class MemoryService {
       reason: input.reason ?? '手动添加的候选记忆',
       relatedIds: [],
       decision: { action: 'inbox', rationale: '等待用户确认' },
+      visibility: DEFAULT_VISIBILITY,
+      sourceChannels: ['desktop'],
     }
     this.candidates.push(candidate)
+    // Keep the synchronous API used by existing callers; the queue write is
+    // serialised by writeFileAtomic and is awaited by the next review action.
+    void this.persistCandidates()
     return { id: candidate.id }
   }
 
@@ -1714,6 +1925,13 @@ export class MemoryService {
     const pending: MemoryCandidate[] = []
 
     for (const candidate of outcome.candidates) {
+      // Provenance comes from the Owner Gate's decision, never from cwd/preset
+      // and never from the model. Accumulate, never replace (design §二.3, §六).
+      if (input.sourceChannel !== undefined) {
+        candidate.sourceChannels = [
+          ...new Set([...(candidate.sourceChannels ?? []), input.sourceChannel]),
+        ]
+      }
       // Skip a candidate already waiting for the user, so repeated turns on the
       // same subject do not pile up duplicate Inbox entries.
       if (this.candidates.some((waiting) => sameCandidateSubject(waiting, candidate))) continue
@@ -1724,7 +1942,12 @@ export class MemoryService {
       // 这里在**应用之前**改道，所以候选记忆仍然完整经过既有的提取、敏感信息
       // 与冲突判定流程，只是不会被直接写成 active 长期记忆。
       if (input.forceInbox === true) {
-        candidate.decision = { action: 'inbox', rationale: 'QQ 会话按联动策略只写入收件箱，等待人工确认' }
+        // A QQ-originated candidate is qq-private until a human explicitly
+        // widens it during review; nothing here can produce `shared`.
+        candidate.visibility = input.sourceChannel === 'qq'
+          ? 'qq-private'
+          : (isMemoryVisibility(candidate.visibility) ? candidate.visibility : DEFAULT_VISIBILITY)
+        candidate.decision = { action: 'inbox', rationale: '来源通道按策略只写入收件箱，等待人工确认' }
         pending.push(candidate)
         this.candidates.push(candidate)
         continue
@@ -1781,6 +2004,7 @@ export class MemoryService {
     }
 
     if (applied.length > 0) await this.refreshAfterWrite()
+    await this.persistCandidates()
     return {
       candidates: outcome.candidates,
       applied,
@@ -1820,6 +2044,9 @@ export class MemoryService {
     usedTokens: number
     includedIds: string[]
     omitted: number
+    groups?: { key: string; heading: string; ids: string[] }[]
+    excluded?: { id: string; title: string; reason: string }[]
+    dedupedIds?: string[]
     error: string | null
   } {
     if (this.standingProbe === undefined) {
@@ -1836,7 +2063,9 @@ export class MemoryService {
     }
     try {
       const text = this.standingProbe.text()
-      const standing = this.isReady() ? this.standing() : { usedTokens: 0, includedIds: [], omitted: 0 }
+      const standing = this.isReady()
+        ? this.standing()
+        : { usedTokens: 0, includedIds: [] as string[], omitted: 0, groups: [], excluded: [], dedupedIds: [] }
       return {
         registered: true,
         name: this.standingProbe.name,
@@ -1845,6 +2074,13 @@ export class MemoryService {
         usedTokens: standing.usedTokens,
         includedIds: standing.includedIds,
         omitted: standing.omitted,
+        groups: (standing.groups ?? []).map((group) => ({
+          key: group.key,
+          heading: group.heading,
+          ids: group.ids,
+        })),
+        excluded: standing.excluded ?? [],
+        dedupedIds: standing.dedupedIds ?? [],
         error: null,
       }
     } catch (error) {
@@ -1868,11 +2104,15 @@ export class MemoryService {
    * plugin has not been authorised to treat as fact yet, so the user confirms it
    * (or edits it) before it can be recalled.
    */
-  async materializeCandidate(candidateId: string): Promise<{ id: string }> {
+  async materializeCandidate(
+    candidateId: string,
+    visibility?: MemoryVisibility,
+  ): Promise<{ id: string }> {
     const candidate = this.candidates.find((entry) => entry.id === candidateId)
     if (candidate === undefined) throw new ServiceError(ERROR_CODES.notFound, `未找到候选记忆 ${candidateId}。`)
     if (this.repository === null) throw new ServiceError(ERROR_CODES.internal, '仓库不可用。')
-    const memory = this.memoryFromCandidate(candidate, 'pending')
+    const scope = visibility ?? (isMemoryVisibility(candidate.visibility) ? candidate.visibility : DEFAULT_VISIBILITY)
+    const memory = this.memoryFromCandidate(candidate, 'pending', scope)
     await this.repository.save(memory)
     await this.repository.journal({
       at: nowIso(),
@@ -1883,10 +2123,15 @@ export class MemoryService {
     })
     this.candidates = this.candidates.filter((entry) => entry.id !== candidateId)
     await this.refreshAfterWrite()
+    await this.persistCandidates()
     return { id: memory.id }
   }
 
-  private memoryFromCandidate(candidate: MemoryCandidate, status: MemoryStatus): Memory {
+  private memoryFromCandidate(
+    candidate: MemoryCandidate,
+    status: MemoryStatus,
+    visibility: MemoryVisibility = DEFAULT_VISIBILITY,
+  ): Memory {
     return {
       id: candidate.id,
       type: candidate.type,
@@ -1899,6 +2144,10 @@ export class MemoryService {
       importance: candidate.importance,
       pinned: false,
       sourceSessions: candidate.sourceSessions,
+      sourceChannels: [...(candidate.sourceChannels ?? [])],
+      // Confirming a candidate says "this is true", not "publish this". The
+      // caller may widen it; the default must not.
+      visibility,
       supersedes: [],
       conflictsWith: [],
       aliases: [],

@@ -13,7 +13,7 @@ import type { ReactElement } from 'react'
 import type { WireHit } from '../../shared/protocol.js'
 import { useT } from '../i18n.js'
 import { Badge, MemoryRow } from '../ui.js'
-import { confidenceKind, formatTime, shortId, statusKind, statusLabel, typeLabel } from '../util.js'
+import { confidenceKind, confidenceLabel, formatTime, shortId, statusKind, statusLabel, typeLabel } from '../util.js'
 
 /** Render one wire hit. */
 export function HitRow(props: {
@@ -24,6 +24,9 @@ export function HitRow(props: {
 }): ReactElement {
   const translate = useT()
   const record = props.hit.record
+  // The raw score is a float with many digits; two decimals is the precision a
+  // human can actually use when comparing two rows.
+  const score = Math.round(props.hit.score * 100) / 100
   return (
     <MemoryRow
       id={record.id}
@@ -37,10 +40,10 @@ export function HitRow(props: {
           <Badge kind="brand">{typeLabel(record.type)}</Badge>
           <Badge kind={statusKind(record.status)}>{statusLabel(record.status)}</Badge>
           {record.pinned ? <Badge kind="warn">{translate('detail.pinned')}</Badge> : null}
-          <Badge kind={confidenceKind(record.confidence)}>{record.confidence}</Badge>
+          <Badge kind={confidenceKind(record.confidence)}>{confidenceLabel(record.confidence)}</Badge>
           <span>{formatTime(record.updatedAt)}</span>
           <span>
-            {translate('search.score')}: <span className="lmv-mono">{String(props.hit.score)}</span>
+            {translate('search.score')}: <span className="lmv-mono">{String(score)}</span>
           </span>
           <span className="lmv-mono">{shortId(record.id, 26)}</span>
         </>

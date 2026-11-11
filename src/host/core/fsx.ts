@@ -104,7 +104,7 @@ export async function isDirectory(target: string): Promise<boolean> {
  */
 export async function writeFileAtomic(
   filename: string,
-  content: string,
+  content: string | Uint8Array,
   options: { mode?: number; dirMode?: number } = {},
 ): Promise<void> {
   await mkdir(dirname(filename), { recursive: true, ...(options.dirMode === undefined ? {} : { mode: options.dirMode }) })
@@ -242,13 +242,34 @@ export async function statOrNull(target: string): Promise<{ size: number; mtimeM
   }
 }
 
+/**
+ * Windows hands out `EPERM` / `EBUSY` for a file that is *briefly* held by
+ * another process — Defender, the search indexer, or Obsidian's own watcher.
+ * These are transient: a short bounded retry turns a spurious failure into a
+ * success without hiding a permanently locked file (it still throws at the end).
+ */
+const TRANSIENT_REMOVE_CODES = new Set(['EPERM', 'EBUSY', 'EACCES'])
+const REMOVE_RETRY_DELAYS_MS = [20, 40, 80, 160, 320] as const
+
 export async function removeFile(target: string): Promise<void> {
-  try {
-    await unlink(target)
-  } catch (error) {
-    if ((error as { code?: unknown } | null)?.code === 'ENOENT') return
-    throw wrapFsError(error, FS_CODES.io, 'could not remove file', target)
+  let lastError: unknown = null
+  for (let attempt = 0; attempt <= REMOVE_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      await unlink(target)
+      return
+    } catch (error) {
+      if ((error as { code?: unknown } | null)?.code === 'ENOENT') return
+      lastError = error
+      const code = (error as { code?: unknown } | null)?.code
+      if (typeof code !== 'string' || !TRANSIENT_REMOVE_CODES.has(code)) {
+        throw wrapFsError(error, FS_CODES.io, 'could not remove file', target)
+      }
+      const delay = REMOVE_RETRY_DELAYS_MS[attempt]
+      if (delay === undefined) break
+      await new Promise((resolve) => setTimeout(resolve, delay))
+    }
   }
+  throw wrapFsError(lastError, FS_CODES.io, 'could not remove file', target)
 }
 
 /** Recursively list files under `root` whose name ends with one of `extensions`. */

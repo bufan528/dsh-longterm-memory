@@ -19,6 +19,7 @@ import type {
   CandidateDecision,
   Confidence,
   MemoryCandidate,
+  MemoryChannel,
   MemoryType,
 } from '../../shared/types.js'
 import { TYPE_DESCRIPTORS } from '../../shared/types.js'
@@ -329,6 +330,12 @@ export interface TurnInput {
    * into long-term memory without a human confirming it.
    */
   forceInbox?: boolean
+  /**
+   * Interface that produced this turn, as decided by the Owner Gate — never
+   * guessed from cwd/preset (design §二.3). Drives the candidate's
+   * `sourceChannels` and its conservative default visibility.
+   */
+  sourceChannel?: MemoryChannel
 }
 
 export interface ExtractionOptions {

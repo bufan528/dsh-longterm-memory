@@ -9,16 +9,18 @@
  * @module tests/integration/save-window-b.test.ts
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { cleanup, makeTempRoot } from '../helpers.js'
+import { buildServiceModule, removeServiceModule } from '../support/build-service-module.js'
 import { MemoryService } from '../../src/host/core/service.js'
 
 let root: string
 let vault: string
+let serviceModule: string
 
 const CHILD = join(process.cwd(), 'tests', 'support', 'child-save-crash.mjs')
 const meta = () => join(vault, '.dsh-memory')
@@ -40,7 +42,7 @@ async function runCrashChild(phase: 'after-stage' | 'after-write' | 'after-commi
   return await new Promise<ChildResult>((resolvePromise) => {
     const child = spawn(process.execPath, [CHILD, vault, phase, marker], {
       cwd: process.cwd(),
-      env: { ...process.env },
+      env: { ...process.env, DSH_CHILD_SERVICE_MODULE: serviceModule },
       stdio: ['ignore', 'ignore', 'pipe'],
     })
     let stderr = ''
@@ -80,6 +82,14 @@ async function pendingFor(marker: string): Promise<number> {
 function monthFiles(): Promise<string[]> {
   return readdir(join(meta(), 'journal')).then((names) => names.filter((name) => name.endsWith('.jsonl')).map((name) => join(meta(), 'journal', name))).catch(() => [])
 }
+
+beforeAll(async () => {
+  serviceModule = await buildServiceModule()
+})
+
+afterAll(async () => {
+  await removeServiceModule()
+})
 
 beforeEach(async () => {
   root = await makeTempRoot('save-window-b')

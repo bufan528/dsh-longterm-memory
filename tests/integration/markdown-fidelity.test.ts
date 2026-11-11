@@ -281,6 +281,8 @@ describe('spliceBody unit contract', () => {
     importance: 50,
     pinned: false,
     sourceSessions: [],
+    sourceChannels: [],
+    visibility: 'desktop-private',
     supersedes: [],
     conflictsWith: [],
     aliases: [],

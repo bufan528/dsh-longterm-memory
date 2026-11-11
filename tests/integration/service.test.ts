@@ -669,7 +669,7 @@ describe('recall and context budget', () => {
     expect(types).toContain('preference')
     expect(types).toContain('decision')
     expect(types).not.toContain('knowledge')
-    expect(standing.text).toContain('Long-term memory')
+    expect(standing.text).toContain('长期记忆')
   })
 
   it('previews exactly what would be injected', async () => {

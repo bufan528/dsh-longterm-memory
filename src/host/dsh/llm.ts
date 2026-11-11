@@ -46,7 +46,8 @@ interface DefaultModelLike {
 
 interface CordisLike {
   get: (name: string) => unknown
-  logger?: { info: (message: string, ...rest: unknown[]) => void; warn: (message: string, ...rest: unknown[]) => void }
+  /** Only `get` is used: this adapter never logs. */
+  logger?: { warn: (message: string, ...rest: unknown[]) => void }
 }
 
 /** `createUserMessage` exactly as `@deepseek-ai/dsh-llm` exports it. */
@@ -59,9 +60,31 @@ export interface DshLlmAdapterOptions {
   maxOutputTokens: number
 }
 
+/** One free-form completion: a system instruction plus a single user turn. */
+export interface TextCompletionRequest {
+  system: string
+  user: string
+  /** Overrides the adapter default for this call only. */
+  maxOutputTokens?: number
+}
+
+export interface TextCompletionAnswer {
+  text: string
+  provider: string
+  model: string
+}
+
 export interface DshLlmAdapter extends LlmAdapter {
   /** Resolve the module and services once; safe to call more than once. */
   init: () => Promise<void>
+  /**
+   * The same model route as extraction, with a caller-supplied instruction.
+   *
+   * Used by the persona preview, which needs to *speak* rather than extract.
+   * It shares the route, the timeout and the streaming reader so a provider
+   * quirk cannot work for one feature and fail for the other.
+   */
+  completeText: (request: TextCompletionRequest, signal: AbortSignal) => Promise<TextCompletionAnswer>
 }
 
 /**
@@ -137,6 +160,77 @@ export function createDshLlmAdapter(ctx: CordisLike, options: DshLlmAdapterOptio
     return initPromise
   }
 
+  /**
+   * One call: resolve the route, stream, collect text.
+   *
+   * Both public methods funnel through here so the timeout, the abort wiring and
+   * the tolerant chunk reader behave identically no matter which feature asked.
+   */
+  const run = async (
+    system: string,
+    user: string,
+    signal: AbortSignal,
+    maxOutputTokens: number,
+    /** Wording of the audit messages, so extraction keeps its historical text. */
+    wording: { label: string; empty: string },
+  ): Promise<TextCompletionAnswer> => {
+    if (createUserMessage === undefined) throw new Error(reason ?? '模型访问不可用')
+    const llm = ctx.get('llm') as LlmServiceLike | undefined
+    if (llm === undefined) throw new Error('宿主未提供 ctx.llm')
+    const defaultModel = ctx.get('agentDefaultModel') as DefaultModelLike | undefined
+    if (defaultModel === undefined) throw new Error('宿主未提供 ctx.agentDefaultModel')
+
+    const selection = defaultModel.currentSelection()
+    if (typeof selection.provider !== 'string' || selection.provider.length === 0) {
+      throw new Error('当前没有可用的默认模型 provider')
+    }
+    if (typeof selection.model !== 'string' || selection.model.length === 0) {
+      throw new Error('当前没有可用的默认模型')
+    }
+
+    // Own timeout so a slow provider cannot hold the caller open.
+    const controller = new AbortController()
+    const abortFromParent = (): void => controller.abort(signal.reason)
+    if (signal.aborted) abortFromParent()
+    else signal.addEventListener('abort', abortFromParent, { once: true })
+    const timer = setTimeout(() => {
+      controller.abort(new Error(`${wording.label}调用超时（${String(options.timeoutMs)} ms）`))
+    }, options.timeoutMs)
+
+    try {
+      const call = await llm.prepareCall(
+        { provider: selection.provider, model: selection.model, maxTokens: maxOutputTokens },
+        controller.signal,
+        (controls) => controls,
+      )
+      const message = createUserMessage({
+        content: [{ type: 'text', text: user }],
+        source: { kind: 'dsh-longterm-memory', form: 'extraction' },
+      })
+      const streamOptions: Record<string, unknown> = {
+        ...call.config,
+        messages: [message],
+        system,
+        signal: controller.signal,
+      }
+
+      const chunks: unknown[] = []
+      for await (const chunk of call.stream(streamOptions)) {
+        if (controller.signal.aborted) break
+        chunks.push(chunk)
+      }
+      if (controller.signal.aborted) {
+        throw new Error(`${wording.label}调用被中止：${describeError(controller.signal.reason)}`)
+      }
+      const text = collectAssistantText(chunks)
+      if (text.trim().length === 0) throw new Error(wording.empty)
+      return { text, provider: selection.provider, model: selection.model }
+    } finally {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', abortFromParent)
+    }
+  }
+
   return {
     get available(): boolean {
       return initialised && createUserMessage !== undefined && reason === undefined
@@ -147,63 +241,20 @@ export function createDshLlmAdapter(ctx: CordisLike, options: DshLlmAdapterOptio
     init,
 
     async complete(request: LlmExtractionRequest, signal: AbortSignal): Promise<LlmExtractionAnswer> {
-      if (createUserMessage === undefined) throw new Error(reason ?? '模型访问不可用')
-      const llm = ctx.get('llm') as LlmServiceLike | undefined
-      if (llm === undefined) throw new Error('宿主未提供 ctx.llm')
-      const defaultModel = ctx.get('agentDefaultModel') as DefaultModelLike | undefined
-      if (defaultModel === undefined) throw new Error('宿主未提供 ctx.agentDefaultModel')
+      return run(
+        EXTRACTION_SYSTEM_PROMPT,
+        buildExtractionUserText(request),
+        signal,
+        options.maxOutputTokens,
+        { label: '记忆提取', empty: '模型没有返回任何文本，已按提取失败处理' },
+      )
+    },
 
-      const selection = defaultModel.currentSelection()
-      if (typeof selection.provider !== 'string' || selection.provider.length === 0) {
-        throw new Error('当前没有可用的默认模型 provider')
-      }
-      if (typeof selection.model !== 'string' || selection.model.length === 0) {
-        throw new Error('当前没有可用的默认模型')
-      }
-
-      // Own timeout so a slow provider cannot hold the extraction chain open.
-      const controller = new AbortController()
-      const abortFromParent = (): void => controller.abort(signal.reason)
-      if (signal.aborted) abortFromParent()
-      else signal.addEventListener('abort', abortFromParent, { once: true })
-      const timer = setTimeout(() => {
-        controller.abort(new Error(`记忆提取调用超时（${String(options.timeoutMs)} ms）`))
-      }, options.timeoutMs)
-
-      try {
-        const call = await llm.prepareCall(
-          { provider: selection.provider, model: selection.model, maxTokens: options.maxOutputTokens },
-          controller.signal,
-          (controls) => controls,
-        )
-        const message = createUserMessage({
-          content: [{ type: 'text', text: buildExtractionUserText(request) }],
-          source: { kind: 'dsh-longterm-memory', form: 'extraction' },
-        })
-        const streamOptions: Record<string, unknown> = {
-          ...call.config,
-          messages: [message],
-          system: EXTRACTION_SYSTEM_PROMPT,
-          signal: controller.signal,
-        }
-
-        const chunks: unknown[] = []
-        for await (const chunk of call.stream(streamOptions)) {
-          if (controller.signal.aborted) break
-          chunks.push(chunk)
-        }
-        if (controller.signal.aborted) {
-          throw new Error(`记忆提取调用被中止：${describeError(controller.signal.reason)}`)
-        }
-        const text = collectAssistantText(chunks)
-        if (text.trim().length === 0) {
-          throw new Error('模型没有返回任何文本，已按提取失败处理')
-        }
-        return { text, provider: selection.provider, model: selection.model }
-      } finally {
-        clearTimeout(timer)
-        signal.removeEventListener('abort', abortFromParent)
-      }
+    async completeText(request: TextCompletionRequest, signal: AbortSignal): Promise<TextCompletionAnswer> {
+      return run(request.system, request.user, signal, request.maxOutputTokens ?? options.maxOutputTokens, {
+        label: '人格预览',
+        empty: '模型没有返回任何文本',
+      })
     },
   }
 }

@@ -19,9 +19,31 @@ if (vault === undefined || phase === undefined || marker === undefined) {
   process.exit(2)
 }
 
-const lib = await import('../../lib/host/core/service.js').catch(() => null)
+// The parent decides which build this child runs:
+//  - `DSH_CHILD_SERVICE_MODULE` → a bundle of the current `src/` (what the parent
+//    itself imports), so both processes share one on-disk format;
+//  - otherwise → the last release build in `lib/` (historical default).
+// Running the frozen `lib/` against a newer `src/` parent produced checksum
+// mismatches that looked like recovery bugs but were really a version skew.
+const override = process.env.DSH_CHILD_SERVICE_MODULE
+let lib = null
+if (override !== undefined && override !== '') {
+  try {
+    // The bundle under test is CommonJS (see tests/support/build-service-module.ts).
+    const { createRequire } = await import('node:module')
+    lib = createRequire(import.meta.url)(override)
+  } catch {
+    lib = null
+  }
+} else {
+  lib = await import('../../lib/host/core/service.js').catch(() => null)
+}
 if (lib === null) {
-  process.stderr.write('lib/host/core/service.js is missing; run `npm run build` first\n')
+  process.stderr.write(
+    override !== undefined && override !== ''
+      ? `could not load the module under test: ${override}\n`
+      : 'lib/host/core/service.js is missing; run `npm run build` first\n',
+  )
   process.exit(3)
 }
 

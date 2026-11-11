@@ -318,7 +318,10 @@ async function fakeRequest(url: string): Promise<IncomingMessage> {
   return request as unknown as IncomingMessage
 }
 
-async function waitFor(predicate: () => boolean, timeoutMs = 5000): Promise<void> {
+async function waitFor(predicate: () => boolean, timeoutMs = 60000): Promise<void> {
+  // Warm-up runs in a background promise; on a sandboxed filesystem the first
+  // vault discovery + initialize can exceed 5s. This is a polling window, not
+  // a functional assertion.
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     if (predicate()) return

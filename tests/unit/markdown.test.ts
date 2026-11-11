@@ -30,6 +30,8 @@ function sampleMemory(overrides: Partial<Memory> = {}): Memory {
     importance: 80,
     pinned: true,
     sourceSessions: ['session-abc'],
+    sourceChannels: ['desktop'],
+    visibility: 'shared',
     supersedes: [],
     conflictsWith: [],
     aliases: ['事实来源'],

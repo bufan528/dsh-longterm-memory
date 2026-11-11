@@ -12,7 +12,14 @@
 
 import { join } from 'node:path'
 import { appendFile } from 'node:fs/promises'
-import { TYPE_DESCRIPTORS, VAULT_DIRS, type JournalEntry } from '../../shared/types.js'
+import {
+  DEFAULT_VISIBILITY,
+  TYPE_DESCRIPTORS,
+  VAULT_DIRS,
+  isMemoryChannel,
+  isMemoryVisibility,
+  type JournalEntry,
+} from '../../shared/types.js'
 import { extractWikilinks } from '../../shared/markdown.js'
 import {
   INDEX_FORMAT_VERSION,
@@ -69,6 +76,8 @@ export function recordFromDocument(document: LoadedDocument): IndexRecord {
     confidence: memory.confidence,
     importance: memory.importance,
     pinned: memory.pinned,
+    visibility: memory.visibility,
+    sourceChannels: [...memory.sourceChannels],
     createdAt: memory.createdAt,
     updatedAt: memory.updatedAt,
     preview: memory.summary.replace(/\s+/g, ' ').trim().slice(0, 320),
@@ -261,6 +270,12 @@ function validateRecord(value: unknown): IndexRecord | null {
     confidence: typeof record.confidence === 'string' ? record.confidence : 'medium',
     importance: typeof record.importance === 'number' ? record.importance : 50,
     pinned: record.pinned === true,
+    // A persisted index that predates the field must not be read as `shared`;
+    // the restrictive default keeps it out of the other interface until rebuilt.
+    visibility: isMemoryVisibility(record.visibility) ? record.visibility : DEFAULT_VISIBILITY,
+    sourceChannels: Array.isArray(record.sourceChannels)
+      ? record.sourceChannels.filter(isMemoryChannel)
+      : [],
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     preview: typeof record.preview === 'string' ? record.preview : '',

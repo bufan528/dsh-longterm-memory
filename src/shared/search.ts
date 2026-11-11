@@ -9,8 +9,17 @@
  * @module dsh-longterm-memory/shared/search
  */
 
-/** Bumped when tokenisation or scoring changes so a stale index is rebuilt. */
-export const INDEX_FORMAT_VERSION = 3
+import { DEFAULT_VISIBILITY } from './types.js'
+
+/**
+ * Bumped when tokenisation or scoring changes so a stale index is rebuilt.
+ *
+ * v4 adds `visibility` / `sourceChannels` to each record. An index built by v3
+ * has no visibility, so every record would be treated as the restrictive
+ * default — including memories the user had marked `shared`. Rebuilding once is
+ * cheaper than explaining that mismatch, so the version bump forces it.
+ */
+export const INDEX_FORMAT_VERSION = 4
 
 const CJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/
 const WORD = /[a-z0-9][a-z0-9_]*/g
@@ -139,6 +148,13 @@ export interface IndexRecord {
   confidence: string
   importance: number
   pinned: boolean
+  /**
+   * Read scope. Absent in indexes written before the field existed; treat an
+   * absent value as the restrictive default, never as `shared`.
+   */
+  visibility?: string
+  /** Interfaces that contributed to this memory. Provenance only, never access. */
+  sourceChannels?: string[]
   createdAt: string
   updatedAt: string
   /** First ~320 characters of the summary, for result snippets. */
@@ -234,6 +250,12 @@ export interface QueryFilters {
   types?: string[]
   statuses?: string[]
   tags?: string[]
+  /**
+   * Allowed read scopes. `undefined` means "no scope restriction" (browsing the
+   * vault on disk); an **empty array** means "nothing is readable", which is the
+   * fail-closed outcome and must not be confused with `undefined`.
+   */
+  visibilities?: string[]
   /** Inclusive lower bound on `updatedAt`. */
   since?: string
   /** Exclusive upper bound on `updatedAt`. */
@@ -383,6 +405,15 @@ function passesFilters(record: IndexRecord, filters: QueryFilters): boolean {
   }
   if (filters.pinnedOnly === true && !record.pinned) return false
   if (filters.minImportance !== undefined && record.importance < filters.minImportance) return false
+  // Read scope. `undefined` means unscoped (vault browsing); an empty array means
+  // nothing is readable, which is the fail-closed result and must stay distinct
+  // from "no restriction". An unset record value falls back to the restrictive
+  // default so a partially migrated vault cannot leak.
+  if (filters.visibilities !== undefined) {
+    if (filters.visibilities.length === 0) return false
+    const recordVisibility = record.visibility ?? DEFAULT_VISIBILITY
+    if (!filters.visibilities.includes(recordVisibility)) return false
+  }
   if (filters.since !== undefined) {
     const since = Date.parse(filters.since)
     if (!Number.isNaN(since) && Date.parse(record.updatedAt) < since) return false

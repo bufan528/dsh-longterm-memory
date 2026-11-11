@@ -1,0 +1,24 @@
+A: origin=qqbot-merge THREW session header origin must be "subagent"
+B: no origin OK id= session-2
+B: no origin header= n/a
+C: origin=subagent OK id= session-3
+C: origin=subagent header= n/a
+A1_VERDICT {
+  "rejectQq": true,
+  "acceptNo": true,
+  "acceptSub": true,
+  "r1": {
+    "ok": false,
+    "detail": "session header origin must be \"subagent\""
+  },
+  "r2": {
+    "ok": true,
+    "detail": "ok",
+    "id": "session-2"
+  },
+  "r3": {
+    "ok": true,
+    "detail": "ok",
+    "id": "session-3"
+  }
+}

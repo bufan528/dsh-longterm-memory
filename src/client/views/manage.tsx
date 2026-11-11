@@ -2,6 +2,11 @@
  * Management (记忆管理): index maintenance, storage location, vault switching,
  * bulk status changes over the shared selection, and the vault-wide journal.
  *
+ * Order follows "what you press often" → "what you press rarely": index
+ * maintenance and the bulk actions on the current selection come first, while
+ * moving the vault (a once-in-a-project operation) hides behind a disclosure so
+ * it cannot be triggered by muscle memory.
+ *
  * @module dsh-longterm-memory/client/views/manage
  */
 
@@ -13,7 +18,7 @@ import type { MemoryStatus, VaultInfo } from '../../shared/types.js'
 import { call, useAsync, useMutation } from '../api.js'
 import { useT } from '../i18n.js'
 import { usePage } from '../page-api.js'
-import { Button, Card, Empty, ErrorNotice, Field, HistoryItem, KvList, Loading, Notice, TextInput } from '../ui.js'
+import { Badge, Button, Card, Empty, ErrorNotice, Field, HistoryItem, Icon, KvList, Loading, Notice, TextInput } from '../ui.js'
 import { formatTime, statusLabel } from '../util.js'
 import { MergeDialog } from './merge.js'
 
@@ -39,6 +44,7 @@ export function ManageView(props: { vault: VaultInfo; onVaultChanged: () => void
   const [rebuildResult, setRebuildResult] = useState<RebuildIndexResponse | null>(null)
   const [syncResult, setSyncResult] = useState<SyncIndexResponse | null>(null)
   const [mergeOpen, setMergeOpen] = useState(false)
+  const [switchOpen, setSwitchOpen] = useState(false)
 
   const refresh = (): void => {
     overview.reload()
@@ -78,32 +84,42 @@ export function ManageView(props: { vault: VaultInfo; onVaultChanged: () => void
   }
 
   const selected = page.selection
+  const busyIndex = overview.data?.busy === true || rebuild.busy || sync.busy
 
   return (
     <div className="lmv-main">
       <Card
-        title={translate('manage.index')}
+        title={
+          <>
+            <Icon name="refresh" />
+            {translate('manage.index')}
+          </>
+        }
         actions={
           <>
-            <Button disabled={rebuild.busy || sync.busy} onClick={() => void runRebuild()}>
-              {translate('manage.rebuild')}
-            </Button>
-            <Button disabled={rebuild.busy || sync.busy} onClick={() => void runSync()}>
+            <Button variant="primary" disabled={busyIndex} onClick={() => void runSync()}>
               {translate('manage.sync')}
+            </Button>
+            <Button disabled={busyIndex} onClick={() => void runRebuild()}>
+              {translate('manage.rebuild')}
             </Button>
           </>
         }
       >
-        {overview.data?.busy === true || rebuild.busy || sync.busy ? (
-          <Loading label={translate('overview.busy')} />
-        ) : null}
+        {busyIndex ? <Loading label={translate('overview.busy')} /> : null}
         <KvList
           items={[
             { key: translate('overview.indexBuiltAt'), value: formatTime(props.vault.index.builtAt) },
             { key: translate('overview.indexCount'), value: String(props.vault.index.count) },
             {
               key: translate('overview.indexHealthy'),
-              value: props.vault.index.healthy ? translate('overview.indexHealthyYes') : translate('overview.indexHealthyNo'),
+              value: (
+                <Badge kind={props.vault.index.healthy ? 'ok' : 'warn'}>
+                  {props.vault.index.healthy
+                    ? translate('overview.indexHealthyYes')
+                    : translate('overview.indexHealthyNo')}
+                </Badge>
+              ),
             },
           ]}
         />
@@ -137,23 +153,92 @@ export function ManageView(props: { vault: VaultInfo; onVaultChanged: () => void
       </Card>
 
       <Card
-        title={translate('manage.storage')}
+        title={
+          <>
+            <Icon name="review" />
+            {translate('manage.selection')}
+          </>
+        }
         actions={
-          <Button
-            disabled={openVault.busy}
-            onClick={() => {
-              void (async () => {
-                try {
-                  const result = await openVault.run()
-                  if (result !== undefined) setOpenNotice(result)
-                } catch {
-                  /* rendered from the mutation state */
-                }
-              })()
-            }}
-          >
-            {translate('manage.openVault')}
-          </Button>
+          selected.length === 0 ? null : (
+            <>
+              <Badge kind="brand">{translate('common.selected', { count: selected.length })}</Badge>
+              <Button variant="primary" disabled={selected.length < 2} onClick={() => setMergeOpen(true)}>
+                {translate('manage.bulkMerge')}
+              </Button>
+              <Button variant="ghost" onClick={page.clearSelection}>
+                {translate('search.clearSelection')}
+              </Button>
+            </>
+          )
+        }
+      >
+        {selected.length === 0 ? (
+          <Empty icon="manage" title={translate('manage.selectionEmpty')} hint={translate('manage.selectionHint')} />
+        ) : (
+          <>
+            <div className="lmv-chips lmv-chips-scroll">
+              {selected.map((id) => (
+                <span key={id} className="lmv-mono lmv-badge">
+                  {id}
+                </span>
+              ))}
+            </div>
+            <div className="lmv-wrap">
+              <Button disabled={bulkStatus.busy} onClick={() => void runBulk(() => bulkStatus.run('archived'))}>
+                {translate('manage.bulkArchive')}
+              </Button>
+              <Button disabled={bulkStatus.busy} onClick={() => void runBulk(() => bulkStatus.run('stale'))}>
+                {translate('manage.bulkStale')}
+              </Button>
+              <Button disabled={bulkStatus.busy} onClick={() => void runBulk(() => bulkStatus.run('active'))}>
+                {translate('manage.bulkRestore')}
+              </Button>
+              <Button disabled={bulkPin.busy} onClick={() => void runBulk(() => bulkPin.run(true))}>
+                {translate('manage.bulkPin')}
+              </Button>
+              <Button disabled={bulkPin.busy} onClick={() => void runBulk(() => bulkPin.run(false))}>
+                {translate('manage.bulkUnpin')}
+              </Button>
+            </div>
+            <span className="lmv-meta">
+              {translate('search.statuses')}: {statusLabel('active')} / {statusLabel('stale')} / {statusLabel('archived')}
+            </span>
+          </>
+        )}
+        {bulkStatus.error === null ? null : <ErrorNotice error={bulkStatus.error} />}
+        {bulkPin.error === null ? null : <ErrorNotice error={bulkPin.error} />}
+      </Card>
+
+      <Card
+        title={
+          <>
+            <Icon name="shield" />
+            {translate('manage.storage')}
+          </>
+        }
+        actions={
+          <>
+            <Button
+              disabled={openVault.busy}
+              onClick={() => {
+                void (async () => {
+                  try {
+                    const result = await openVault.run()
+                    if (result !== undefined) setOpenNotice(result)
+                  } catch {
+                    /* rendered from the mutation state */
+                  }
+                })()
+              }}
+            >
+              {translate('manage.openVault')}
+            </Button>
+            <Button variant="ghost" onClick={() => setSwitchOpen((open) => !open)}>
+              <Icon name={switchOpen ? 'close' : 'settings'} size={13} />
+              {translate('manage.switchVault')}
+            </Button>
+          </>
         }
       >
         <KvList
@@ -167,84 +252,71 @@ export function ManageView(props: { vault: VaultInfo; onVaultChanged: () => void
         />
         {openNotice === null ? null : <Notice kind={openNotice.opened ? 'ok' : 'warn'}>{openNotice.detail}</Notice>}
         {openVault.error === null ? null : <ErrorNotice error={openVault.error} />}
-      </Card>
 
-      <Card title={translate('manage.switchVault')}>
-        <Field label={translate('manage.vaultPath')}>
-          <TextInput value={vaultPath} block placeholder={translate('init.manualPlaceholder')} onChange={setVaultPath} />
-        </Field>
-        {chooseVault.error === null ? null : <ErrorNotice error={chooseVault.error} />}
-        <div className="lmv-wrap">
-          <Button
-            variant="primary"
-            disabled={chooseVault.busy || vaultPath.trim().length === 0}
-            onClick={() => {
-              void (async () => {
-                try {
-                  await chooseVault.run(vaultPath.trim())
-                  page.toast(translate('init.done'), 'ok')
+        {switchOpen ? (
+          <div className="lmv-anchors lmv-fade">
+            <span className="lmv-anchors-head">
+              <Icon name="settings" size={13} />
+              {translate('manage.switchVault')}
+            </span>
+            <Field label={translate('manage.vaultPath')}>
+              <TextInput value={vaultPath} block placeholder={translate('init.manualPlaceholder')} onChange={setVaultPath} />
+            </Field>
+            {chooseVault.error === null ? null : <ErrorNotice error={chooseVault.error} />}
+            <div className="lmv-wrap">
+              <Button
+                variant="primary"
+                disabled={chooseVault.busy || vaultPath.trim().length === 0}
+                onClick={() => {
+                  void (async () => {
+                    try {
+                      await chooseVault.run(vaultPath.trim())
+                      page.toast(translate('init.done'), 'ok')
+                      setVaultPath('')
+                      refresh()
+                    } catch {
+                      /* rendered from the mutation state */
+                    }
+                  })()
+                }}
+              >
+                {translate('manage.chooseVault')}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
                   setVaultPath('')
-                  refresh()
-                } catch {
-                  /* rendered from the mutation state */
-                }
-              })()
-            }}
-          >
-            {translate('manage.chooseVault')}
-          </Button>
-        </div>
-      </Card>
-
-      <Card title={translate('manage.selection')}>
-        <span className="lmv-field-label">{translate('manage.selectionHint')}</span>
-        {selected.length === 0 ? (
-          <Empty>{translate('manage.selectionEmpty')}</Empty>
-        ) : (
-          <span className="lmv-mono">{selected.join(', ')}</span>
-        )}
-        <div className="lmv-wrap">
-          <Button disabled={selected.length === 0 || bulkStatus.busy} onClick={() => void runBulk(() => bulkStatus.run('archived'))}>
-            {translate('manage.bulkArchive')}
-          </Button>
-          <Button disabled={selected.length === 0 || bulkStatus.busy} onClick={() => void runBulk(() => bulkStatus.run('stale'))}>
-            {translate('manage.bulkStale')}
-          </Button>
-          <Button disabled={selected.length === 0 || bulkStatus.busy} onClick={() => void runBulk(() => bulkStatus.run('active'))}>
-            {translate('manage.bulkRestore')}
-          </Button>
-          <Button disabled={selected.length === 0 || bulkPin.busy} onClick={() => void runBulk(() => bulkPin.run(true))}>
-            {translate('manage.bulkPin')}
-          </Button>
-          <Button disabled={selected.length === 0 || bulkPin.busy} onClick={() => void runBulk(() => bulkPin.run(false))}>
-            {translate('manage.bulkUnpin')}
-          </Button>
-          <Button variant="primary" disabled={selected.length < 2} onClick={() => setMergeOpen(true)}>
-            {translate('manage.bulkMerge')}
-          </Button>
-          <Button variant="ghost" disabled={selected.length === 0} onClick={page.clearSelection}>
-            {translate('search.clearSelection')}
-          </Button>
-        </div>
-        <span className="lmv-meta">
-          {translate('search.statuses')}: {statusLabel('active')} / {statusLabel('stale')} / {statusLabel('archived')}
-        </span>
-        {bulkStatus.error === null ? null : <ErrorNotice error={bulkStatus.error} />}
-        {bulkPin.error === null ? null : <ErrorNotice error={bulkPin.error} />}
+                  setSwitchOpen(false)
+                }}
+              >
+                {translate('common.cancel')}
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </Card>
 
       <Card
-        title={translate('manage.journal')}
+        title={
+          <>
+            <Icon name="clock" />
+            {translate('manage.journal')}
+          </>
+        }
         actions={
-          <Button variant="ghost" onClick={journal.reload}>
-            {translate('common.refresh')}
-          </Button>
+          <>
+            <Badge kind="plain">{String(journal.data?.entries.length ?? 0)}</Badge>
+            <Button variant="ghost" onClick={journal.reload}>
+              <Icon name="refresh" size={13} />
+              {translate('common.refresh')}
+            </Button>
+          </>
         }
       >
         {journal.loading ? <Loading /> : null}
         {journal.error === null ? null : <ErrorNotice error={journal.error} onRetry={journal.reload} />}
         {journal.data === null || journal.data.entries.length === 0 ? (
-          <Empty>{translate('manage.journalEmpty')}</Empty>
+          <Empty icon="clock" title={translate('manage.journalEmpty')} hint={translate('manage.journalHint')} />
         ) : (
           <div className="lmv-history">
             {journal.data.entries.map((entry, index) => (

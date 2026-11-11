@@ -23,6 +23,10 @@ import { fileURLToPath } from 'node:url'
 import { resolveConfig } from './config.js'
 import { MemoryService } from './core/service.js'
 import { installStandingSection, installTurnExtraction, installPerStepRecall } from './dsh/inject.js'
+import { CompanionService } from './companion/service.js'
+import { StickerStore } from './companion/stickers.js'
+import { ReminderStore } from './tasks/reminder-store.js'
+import { ReminderService } from './tasks/reminder-service.js'
 import { installRoutes } from './dsh/routes.js'
 import { installTools } from './dsh/tools.js'
 import { createDshLlmAdapter } from './dsh/llm.js'
@@ -40,7 +44,12 @@ export const name = 'longterm-memory'
  */
 export const inject: string[] = []
 
-/** No service is published by this plugin; `provide` is intentionally absent. */
+/**
+ * `companion` is registered at runtime via `ctx.provide()` inside `apply()`.
+ * The module-level array is intentionally empty: Cordis 4.x does not treat it
+ * as a registration mechanism, and declaring it here would make the Host
+ * believe a service exists before `apply()` has run.
+ */
 export const provide: string[] = []
 
 /** Minimal Cordis context surface used by the entry. */
@@ -49,6 +58,8 @@ export interface CordisContextLike {
   on: (name: string, listener: (...args: never[]) => unknown, options?: unknown) => unknown
   effect: (execute: () => unknown, label?: string) => unknown
   inject: (names: string[], callback: (context: CordisContextLike) => unknown) => unknown
+  /** Optional: older Host builds may not expose dynamic service registration. */
+  provide?: (name: string, value: unknown) => unknown
   logger?: {
     info: (message: string, ...rest: unknown[]) => void
     warn: (message: string, ...rest: unknown[]) => void
@@ -96,9 +107,77 @@ export function apply(ctx: CordisContextLike, config?: unknown): void {
   // reach the plugin while it demonstrably can.
   service.setCapabilities({ filesystem: true, notes, registeredTools: [] })
 
+  // ------------------------------------------- shared Companion (design §七)
+  // Published dynamically, not through a static import from the QQ plugin, so
+  // load order cannot create a circular dependency (design §九.C). The QQ side
+  // resolves `ctx.get('companion')` lazily and degrades to a conservative
+  // default when this service is absent.
+  const companion = new CompanionService(
+    () => service.getVaultPath(),
+    ctx.logger === undefined ? {} : { logger: { warn: ctx.logger.warn.bind(ctx.logger) } },
+  )
+  if (typeof ctx.provide === 'function') {
+    try {
+      ctx.provide('companion', companion)
+      ctx.logger?.info('dsh-longterm-memory: companion service provided (contract companion@v1)')
+    } catch (error) {
+      ctx.logger?.warn('dsh-longterm-memory: companion 服务注册失败: %o', error)
+    }
+  } else {
+    // Informational, not a warning: a Host without provide() is a supported
+    // degradation path and the QQ side falls back to the conservative persona.
+    ctx.logger?.info('dsh-longterm-memory: 当前 Host 不提供 provide()，QQ 侧将使用保守默认人格')
+  }
+
+  // ------------------------------------- shared reminders (design WP-5)
+  // "提醒属于共享的个人事项": the list lives in `Tasks/Reminders/` inside the
+  // vault so both ends read the same rows. The QQ plugin still owns *delivery*
+  // policy — this service only stores state, it never sends anything.
+  const reminderStore = new ReminderStore({
+    vaultPath: () => service.getVaultPath(),
+    ...(ctx.logger === undefined ? {} : { logger: { warn: ctx.logger.warn.bind(ctx.logger) } }),
+  })
+  if (typeof ctx.provide === 'function') {
+    try {
+      ctx.provide('reminderStore', reminderStore)
+      ctx.logger?.info('dsh-longterm-memory: reminderStore service provided (contract reminder-store@v1)')
+    } catch (error) {
+      ctx.logger?.warn('dsh-longterm-memory: reminderStore 服务注册失败: %o', error)
+    }
+  }
+
+  // Management-page operations (create/cancel/complete/reschedule) live here so
+  // the reminder tab works without the QQ plugin being loaded. Delivery policy
+  // still belongs to the plugin: this service only writes rows.
+  const reminderService = new ReminderService(reminderStore)
+  if (typeof ctx.provide === 'function') {
+    try {
+      ctx.provide('reminderService', reminderService)
+    } catch (error) {
+      ctx.logger?.warn('dsh-longterm-memory: reminderService 服务注册失败: %o', error)
+    }
+  }
+
+  // ------------------------------------------ sticker library (WP-4 on PC)
+  // The library lives in `Companion/Stickers/` (excluded from the fact index),
+  // so the PC page can manage stickers on an install where dsh-qqbot-merge is
+  // absent. The plugin reads the same directory through this contract.
+  const stickerStore = new StickerStore({
+    vaultPath: () => service.getVaultPath(),
+    ...(ctx.logger === undefined ? {} : { logger: { warn: ctx.logger.warn.bind(ctx.logger) } }),
+  })
+  if (typeof ctx.provide === 'function') {
+    try {
+      ctx.provide('stickerLibrary', stickerStore)
+      ctx.logger?.info('dsh-longterm-memory: stickerLibrary service provided (contract sticker-library@v1)')
+    } catch (error) {
+      ctx.logger?.warn('dsh-longterm-memory: stickerLibrary 服务注册失败: %o', error)
+    }
+  }
+
   // ---------------------------------------------------------------- web API
   ctx.inject(['webServer'], (scoped) => {
-    const result = installRoutes(scoped, service)
+    const result = installRoutes(scoped, service, undefined, companion)
     service.setCapabilities({
       webServer: result.installed,
       ...(result.installed || result.note === undefined ? {} : { notes: { webServer: result.note } }),

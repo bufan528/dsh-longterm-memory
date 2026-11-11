@@ -29,6 +29,7 @@ import {
   ErrorNotice,
   Field,
   HistoryItem,
+  Icon,
   KvList,
   Loading,
   Modal,
@@ -224,22 +225,25 @@ export function DetailView(props: { id: string; onBack: () => void; onChanged: (
 
   return (
     <div className="lmv-main">
-      <div className="lmv-wrap">
-        <Button variant="ghost" onClick={props.onBack}>
-          ← {translate('common.back')}
+      <section className="lmv-detail-head">
+        <Button variant="ghost" onClick={props.onBack} ariaLabel={translate('common.back')}>
+          <Icon name="back" />
         </Button>
-        <span className="lmv-grow lmv-row-title">{memory.title}</span>
-        <Badge kind="brand">{typeLabel(memory.type)}</Badge>
-        <Badge kind={statusKind(memory.status)}>{statusLabel(memory.status)}</Badge>
-        <Badge kind={confidenceKind(memory.confidence)}>{confidenceLabel(memory.confidence)}</Badge>
-        {memory.pinned ? <Badge kind="warn">{translate('detail.pinned')}</Badge> : null}
-      </div>
-
-      <Card
-        title={translate('detail.actions')}
-        actions={
-          <>
-            {memory.status === 'pending' ? (
+        <div className="lmv-detail-main">
+          <h2 className="lmv-detail-title">{memory.title}</h2>
+          <div className="lmv-wrap">
+            <Badge kind="brand">{typeLabel(memory.type)}</Badge>
+            <Badge kind={statusKind(memory.status)}>{statusLabel(memory.status)}</Badge>
+            <Badge kind={confidenceKind(memory.confidence)}>{confidenceLabel(memory.confidence)}</Badge>
+            {memory.pinned ? <Badge kind="warn">{translate('detail.pinned')}</Badge> : null}
+            <span className="lmv-meta">
+              {translate('detail.updatedAt')} · {formatTime(memory.updatedAt)}
+            </span>
+          </div>
+        </div>
+        <div className="lmv-detail-actions">
+          {memory.status === 'pending' ? (
+            <>
               <Button
                 variant="primary"
                 disabled={confirmMemory.busy}
@@ -247,34 +251,16 @@ export function DetailView(props: { id: string; onBack: () => void; onChanged: (
               >
                 {translate('action.confirm')}
               </Button>
-            ) : null}
-            {memory.status === 'pending' ? (
               <Button
                 disabled={rejectMemory.busy}
                 onClick={() => void guard(() => rejectMemory.run(), t('action.rejected', { id: memory.id }))}
               >
                 {translate('action.reject')}
               </Button>
-            ) : null}
+            </>
+          ) : (
             <Button
-              disabled={changeStatus.busy}
-              onClick={() => void guard(() => changeStatus.run('archived'), t('action.archived', { id: memory.id }))}
-            >
-              {translate('action.archive')}
-            </Button>
-            <Button
-              disabled={changeStatus.busy}
-              onClick={() => void guard(() => changeStatus.run('stale'), t('action.staled', { id: memory.id }))}
-            >
-              {translate('action.stale')}
-            </Button>
-            <Button
-              disabled={changeStatus.busy}
-              onClick={() => void guard(() => changeStatus.run('active'), t('action.restored', { id: memory.id }))}
-            >
-              {translate('action.restore')}
-            </Button>
-            <Button
+              variant="ghost"
               disabled={changePinned.busy}
               onClick={() =>
                 void guard(
@@ -283,14 +269,47 @@ export function DetailView(props: { id: string; onBack: () => void; onChanged: (
                 )
               }
             >
+              <Icon name={memory.pinned ? 'starOn' : 'star'} size={13} />
               {memory.pinned ? translate('action.unpin') : translate('action.pin')}
             </Button>
-            <Button disabled={memory.conflictsWith.length === 0} onClick={() => setConflictOpen(true)}>
-              {translate('action.resolve')}
-            </Button>
-            <Button variant="danger" onClick={() => setDeleteOpen(true)}>
-              {translate('action.delete')}
-            </Button>
+          )}
+        </div>
+      </section>
+
+      <Card
+        title={
+          <>
+            <Icon name="spark" />
+            {translate('detail.summary')}
+          </>
+        }
+      >
+        <Prose text={memory.summary} fallback={translate('common.none')} />
+      </Card>
+
+      {memory.sections.length === 0 ? null : (
+        <Card
+          title={
+            <>
+              <Icon name="manage" />
+              {translate('detail.sections')}
+            </>
+          }
+        >
+          {memory.sections.map((section) => (
+            <div key={section.heading}>
+              <h4 className="lmv-prose-h">{section.heading}</h4>
+              <Prose text={section.body} />
+            </div>
+          ))}
+        </Card>
+      )}
+
+      <Card
+        title={
+          <>
+            <Icon name="bolt" />
+            {translate('detail.actions')}
           </>
         }
       >
@@ -300,6 +319,75 @@ export function DetailView(props: { id: string; onBack: () => void; onChanged: (
           {translate('detail.recallNote')}: {detail.data?.recallNote ?? translate('common.unknown')}
         </Notice>
 
+        <div className="lmv-action-group">
+          <span className="lmv-kicker">{translate('edit.status')}</span>
+          <div className="lmv-action-row">
+            {memory.status === 'pending' ? (
+              <>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={confirmMemory.busy}
+                  onClick={() => void guard(() => confirmMemory.run(), t('action.confirmed', { id: memory.id }))}
+                >
+                  {translate('action.confirm')}
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={rejectMemory.busy}
+                  onClick={() => void guard(() => rejectMemory.run(), t('action.rejected', { id: memory.id }))}
+                >
+                  {translate('action.reject')}
+                </Button>
+              </>
+            ) : null}
+            <Button
+              size="sm"
+              disabled={changeStatus.busy}
+              onClick={() => void guard(() => changeStatus.run('archived'), t('action.archived', { id: memory.id }))}
+            >
+              {translate('action.archive')}
+            </Button>
+            <Button
+              size="sm"
+              disabled={changeStatus.busy}
+              onClick={() => void guard(() => changeStatus.run('stale'), t('action.staled', { id: memory.id }))}
+            >
+              {translate('action.stale')}
+            </Button>
+            <Button
+              size="sm"
+              disabled={changeStatus.busy}
+              onClick={() => void guard(() => changeStatus.run('active'), t('action.restored', { id: memory.id }))}
+            >
+              {translate('action.restore')}
+            </Button>
+          </div>
+        </div>
+
+        <hr className="lmv-hr" />
+
+        <div className="lmv-action-group">
+          <span className="lmv-kicker">{translate('detail.relations')}</span>
+          <div className="lmv-action-row">
+            <Button size="sm" disabled={memory.conflictsWith.length === 0} onClick={() => setConflictOpen(true)}>
+              {translate('action.resolve')}
+            </Button>
+            <Button size="sm" variant="danger" onClick={() => setDeleteOpen(true)}>
+              {translate('action.delete')}
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <Card
+        title={
+          <>
+            <Icon name="review" />
+            {translate('detail.meta')}
+          </>
+        }
+      >
         <KvList
           items={[
             { key: translate('detail.path'), value: <span className="lmv-mono">{detail.data?.relativePath ?? ''}</span> },
@@ -350,22 +438,15 @@ export function DetailView(props: { id: string; onBack: () => void; onChanged: (
         />
       </Card>
 
-      <Card title={translate('detail.summary')}>
-        <Prose text={memory.summary} fallback={translate('common.none')} />
-      </Card>
-
-      {memory.sections.length === 0 ? null : (
-        <Card title={translate('detail.sections')}>
-          {memory.sections.map((section) => (
-            <div key={section.heading}>
-              <h4 className="lmv-prose-h">{section.heading}</h4>
-              <Prose text={section.body} />
-            </div>
-          ))}
-        </Card>
-      )}
-
-      <Card title={translate('detail.related')}>
+      <Card
+        title={
+          <>
+            <Icon name="sharing" />
+            {translate('detail.related')}
+          </>
+        }
+        actions={related.length === 0 ? null : <Badge kind="plain">{String(related.length)}</Badge>}
+      >
         {related.length === 0 ? (
           <Empty />
         ) : (
@@ -388,16 +469,33 @@ export function DetailView(props: { id: string; onBack: () => void; onChanged: (
       </Card>
 
       <Card
-        title={tab === 'raw' ? translate('raw.title') : translate('detail.tabFields')}
-        actions={
+        title={
           <>
-            <Button variant={tab === 'fields' ? 'primary' : 'ghost'} onClick={() => setTab('fields')}>
-              {translate('detail.tabFields')}
-            </Button>
-            <Button variant={tab === 'raw' ? 'primary' : 'ghost'} onClick={() => setTab('raw')}>
-              {translate('detail.tabRaw')}
-            </Button>
+            <Icon name="settings" />
+            {tab === 'raw' ? translate('raw.title') : translate('detail.tabFields')}
           </>
+        }
+        actions={
+          <div className="lmv-seg" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'fields'}
+              className={`lmv-seg-btn${tab === 'fields' ? ' lmv-seg-btn-on' : ''}`}
+              onClick={() => setTab('fields')}
+            >
+              {translate('detail.tabFields')}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'raw'}
+              className={`lmv-seg-btn${tab === 'raw' ? ' lmv-seg-btn-on' : ''}`}
+              onClick={() => setTab('raw')}
+            >
+              {translate('detail.tabRaw')}
+            </button>
+          </div>
         }
       >
         {outcome === null ? null : (
@@ -557,9 +655,17 @@ export function DetailView(props: { id: string; onBack: () => void; onChanged: (
         )}
       </Card>
 
-      <Card title={translate('detail.history')}>
+      <Card
+        title={
+          <>
+            <Icon name="clock" />
+            {translate('detail.history')}
+          </>
+        }
+        actions={history.length === 0 ? null : <Badge kind="plain">{String(history.length)}</Badge>}
+      >
         {history.length === 0 ? (
-          <Empty>{translate('detail.historyEmpty')}</Empty>
+          <Empty icon="clock" title={translate('detail.historyEmpty')} />
         ) : (
           <div className="lmv-history">
             {history.map((entry, index) => (

@@ -37,6 +37,55 @@ export const CONFIDENCE_LEVELS = ['low', 'medium', 'high'] as const
 
 export type Confidence = (typeof CONFIDENCE_LEVELS)[number]
 
+/**
+ * Which interface a memory may be read from.
+ *
+ * A closed enum on purpose: adding a value requires updating
+ * {@link CHANNEL_VISIBILITIES} in the same edit, so no code path can silently
+ * widen access by inventing a scope.
+ */
+export const MEMORY_VISIBILITIES = ['shared', 'desktop-private', 'qq-private'] as const
+
+export type MemoryVisibility = (typeof MEMORY_VISIBILITIES)[number]
+
+/** An interface that can both read and write memories. */
+export const MEMORY_CHANNELS = ['desktop', 'qq'] as const
+
+export type MemoryChannel = (typeof MEMORY_CHANNELS)[number]
+
+export function isMemoryChannel(value: unknown): value is MemoryChannel {
+  return typeof value === 'string' && (MEMORY_CHANNELS as readonly string[]).includes(value)
+}
+
+/**
+ * Visibility assigned when a memory file carries no `visibility` key.
+ *
+ * Deliberately the **most restrictive** value. Existing vaults predate this
+ * field; defaulting to `shared` would mean that upgrading the plugin silently
+ * published every desktop memory to the bound QQ account. The user must
+ * explicitly opt in through the migration wizard before anything becomes shared.
+ */
+export const DEFAULT_VISIBILITY: MemoryVisibility = 'desktop-private'
+
+/**
+ * Which visibilities each interface is allowed to read.
+ *
+ * The single source of truth for cross-interface access. Callers pass these
+ * arrays into `QueryFilters.visibilities`; the retrieval layer only compares
+ * strings, so it cannot widen access on its own.
+ *
+ * Note the symmetry: `desktop-private` is invisible to QQ, and `qq-private` is
+ * invisible to the desktop. Only `shared` is readable from both.
+ */
+export const CHANNEL_VISIBILITIES: Readonly<Record<'desktop' | 'qq', readonly MemoryVisibility[]>> = {
+  desktop: ['shared', 'desktop-private'],
+  qq: ['shared', 'qq-private'],
+}
+
+export function isMemoryVisibility(value: unknown): value is MemoryVisibility {
+  return typeof value === 'string' && (MEMORY_VISIBILITIES as readonly string[]).includes(value)
+}
+
 /** Human-facing label for each category, plus its storage directory. */
 export interface TypeDescriptor {
   readonly type: MemoryType
@@ -87,6 +136,16 @@ export const VAULT_DIRS = {
   history: 'History',
   private: '.dsh-memory',
   obsidian: '.obsidian',
+  /** Product configuration, NOT a fact-memory directory (design §七). */
+  companion: 'Companion',
+  /**
+   * Shared reminder state (design WP-5: "提醒属于共享的个人事项").
+   *
+   * Deliberately NOT `Tasks/`: that is already the `task` memory type directory.
+   * Like `Companion`, this is product state rather than a long-term fact, so the
+   * whole directory is excluded from the memory index.
+   */
+  reminders: 'Reminders',
 } as const
 
 /** File names the plugin owns at the vault root. */
@@ -129,6 +188,18 @@ export interface MemoryMeta {
   pinned: boolean
   /** Session ids that produced or last touched this memory. Empty when host-provided ids were unavailable. */
   sourceSessions: string[]
+  /**
+   * Which interfaces contributed to this memory. Provenance only — never used to
+   * grant access. Access is decided by {@link visibility} alone.
+   */
+  sourceChannels: MemoryChannel[]
+  /**
+   * Which interface may read this memory.
+   *
+   * Missing in files written before this field existed; {@link DEFAULT_VISIBILITY}
+   * applies there, which is why the default must stay restrictive.
+   */
+  visibility: MemoryVisibility
   /** Ids of memories this one replaces. */
   supersedes: string[]
   /** Id of the active memory that replaced this one, when superseded. */
@@ -185,6 +256,17 @@ export interface MemoryCandidate {
   confidence: Confidence
   importance: number
   sourceSessions: string[]
+  /**
+   * Interfaces that produced this candidate. Present so a queued candidate keeps
+   * its provenance across restarts; optional because older queues lack it.
+   */
+  sourceChannels?: MemoryChannel[]
+  /**
+   * Read scope proposed for this candidate. QQ-originated candidates are
+   * `qq-private`; an explicit review decision is the only way to widen it to
+   * `shared` (design §六 / M-03). Optional for queues written before L2.
+   */
+  visibility?: MemoryVisibility
   evidence: string
   createdAt: string
   /** Why the extractor proposed this candidate. */

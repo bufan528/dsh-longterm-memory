@@ -23,6 +23,8 @@ export interface VaultLayout {
   journalDir: string
   historyDir: string
   quarantineDir: string
+  /** Persisted review queue. Derived data, but must survive a Host restart. */
+  candidates: string
   readme: string
   home: string
   indexDir: string
@@ -39,6 +41,7 @@ export function layoutFor(root: string): VaultLayout {
     journalDir: join(privateDir, 'journal'),
     historyDir: join(root, VAULT_DIRS.history),
     quarantineDir: join(privateDir, 'quarantine'),
+    candidates: join(privateDir, 'candidates.json'),
     readme: join(root, 'README.md'),
     home: join(root, 'Memory Home.md'),
     indexDir: join(root, VAULT_DIRS.index),
@@ -55,6 +58,8 @@ export function requiredDirectories(layout: VaultLayout): string[] {
     join(layout.root, VAULT_DIRS.inbox),
     join(layout.root, VAULT_DIRS.archive),
     join(layout.root, VAULT_DIRS.conflicts),
+    join(layout.root, VAULT_DIRS.companion),
+    join(layout.root, VAULT_DIRS.reminders),
     layout.obsidianDir,
     join(layout.root, PRIVATE_DIR),
     layout.journalDir,

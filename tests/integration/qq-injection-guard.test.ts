@@ -1,15 +1,13 @@
 /**
- * QQ 接入联动：三个宿主执行点的拦截集成测试。
+ * QQ 接入联动 + Owner Gate：三个宿主执行点的拦截集成测试（WP-2A-R1）。
  *
- * 用假 Cordis 上下文 + 真实 `MemoryService`（真实临时仓库）验证联动策略真的
- * 落在执行上，而不只是页面上的一排开关：
+ * 用假 Cordis 上下文 + 真实 `MemoryService`（真实临时仓库）验证：
+ * 1. 常驻记忆注入：QQ/未绑定 fail-closed；有正向 PC 证据才返回常驻文本；
+ * 2. 会话结束写回：无 Owner 证据 → forceInbox；有证据且 linkage 允许 → active；
+ * 3. 模型工具：installTools 经统一 Owner Gate；无服务/未登记 → DENY。
  *
- * 1. 常驻记忆注入：`systemPrompt.section().text({ agent })` 在 QQ 会话返回空串，
- *    桌面会话返回既有常驻文本，无上下文的预览调用不计入拦截；
- * 2. 会话结束写回：`session/event` 的 `turn/end` 对 QQ 会话只产出收件箱候选，
- *    索引里不出现 active 记忆；桌面会话照旧自动落盘；
- * 3. 模型工具：`buildToolDefinitions(service, linkage)` / `installTools` 在执行前
- *    拦截 QQ 会话的 `memory_search`，桌面会话正常返回。
+ * 注意：mock `qqbotContext` 的 `platform:'desktop'` 仅用于验证
+ * **存在正向证据时的 ALLOW 路径**；当前代码库无生产 producer（见交付报告）。
  *
  * @module tests/integration/qq-injection-guard.test
  */
@@ -81,11 +79,57 @@ function fakeCtx(services: Record<string, unknown> = {}): FakeCtx {
   return ctx
 }
 
+/**
+ * WP-2A-R1 mock qqbotContext：
+ * - `desktop*` / `plain*` 会话 → live `platform:'desktop'`（正向 PC 证据，ALLOW 路径）
+ * - `qq*` 会话 → live qq C2C（ownerId 默认已绑定，可用参数改为未绑定）
+ * - 其他 → null（未登记 → 无正向证据 → DENY）
+ */
+function mockQqContext(opts: { qqOwnerId?: string | null; knownQq?: (id: string) => boolean } = {}) {
+  const qqOwnerId = opts.qqOwnerId === undefined ? 'owner-test' : opts.qqOwnerId
+  return {
+    getContext(sessionId: string) {
+      if (sessionId.startsWith('desktop') || sessionId.startsWith('plain') || sessionId.startsWith('unmarked')) {
+        return {
+          platform: 'desktop',
+          conversationType: 'c2c',
+          isPrivate: true,
+          ownerId: null,
+          identified: true,
+        }
+      }
+      if (sessionId.startsWith('qq')) {
+        return {
+          platform: 'qq',
+          conversationType: 'c2c',
+          isPrivate: true,
+          ownerId: qqOwnerId,
+          identified: true,
+        }
+      }
+      return null
+    },
+    isKnownQqSession(sessionId: string) {
+      if (opts.knownQq) return opts.knownQq(sessionId)
+      return sessionId.startsWith('qq')
+    },
+    isRegistryHealthy() {
+      return true
+    },
+  }
+}
+
 /** 取出常驻分区的 `text` 回调，并原样模拟宿主传入的 context 形状。 */
-function captureStandingText(ctx: FakeCtx, linkage = service.linkage): (context?: unknown) => string {
+function captureStandingText(
+  ctx: FakeCtx,
+  linkage = service.linkage,
+  qqContext: unknown = mockQqContext(),
+): (context?: unknown) => string {
   const sections: Record<string, unknown>[] = []
+  const services: Record<string, unknown> = { ...ctx.services }
+  if (qqContext !== null) services['qqbotContext'] = qqContext
   const ctxWithPrompt = fakeCtx({
-    ...ctx.services,
+    ...services,
     systemPrompt: {
       section: (section: Record<string, unknown>) => {
         sections.push(section)
@@ -135,7 +179,10 @@ async function waitFor(predicate: () => boolean, timeoutMs = 5000): Promise<void
 }
 
 /** 保存一条常驻记忆，让 standing 文本非空、便于断言「有内容」与「被清空」。 */
-async function saveStandingMemory(): Promise<void> {
+async function saveStandingMemory(visibility: 'shared' | 'desktop-private' = 'shared'): Promise<void> {
+  // L1 起记忆带可见范围：这条记忆是「QQ 已绑定时应当读到的常驻内容」，
+  // 因此显式声明 shared。旧用例默认它可被 QQ 读到，等于默认 PC 记忆对 QQ 全量可见，
+  // 那正是可见范围要禁止的行为。
   await service.save({
     type: 'profile',
     title: '用户背景',
@@ -143,6 +190,7 @@ async function saveStandingMemory(): Promise<void> {
     tags: [],
     confidence: 'high',
     importance: 90,
+    visibility,
   })
 }
 
@@ -169,15 +217,58 @@ describe('installStandingSection 的按会话拦截', () => {
     expect(service.qqLinkageReport().runtime.sessionAwareStanding).toBe(true)
   })
 
-  it('桌面会话 → 返回既有常驻文本，不计数', async () => {
+  it('QQ 已绑定 → linkage 放行时返回常驻文本（正向矩阵）', async () => {
+    await saveStandingMemory()
+    const text = captureStandingText(fakeCtx(), service.linkage, mockQqContext({ qqOwnerId: 'owner-1' }))
+
+    const output = text({ agent: agentFor('qq-standing', { origin: 'qq' }) })
+    expect(output).toContain('用户背景')
+    expect(service.qqLinkageReport().counters.standingBlocked).toBe(0)
+  })
+
+  it('QQ 已绑定但记忆是 desktop-private → 常驻文本为空（可见范围隔离）', async () => {
+    // 放行不等于可读：身份通过只是第一道门，可见范围是第二道。
+    await saveStandingMemory('desktop-private')
+    const text = captureStandingText(fakeCtx(), service.linkage, mockQqContext({ qqOwnerId: 'owner-1' }))
+
+    const output = text({ agent: agentFor('qq-standing-private', { origin: 'qq' }) })
+    expect(output).toBe('')
+  })
+
+  it('QQ 未绑定 → 即使 linkage mode=off 也 DENY 空串（R 矩阵）', async () => {
+    await saveStandingMemory()
+    const text = captureStandingText(fakeCtx(), service.linkage, mockQqContext({ qqOwnerId: null }))
+
+    const output = text({ agent: agentFor('qq-unbound', { origin: 'qq' }) })
+    expect(output).toBe('')
+  })
+
+  it('有正向 PC 证据的桌面会话 → 返回常驻文本，不计数', async () => {
     await saveStandingMemory()
     await enableDenyQq()
     const text = captureStandingText(fakeCtx())
 
     const output = text({ agent: agentFor('desktop-standing', { origin: 'desktop' }) })
-    expect(output).toContain('Long-term memory')
+    expect(output).toContain('长期记忆')
     expect(output).toContain('用户背景')
     expect(service.qqLinkageReport().counters.standingBlocked).toBe(0)
+  })
+
+  it('R2: 无 qqbotContext 服务 → DENY 空串（服务缺失≠可信 PC）', async () => {
+    await saveStandingMemory()
+    await enableDenyQq()
+    const text = captureStandingText(fakeCtx(), service.linkage, null)
+
+    const output = text({ agent: agentFor('no-service-standing', {}) })
+    expect(output).toBe('')
+  })
+
+  it('R1: 服务在但会话未登记且无 live 来源 → DENY', async () => {
+    await saveStandingMemory()
+    const text = captureStandingText(fakeCtx(), service.linkage, mockQqContext())
+
+    const output = text({ agent: agentFor('unknown-session', {}) })
+    expect(output).toBe('')
   })
 
   it('没有会话上下文的调用（如管理页预览）不计入拦截，也不宣称已观测上下文', async () => {
@@ -191,19 +282,20 @@ describe('installStandingSection 的按会话拦截', () => {
     expect(service.qqLinkageReport().runtime.sessionAwareStanding).toBe(false)
   })
 
-  it('未配置 QQ 标记时即使策略启用也不会误伤任何会话', async () => {
+  it('未配置 QQ 标记时 linkage 不误伤；有正向 PC 证据仍可读', async () => {
     await saveStandingMemory()
     await service.setQqLinkage({ mode: 'deny-qq' })
     const text = captureStandingText(fakeCtx())
 
     const output = text({ agent: agentFor('unmarked', { origin: 'qq' }) })
+    // mock 将 unmarked* 视为 desktop 正向证据 → 允许；linkage 因无标记不拦截
     expect(output).toContain('用户背景')
     expect(service.qqLinkageReport().counters.standingBlocked).toBe(0)
   })
 
-  it('mode=off 时 QQ 上下文照旧得到常驻文本（回归）', async () => {
+  it('mode=off + QQ 已绑定 → 常驻文本（linkage 与 Owner Gate 并行，回归）', async () => {
     await saveStandingMemory()
-    const text = captureStandingText(fakeCtx())
+    const text = captureStandingText(fakeCtx(), service.linkage, mockQqContext({ qqOwnerId: 'owner-1' }))
 
     const output = text({ agent: agentFor('qq-off', { origin: 'qq' }) })
     expect(output).toContain('用户背景')
@@ -214,8 +306,8 @@ describe('installStandingSection 的按会话拦截', () => {
 /* ------------------------------------------------------ 写回执行点 */
 
 describe('installTurnExtraction 的写回拦截', () => {
-  function installExtraction(linkage = service.linkage): FakeCtx {
-    const ctx = fakeCtx()
+  function installExtraction(linkage = service.linkage, qqContext: unknown = mockQqContext()): FakeCtx {
+    const ctx = fakeCtx(qqContext === null ? {} : { qqbotContext: qqContext })
     const notes: Record<string, string> = {}
     const ok = installTurnExtraction(ctx, service, { ...service.getSettings(), enableAutoExtraction: true }, notes, linkage)
     expect(ok).toBe(true)
@@ -241,10 +333,10 @@ describe('installTurnExtraction 的写回拦截', () => {
     expect(service.qqLinkageReport().counters.writesForcedInbox).toBe(1)
   })
 
-  it('桌面会话的 turn/end 照旧直接落盘为 active 记忆', async () => {
+  it('桌面会话（正向 PC 证据）turn/end 直接落盘为 active 记忆', async () => {
     await enableDenyQq()
     const ctx = installExtraction()
-    const session = { id: 'desktop-session', header: { origin: 'desktop' } }
+    const session = { id: 'desktop-session', header: { cwd: 'D:/work' } }
 
     emitSessionEvents(ctx, session, [
       { type: 'turn/start', data: { turn: 1 } },
@@ -256,7 +348,22 @@ describe('installTurnExtraction 的写回拦截', () => {
     expect(service.qqLinkageReport().counters.writesForcedInbox).toBe(0)
   })
 
-  it('无标记的会话不会被误判为 QQ（deny-qq 下照常直接落盘）', async () => {
+  it('R1: 未登记会话无正向证据 → 强制收件箱（不直接 active）', async () => {
+    await enableDenyQq()
+    const ctx = installExtraction()
+    const session = { id: 'unknown-session-1' }
+
+    emitSessionEvents(ctx, session, [
+      { type: 'user/message', data: { content: [{ type: 'text', text: ASSERTED_MESSAGE }] } },
+      { type: 'turn/end', data: { turn: 1 } },
+    ])
+
+    await waitFor(() => service.listCandidates().length > 0)
+    expect(service.search({ limit: 50 }).total).toBe(0)
+    expect(service.listCandidates()[0]?.decision.action).toBe('inbox')
+  })
+
+  it('无标记但有正向 PC 证据 → deny-qq 下照常直接落盘', async () => {
     await enableDenyQq()
     const ctx = installExtraction()
     const session = { id: 'plain-session' }
@@ -270,9 +377,12 @@ describe('installTurnExtraction 的写回拦截', () => {
     expect(service.qqLinkageReport().counters.writesForcedInbox).toBe(0)
   })
 
-  it('mode=off 时 QQ 标记存在也不会强制收件箱（回归）', async () => {
+  it('mode=off + QQ 已绑定 → 来源级 Inbox 约束仍生效（与 linkage 开关独立）', async () => {
+    // 设计 §六：QQ 端产生的新记忆一律只创建候选，经 PC 确认后才升级。
+    // qqLinkage 的写侧开关不能解除来源级审核（§十一.2）；L2 之前此处
+    // 断言「直接落盘」属旧语义，已按设计方案更新。
     await service.setQqLinkage({ writeMode: 'direct', qqMarkers: markers({ origins: ['qq'] }) })
-    const ctx = installExtraction()
+    const ctx = installExtraction(service.linkage, mockQqContext({ qqOwnerId: 'owner-1' }))
     const session = { id: 'qq-off-session', header: { origin: 'qq' } }
 
     emitSessionEvents(ctx, session, [
@@ -280,44 +390,109 @@ describe('installTurnExtraction 的写回拦截', () => {
       { type: 'turn/end', data: { turn: 1 } },
     ])
 
-    await waitFor(() => service.search({ limit: 50 }).total > 0)
+    await waitFor(() => service.listCandidates().length > 0)
+    expect(service.search({ limit: 50 }).total).toBe(0)
+    // linkage 开关确实没有干预；强制 Inbox 来自独立的 Owner Gate 通道判定。
     expect(service.qqLinkageReport().counters.writesForcedInbox).toBe(0)
+    expect(service.listCandidates()[0]?.visibility).toBe('qq-private')
+    expect(service.listCandidates()[0]?.sourceChannels).toEqual(['qq'])
   })
 })
 
 /* ------------------------------------------------------ 模型工具执行点 */
 
 describe('记忆工具执行前的拦截', () => {
-  function searchTool(linkage = service.linkage): ToolDefinition {
-    const definition = buildToolDefinitions(service, linkage).find((entry) => entry.name === 'memory_search')
+  function searchTool(linkage = service.linkage, qqContext: unknown = mockQqContext()): ToolDefinition {
+    // install 路径才挂 ownerGate；显式传入 mock 服务
+    const ctx = fakeCtx(qqContext === null ? {} : { qqbotContext: qqContext })
+    const registered: ToolDefinition[] = []
+    const toolsCtx = fakeCtx({
+      ...(qqContext === null ? {} : { qqbotContext: qqContext }),
+      tools: {
+        register: (definition: ToolDefinition) => {
+          registered.push(definition)
+          return () => undefined
+        },
+      },
+    })
+    installTools(toolsCtx, service, linkage)
+    void ctx
+    const definition = registered.find((entry) => entry.name === 'memory_search')
     expect(definition).toBeDefined()
     if (definition === undefined) throw new Error('memory_search 未注册')
     return definition
   }
 
-  it('QQ 会话调用 memory_search 被拒绝（抛普通工具错误）', async () => {
-    await enableDenyQq()
-    const search = searchTool()
-    await expect(
-      search.execute({ query: 'PowerShell' }, { agent: agentFor('qq-tool', { origin: 'qq' }) }),
-    ).rejects.toThrow(/refused/)
-    expect(service.qqLinkageReport().counters.toolsBlocked).toBe(1)
-  })
-
-  it('桌面会话调用 memory_search 正常返回结果', async () => {
+  it('QQ 已绑定 + linkage 放行 → memory_search 可用（正向矩阵）', async () => {
     await saveStandingMemory()
-    await enableDenyQq()
-    const search = searchTool()
+    await service.setQqLinkage({ mode: 'off' })
+    const search = searchTool(service.linkage, mockQqContext({ qqOwnerId: 'owner-1' }))
     const result = (await search.execute(
       { query: '用户背景' },
-      { agent: agentFor('desktop-tool', { origin: 'desktop' }) },
-    )) as { count: number; results: { title: string }[] }
+      { agent: agentFor('qq-bound-tool', {}) },
+    )) as { count: number }
     expect(result.count).toBeGreaterThan(0)
-    expect(result.results[0]?.title).toBe('用户背景')
-    expect(service.qqLinkageReport().counters.toolsBlocked).toBe(0)
   })
 
-  it('没有 linkage 时工具行为完全不变（既有调用方兼容）', async () => {
+  it('QQ 已绑定但记忆是 desktop-private → memory_search 命中 0（可见范围隔离）', async () => {
+    await saveStandingMemory('desktop-private')
+    await service.setQqLinkage({ mode: 'off' })
+    const search = searchTool(service.linkage, mockQqContext({ qqOwnerId: 'owner-1' }))
+    const result = (await search.execute(
+      { query: '用户背景' },
+      { agent: agentFor('qq-bound-tool-private', {}) },
+    )) as { count: number }
+    expect(result.count).toBe(0)
+  })
+
+  it('QQ 未绑定 → memory_search DENY（即使 linkage off）', async () => {
+    await enableDenyQq()
+    const search = searchTool(service.linkage, mockQqContext({ qqOwnerId: null }))
+    await expect(
+      search.execute({ query: '用户背景' }, { agent: agentFor('qq-unbound-tool', {}) }),
+    ).rejects.toThrow(/refused/)
+  })
+
+  it('R2: installTools 无 qqbotContext 服务 → DENY', async () => {
+    await enableDenyQq()
+    const registered: ToolDefinition[] = []
+    const ctx = fakeCtx({
+      tools: {
+        register: (definition: ToolDefinition) => {
+          registered.push(definition)
+          return () => undefined
+        },
+      },
+    })
+    installTools(ctx, service, service.linkage)
+    const search = registered.find((definition) => definition.name === 'memory_search')
+    if (search === undefined) throw new Error('memory_search 未注册')
+    await expect(
+      search.execute({ query: 'PowerShell' }, { agent: agentFor('no-svc-tool', {}) }),
+    ).rejects.toThrow(/refused/)
+  })
+
+  it('R1: 服务在但未登记会话 → installTools DENY', async () => {
+    await enableDenyQq()
+    const registered: ToolDefinition[] = []
+    const ctx = fakeCtx({
+      qqbotContext: mockQqContext(),
+      tools: {
+        register: (definition: ToolDefinition) => {
+          registered.push(definition)
+          return () => undefined
+        },
+      },
+    })
+    installTools(ctx, service, service.linkage)
+    const search = registered.find((definition) => definition.name === 'memory_search')
+    if (search === undefined) throw new Error('memory_search 未注册')
+    await expect(
+      search.execute({ query: 'PowerShell' }, { agent: agentFor('unregistered-tool', {}) }),
+    ).rejects.toThrow(/refused/)
+  })
+
+  it('无 linkage 的 buildToolDefinitions（未挂 ownerGate）保持旧兼容', async () => {
     await enableDenyQq()
     const search = buildToolDefinitions(service).find((entry) => entry.name === 'memory_search')
     expect(search).toBeDefined()
@@ -330,25 +505,31 @@ describe('记忆工具执行前的拦截', () => {
     expect(service.qqLinkageReport().counters.toolsBlocked).toBe(0)
   })
 
-  it('installTools 把 linkage 传到注册后的工具定义上', async () => {
+  it('installTools 把 Owner Gate + linkage 传到注册后的工具定义上', async () => {
     await enableDenyQq()
     const registered: ToolDefinition[] = []
-    const ctx = fakeCtx({ tools: { register: (definition: ToolDefinition) => { registered.push(definition); return () => undefined } } })
+    const ctx = fakeCtx({
+      qqbotContext: mockQqContext({ qqOwnerId: null }),
+      tools: {
+        register: (definition: ToolDefinition) => {
+          registered.push(definition)
+          return () => undefined
+        },
+      },
+    })
     const result = installTools(ctx, service, service.linkage)
     expect(result.registered).toEqual(['memory_search', 'memory_get', 'memory_save', 'memory_forget'])
 
     const search = registered.find((definition) => definition.name === 'memory_search')
     if (search === undefined) throw new Error('memory_search 未注册')
     await expect(
-      search.execute({ query: 'PowerShell' }, { agent: agentFor('qq-installed', { origin: 'qq' }) }),
+      search.execute({ query: 'PowerShell' }, { agent: agentFor('qq-unbound-installed', {}) }),
     ).rejects.toThrow(/refused/)
   })
 
-  it('工具调用没有执行上下文时按「未识别来源」处理，deny-qq 下仍放行', async () => {
+  it('工具无执行上下文（无 sessionId）→ DENY，不放行', async () => {
     await enableDenyQq()
-    const search = searchTool()
-    const result = (await search.execute({ query: 'PowerShell' }, {})) as { count: number }
-    expect(result.count).toBe(0)
-    expect(service.qqLinkageReport().counters.toolsBlocked).toBe(0)
+    const search = searchTool(service.linkage, mockQqContext())
+    await expect(search.execute({ query: 'PowerShell' }, {})).rejects.toThrow(/refused/)
   })
 })

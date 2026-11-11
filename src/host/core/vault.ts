@@ -143,6 +143,8 @@ export async function initializeVault(
   if (!verification.ok) {
     warnings.push('写入校验未通过，请检查目录权限或磁盘状态后重试。')
   }
+  // Non-fatal: the vault works, but the probe could not be cleaned up.
+  for (const note of verification.notes) warnings.push(note)
 
   return {
     layout,
@@ -160,10 +162,20 @@ export async function initializeVault(
  *
  * The probe writes a unique file, reads it back, and removes it; a read-only or
  * full disk therefore fails initialization loudly instead of at first write.
+ *
+ * Removing the probe is deliberately *not* part of `ok`. Deleting is a weaker
+ * property than writing, and it is the one most likely to be intercepted on a
+ * real machine — an antivirus filter, a recycle-bin shim, or a sync client can
+ * refuse the unlink while the vault stays perfectly usable. Failing
+ * initialization over that would make the plugin uninstallable on those
+ * machines, so the refusal is returned in `notes` and surfaced as a warning.
  */
-export async function verifyVault(layout: VaultLayout): Promise<{ ok: boolean; steps: string[]; failures: string[] }> {
+export async function verifyVault(
+  layout: VaultLayout,
+): Promise<{ ok: boolean; steps: string[]; failures: string[]; notes: string[] }> {
   const steps: string[] = []
   const failures: string[] = []
+  const notes: string[] = []
   const probe = join(layout.quarantineDir, `verify-${randomBytes(4).toString('hex')}.tmp`)
 
   try {
@@ -182,10 +194,15 @@ export async function verifyVault(layout: VaultLayout): Promise<{ ok: boolean; s
     const readBack = await readTextIfExists(probe)
     if (readBack !== payload) failures.push('写入后读回内容不一致')
     else steps.push('写入内容可完整读回')
+  } catch (error) {
+    failures.push(`读写校验失败：${describeError(error)}`)
+  }
+
+  try {
     await removeFile(probe)
     steps.push('可删除文件')
   } catch (error) {
-    failures.push(`读写校验失败：${describeError(error)}`)
+    notes.push(`临时校验文件未能自动删除（不影响读写）：${describeError(error)}`)
   }
 
   const readme = await readTextIfExists(layout.readme)
@@ -204,7 +221,7 @@ export async function verifyVault(layout: VaultLayout): Promise<{ ok: boolean; s
     }
   }
 
-  return { ok: failures.length === 0, steps, failures }
+  return { ok: failures.length === 0, steps, failures, notes }
 }
 
 /** Read the vault's persisted configuration, or null when absent/unreadable. */

@@ -5,6 +5,10 @@
  * carries an explicit privacy note, because turning it on makes the plugin spend
  * an extra model request against the user's own configured provider.
  *
+ * Fourteen controls in one card is a wall; they are grouped by what they affect
+ * (look / injection / extraction / privacy) and the save action follows you to
+ * the bottom of the page so editing card four never means scrolling back to one.
+ *
  * @module dsh-longterm-memory/client/views/settings-view
  */
 
@@ -16,7 +20,7 @@ import type { VaultInfo } from '../../shared/types.js'
 import { call, useAsync, useMutation } from '../api.js'
 import { setLanguage, useT } from '../i18n.js'
 import { usePage } from '../page-api.js'
-import { Button, Card, Checkbox, ErrorNotice, Field, KvList, Loading, Notice, NumberInput, Select, TextInput } from '../ui.js'
+import { Badge, Button, Card, Checkbox, ErrorNotice, Field, Icon, KvList, Loading, Notice, NumberInput, Select, TextInput } from '../ui.js'
 import { formatTime } from '../util.js'
 
 /** Render the settings pane. */
@@ -95,17 +99,14 @@ export function SettingsView(props: { vault: VaultInfo | null; onChanged: () => 
   return (
     <div className="lmv-main">
       <Card
-        title={translate('settings.title')}
-        actions={
+        title={
           <>
-            {dirty ? <span className="lmv-meta">{translate('settings.dirty')}</span> : null}
-            <Button variant="primary" disabled={save.busy} onClick={() => void doSave()}>
-              {translate('common.save')}
-            </Button>
-            <Button variant="ghost" disabled={save.busy} onClick={settings.reload}>
-              {translate('common.reload')}
-            </Button>
+            <Icon name="settings" />
+            {translate('settings.title')}
           </>
+        }
+        actions={
+          dirty ? <Badge kind="warn">{translate('settings.dirty')}</Badge> : <Badge kind="ok">{translate('settings.clean')}</Badge>
         }
       >
         <Field label={translate('settings.language')}>
@@ -121,7 +122,29 @@ export function SettingsView(props: { vault: VaultInfo | null; onChanged: () => 
             }}
           />
         </Field>
+        <KvList
+          items={[
+            {
+              key: translate('settings.vault'),
+              value: <span className="lmv-mono">{props.vault === null ? translate('common.none') : props.vault.path}</span>,
+            },
+            { key: translate('settings.lastIndexRebuild'), value: formatTime(draft.lastIndexRebuild) },
+            {
+              key: translate('overview.indexCount'),
+              value: String(props.vault === null ? 0 : props.vault.index.count),
+            },
+          ]}
+        />
+      </Card>
 
+      <Card
+        title={
+          <>
+            <Icon name="bolt" />
+            {translate('settings.groupRecall')}
+          </>
+        }
+      >
         <Checkbox
           checked={draft.enableTools}
           label={translate('settings.enableTools')}
@@ -136,7 +159,13 @@ export function SettingsView(props: { vault: VaultInfo | null; onChanged: () => 
             patch({ enablePromptSection: checked })
           }}
         />
-
+        <Checkbox
+          checked={draft.enablePerStepRecall}
+          label={translate('settings.enablePerStepRecall')}
+          onChange={(checked) => {
+            patch({ enablePerStepRecall: checked })
+          }}
+        />
         <div className="lmv-toolbar">
           <Field label={translate('settings.standingBudgetTokens')}>
             <NumberInput
@@ -174,24 +203,17 @@ export function SettingsView(props: { vault: VaultInfo | null; onChanged: () => 
               }}
             />
           </Field>
-          <Field label={translate('settings.maxCandidatesPerTurn')}>
-            <NumberInput
-              value={draft.maxCandidatesPerTurn}
-              min={0}
-              onChange={(value) => {
-                patch({ maxCandidatesPerTurn: value })
-              }}
-            />
-          </Field>
         </div>
+      </Card>
 
-        <Checkbox
-          checked={draft.enablePerStepRecall}
-          label={translate('settings.enablePerStepRecall')}
-          onChange={(checked) => {
-            patch({ enablePerStepRecall: checked })
-          }}
-        />
+      <Card
+        title={
+          <>
+            <Icon name="spark" />
+            {translate('settings.groupExtract')}
+          </>
+        }
+      >
         <Checkbox
           checked={draft.enableAutoExtraction}
           label={translate('settings.enableAutoExtraction')}
@@ -207,7 +229,25 @@ export function SettingsView(props: { vault: VaultInfo | null; onChanged: () => 
           }}
         />
         <Notice kind="warn">{translate('settings.llmPrivacy')}</Notice>
+        <Field label={translate('settings.maxCandidatesPerTurn')}>
+          <NumberInput
+            value={draft.maxCandidatesPerTurn}
+            min={0}
+            onChange={(value) => {
+              patch({ maxCandidatesPerTurn: value })
+            }}
+          />
+        </Field>
+      </Card>
 
+      <Card
+        title={
+          <>
+            <Icon name="shield" />
+            {translate('settings.groupPrivacy')}
+          </>
+        }
+      >
         <Checkbox
           checked={draft.redactSecrets}
           label={translate('settings.redactSecrets')}
@@ -222,26 +262,45 @@ export function SettingsView(props: { vault: VaultInfo | null; onChanged: () => 
             patch({ sensitiveNeedsConfirmation: checked })
           }}
         />
-
-        <KvList
-          items={[
-            {
-              key: translate('settings.vault'),
-              value: <span className="lmv-mono">{props.vault === null ? translate('common.none') : props.vault.path}</span>,
-            },
-            { key: translate('settings.lastIndexRebuild'), value: formatTime(draft.lastIndexRebuild) },
-            {
-              key: translate('overview.indexCount'),
-              value: String(props.vault === null ? 0 : props.vault.index.count),
-            },
-          ]}
-        />
-
-        {save.error === null ? null : <ErrorNotice error={save.error} />}
       </Card>
 
+      {dirty ? (
+        <div className="lmv-savebar">
+          <Icon name="spark" size={15} />
+          <span className="lmv-grow">{translate('settings.dirty')}</span>
+          <Button variant="primary" disabled={save.busy} onClick={() => void doSave()}>
+            {translate('common.save')}
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={save.busy}
+            onClick={() => {
+              setDraft(settings.data)
+              setLanguage(settings.data?.language ?? draft.language)
+            }}
+          >
+            {translate('common.reset')}
+          </Button>
+        </div>
+      ) : (
+        <div className="lmv-savebar lmv-savebar-idle">
+          <span className="lmv-grow">{translate('settings.clean')}</span>
+          <Button variant="ghost" disabled={save.busy} onClick={settings.reload}>
+            <Icon name="refresh" size={13} />
+            {translate('common.reload')}
+          </Button>
+        </div>
+      )}
+
+      {save.error === null ? null : <ErrorNotice error={save.error} />}
+
       <Card
-        title={translate('settings.preview')}
+        title={
+          <>
+            <Icon name="search" />
+            {translate('settings.preview')}
+          </>
+        }
         actions={
           <Button
             variant="primary"
@@ -261,7 +320,7 @@ export function SettingsView(props: { vault: VaultInfo | null; onChanged: () => 
           </Button>
         }
       >
-        <span className="lmv-prose-p">{translate('settings.previewHint')}</span>
+        <span className="lmv-subhead">{translate('settings.previewHint')}</span>
         <Field label={translate('settings.previewQuery')}>
           <TextInput value={previewQuery} block onChange={setPreviewQuery} />
         </Field>
@@ -271,11 +330,11 @@ export function SettingsView(props: { vault: VaultInfo | null; onChanged: () => 
         {previewResult === null ? null : (
           <>
             <div className="lmv-wrap">
-              <span className="lmv-meta">{translate('settings.previewTokens', { tokens: previewResult.usedTokens })}</span>
-              <span className="lmv-meta">
+              <Badge kind="plain">{translate('settings.previewTokens', { tokens: previewResult.usedTokens })}</Badge>
+              <Badge kind="plain">
                 {translate('settings.previewIncluded', { count: previewResult.includedIds.length })}
-              </span>
-              <span className="lmv-meta">{translate('settings.previewOmitted', { count: previewResult.omitted })}</span>
+              </Badge>
+              <Badge kind="plain">{translate('settings.previewOmitted', { count: previewResult.omitted })}</Badge>
             </div>
             {previewResult.text.trim().length === 0 ? (
               <Notice>{translate('settings.previewEmpty')}</Notice>
@@ -293,6 +352,7 @@ export function SettingsView(props: { vault: VaultInfo | null; onChanged: () => 
           </>
         )}
       </Card>
+
     </div>
   )
 }

@@ -65,8 +65,22 @@ if (!existsSync(entryPoint)) {
   fail(`entry not found: ${entryPoint}`)
 }
 
+/**
+ * A visible build stamp baked into the browser half.
+ *
+ * The desktop shell caches a plugin's client bundle in memory for the lifetime
+ * of the process. Without a stamp there is no way to tell "my edits did not
+ * work" from "the running app never reloaded them" — the two look identical and
+ * send people back into the editor for changes that are already correct.
+ * Format: `YYYYMMDD-HHmmss` in UTC, so two builds never share a value.
+ */
+const BUILD_ID = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15)
+
 const result = await esbuild.build({
   entryPoints: [entryPoint],
+  // `__LMV_BUILD_ID__` is replaced with a literal, so the page can report
+  // exactly which bundle the shell is running without another RPC.
+  define: { __LMV_BUILD_ID__: JSON.stringify(BUILD_ID) },
   // `outfile` is only used to name the in-memory artifact; `write: false` keeps
   // esbuild from touching the disk so the wrapper below is the single writer.
   outfile: outFile,

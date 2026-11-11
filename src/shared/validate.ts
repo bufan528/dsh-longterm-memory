@@ -12,21 +12,30 @@
 import { z } from 'zod'
 import {
   CONFIDENCE_LEVELS,
+  DEFAULT_VISIBILITY,
   FRONTMATTER_SCHEMA_VERSION,
+  MEMORY_CHANNELS,
   MEMORY_STATUSES,
   MEMORY_TYPES,
+  MEMORY_VISIBILITIES,
   TYPE_DESCRIPTORS,
+  isMemoryChannel,
+  isMemoryVisibility,
   type Confidence,
   type Memory,
+  type MemoryChannel,
   type MemoryMeta,
   type MemoryStatus,
   type MemoryType,
+  type MemoryVisibility,
 } from './types.js'
 import { slugify } from './markdown.js'
 
 export const memoryTypeSchema = z.enum(MEMORY_TYPES)
 export const memoryStatusSchema = z.enum(MEMORY_STATUSES)
 export const confidenceSchema = z.enum(CONFIDENCE_LEVELS)
+export const memoryVisibilitySchema = z.enum(MEMORY_VISIBILITIES)
+export const memoryChannelSchema = z.enum(MEMORY_CHANNELS)
 
 /** A tag: lower-case, no spaces, no leading `#`. */
 export const tagSchema = z
@@ -61,6 +70,8 @@ export const memoryMetaSchema = z.object({
   importance: z.number().int().min(0).max(100),
   pinned: z.boolean(),
   sourceSessions: z.array(z.string().min(1).max(200)).max(64),
+  sourceChannels: z.array(memoryChannelSchema).max(8),
+  visibility: memoryVisibilitySchema,
   supersedes: z.array(z.string().min(1).max(120)).max(64),
   supersededBy: z.string().min(1).max(120).optional(),
   conflictsWith: z.array(z.string().min(1).max(120)).max(64),
@@ -120,6 +131,29 @@ export function normalizeMemory(input: unknown): NormalizeResult {
       : defaultImportance(type)
   if (typeof importanceRaw !== 'number') repairs.push(`missing importance → ${String(importance)}`)
 
+  // Visibility is the only cross-interface access decision, so an absent or
+  // unreadable value must fall back to the restrictive default rather than to
+  // "shared". `desktop-private` keeps pre-existing memories out of QQ until the
+  // user opts in through the migration wizard.
+  //
+  // Only a *present but unreadable* value is a repair. Absence is the expected
+  // state of every file written before this field existed, and the fallback
+  // already errs restrictive, so flagging it would mark the entire legacy vault
+  // as "repaired" and drown the real defect signal.
+  const visibilityRaw = record['visibility']
+  const visibility: MemoryVisibility = isMemoryVisibility(visibilityRaw) ? visibilityRaw : DEFAULT_VISIBILITY
+  if (visibilityRaw !== undefined && !isMemoryVisibility(visibilityRaw)) {
+    repairs.push(`invalid visibility ${JSON.stringify(visibilityRaw)} → "${DEFAULT_VISIBILITY}"`)
+  }
+
+  // Provenance only. Unknown channel names are dropped instead of guessed, and
+  // the absence of the field is normal for files written before it existed, so
+  // it is not reported as a repair.
+  const channelsRaw = record['sourceChannels']
+  const sourceChannels: MemoryChannel[] = Array.isArray(channelsRaw)
+    ? [...new Set(channelsRaw.filter(isMemoryChannel))].slice(0, 8)
+    : []
+
   const candidate: Record<string, unknown> = {
     id,
     type,
@@ -132,6 +166,8 @@ export function normalizeMemory(input: unknown): NormalizeResult {
     importance,
     pinned: record['pinned'] === true,
     sourceSessions: normalizeStringArray(record['sourceSessions'], 64),
+    sourceChannels,
+    visibility,
     supersedes: normalizeStringArray(record['supersedes'], 64),
     conflictsWith: normalizeStringArray(record['conflictsWith'], 64),
     aliases: normalizeStringArray(record['aliases'], 32),
