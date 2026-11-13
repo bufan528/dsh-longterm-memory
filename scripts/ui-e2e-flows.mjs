@@ -170,9 +170,22 @@ function pageSetField(label, value) {
   const norm = (value) => String(value ?? '').replace(/\s+/g, ' ').trim()
   const fields = [...document.querySelectorAll('.lmv-field')]
   const field = fields.find((el) => norm(el.querySelector('.lmv-field-label')?.textContent).startsWith(label))
-  if (field === undefined) return { ok: false, reason: `no field ${label}`, labels: fields.map((el) => norm(el.querySelector('.lmv-field-label')?.textContent).slice(0, 20)) }
-  const el = field.querySelector('input, textarea, select')
-  if (el === null) return { ok: false, reason: 'field has no control' }
+  // The search capture box is a bare input with an aria-label, not a Field —
+  // match that too so the flow does not depend on a wrapper that may change.
+  const labelled = field?.querySelector('input, textarea, select')
+    ?? [...document.querySelectorAll('.lmv-page input, .lmv-page textarea')]
+      .find((el) => norm(el.getAttribute('aria-label')) === label)
+  const el = labelled ?? null
+  if (el === null) {
+    return {
+      ok: false,
+      reason: `no field ${label}`,
+      labels: [
+        ...fields.map((f) => norm(f.querySelector('.lmv-field-label')?.textContent).slice(0, 20)),
+        ...[...document.querySelectorAll('.lmv-page input[aria-label]')].map((i) => norm(i.getAttribute('aria-label'))),
+      ],
+    }
+  }
   const proto = el instanceof HTMLTextAreaElement
     ? HTMLTextAreaElement.prototype
     : el instanceof HTMLSelectElement
@@ -478,7 +491,15 @@ async function scenarioOverview() {
   check('overview: no out-of-sync records after the index actions', indexState.outOfSync.length === 0, JSON.stringify(indexState.outOfSync))
   const vaultStatus = await rpc('status')
   const state = await snapshot()
-  check('overview: headline count matches the service stat', state.text.includes(`记忆总数: ${vaultStatus.vault.stats.total}`), `expected ${vaultStatus.vault.stats.total}`)
+  // The health capsules render `value label` ("0 记忆总数"); older builds used
+  // `label: value`. Accept either layout but still require the live service
+  // total to be on screen — this checks the number, not just the caption.
+  const total = vaultStatus.vault.stats.total
+  check(
+    'overview: headline count matches the service stat',
+    state.text.includes(`记忆总数: ${total}`) || state.text.includes(`${total} 记忆总数`),
+    `expected ${total}`,
+  )
   check('overview: no error panel after index actions', state.errors.length === 0, JSON.stringify(state.errors))
   await shot('overview-index')
 }

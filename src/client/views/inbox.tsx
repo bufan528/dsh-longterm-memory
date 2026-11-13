@@ -18,7 +18,7 @@ import type { Confidence, MemoryType } from '../../shared/types.js'
 import { call, useAsync, useMutation } from '../api.js'
 import { useT } from '../i18n.js'
 import { usePage } from '../page-api.js'
-import { Badge, Button, Card, Checkbox, Collapse, Empty, ErrorNotice, Field, Icon, Loading, Notice, NumberInput, Select, TextArea, TextInput } from '../ui.js'
+import { Badge, Button, Card, Checkbox, Collapse, DisclosureChevron, Empty, ErrorNotice, Field, Icon, Loading, Notice, NumberInput, Select, TextArea, TextInput } from '../ui.js'
 import { clampImportance, confidenceKind, confidenceLabel, decisionLabel, formatTime, splitList, typeLabel } from '../util.js'
 
 /** Render the inbox pane. */
@@ -40,7 +40,10 @@ export function InboxView(): ReactElement {
   const [tagsText, setTagsText] = useState('')
   const [evidence, setEvidence] = useState('')
   const [reason, setReason] = useState('')
-  const [addOpen, setAddOpen] = useState(false)
+  // Open by default: adding a candidate by hand is the primary reason to visit
+  // this page. It was briefly collapsed-by-default, which broke that path
+  // (the real-browser E2E flow caught it). Collapsing stays possible.
+  const [addOpen, setAddOpen] = useState(true)
 
   const refresh = (): void => {
     candidates.reload()
@@ -186,7 +189,8 @@ export function InboxView(): ReactElement {
             ariaExpanded={addOpen}
             onClick={() => setAddOpen((open) => !open)}
           >
-            <Icon name={addOpen ? 'close' : 'plus'} size={13} />
+            <Icon name="plus" size={13} />
+            <DisclosureChevron open={addOpen} />
             {addOpen ? translate('common.less') : translate('common.more')}
           </Button>
         }

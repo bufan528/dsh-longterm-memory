@@ -12,7 +12,7 @@
  * @module dsh-longterm-memory/client/memory-page
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import { call, useAsync } from './api.js'
@@ -39,6 +39,8 @@ interface Toast {
   id: number
   message: string
   kind: ToastKind
+  /** Follow-through: a toast leaves with an animation, it must not blink out. */
+  leaving: boolean
 }
 
 const SECTIONS: readonly { key: Section; labelKey: string; icon: IconName }[] = [
@@ -53,6 +55,8 @@ const SECTIONS: readonly { key: Section; labelKey: string; icon: IconName }[] = 
 
 let toastSeq = 0
 const TOAST_MS = 4500
+/** Exit duration. CSS `lmv-toast-out` uses the same value. */
+const TOAST_EXIT_MS = 260
 
 /** The center-column page for the `longterm-memory` panel. */
 export function MemoryPage(_props: SlotProps): ReactElement {
@@ -63,6 +67,20 @@ export function MemoryPage(_props: SlotProps): ReactElement {
   const [tag, setTag] = useState('')
   const [selection, setSelection] = useState<readonly string[]>([])
   const [toasts, setToasts] = useState<readonly Toast[]>([])
+  const navKey = selectedId ?? section
+  /**
+   * Arcs / anticipation: navigation has a direction. Going forward slides in
+   * from the right, going back from the left. Computed during render (refs are
+   * the only safe place for "previous value" without an extra paint) and fed
+   * to CSS through data-dir; the keyed body remount replays the animation.
+   */
+  const navRank = selectedId !== null ? SECTIONS.length + 1 : SECTIONS.findIndex((entry) => entry.key === section)
+  const lastRank = useRef(navRank)
+  const navDir = useRef<'forward' | 'back'>('forward')
+  if (lastRank.current !== navRank) {
+    navDir.current = navRank >= lastRank.current ? 'forward' : 'back'
+    lastRank.current = navRank
+  }
 
   useEffect(() => {
     const loaded = status.data
@@ -73,9 +91,14 @@ export function MemoryPage(_props: SlotProps): ReactElement {
   const toast = useCallback((message: string, kind: ToastKind = 'info'): void => {
     toastSeq += 1
     const id = toastSeq
-    setToasts((current) => [...current, { id, message, kind }])
+    setToasts((current) => [...current, { id, message, kind, leaving: false }])
+    // Two-phase removal: mark leaving, let the exit animation finish, then
+    // unmount. A toast that simply disappears breaks the motion arc.
     window.setTimeout(() => {
-      setToasts((current) => current.filter((item) => item.id !== id))
+      setToasts((current) => current.map((item) => (item.id === id ? { ...item, leaving: true } : item)))
+      window.setTimeout(() => {
+        setToasts((current) => current.filter((item) => item.id !== id))
+      }, TOAST_EXIT_MS)
     }, TOAST_MS)
   }, [])
 
@@ -240,7 +263,7 @@ export function MemoryPage(_props: SlotProps): ReactElement {
         </nav>
 
         <div className="lmv-body">
-          <div className="lmv-fade" key={selectedId ?? section}>
+          <div className="lmv-fade" data-dir={navDir.current} key={navKey}>
             {sectionBody}
           </div>
         </div>
@@ -256,7 +279,10 @@ function Toasts(props: { toasts: readonly Toast[] }): ReactElement | null {
   return (
     <div className="lmv-toasts" role="status" aria-live="polite">
       {props.toasts.map((item) => (
-        <div key={item.id} className={`lmv-toast${item.kind === 'info' ? '' : ` lmv-toast-${item.kind}`}`}>
+        <div
+          key={item.id}
+          className={`lmv-toast${item.kind === 'info' ? '' : ` lmv-toast-${item.kind}`}${item.leaving ? ' lmv-toast-out' : ''}`}
+        >
           <Icon name={item.kind === 'ok' ? 'check' : item.kind === 'error' ? 'bolt' : 'spark'} />
           <span className="lmv-grow">{item.message}</span>
         </div>

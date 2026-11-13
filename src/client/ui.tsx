@@ -370,6 +370,21 @@ export function Select<T extends string>(props: {
 }
 
 /**
+ * A disclosure indicator that rotates instead of swapping glyphs.
+ *
+ * Disney's "pose-to-pose" rule: the eye follows one continuous motion, so the
+ * same chevron turns 90 degrees when its panel opens. Swapping a close icon
+ * for a chevron reads as a jump, not a disclosure.
+ */
+export function DisclosureChevron(props: { open: boolean; size?: number }): ReactElement {
+  return (
+    <span className={`lmv-chev${props.open ? ' lmv-chev-open' : ''}`} aria-hidden="true">
+      <Icon name="chevron" size={props.size ?? 12} />
+    </span>
+  )
+}
+
+/**
  * Expand/collapse with a height transition, no measuring and no JS.
  *
  * `grid-template-rows: 0fr → 1fr` animates any content height in modern

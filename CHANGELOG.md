@@ -40,12 +40,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Overview became a status band plus an attention strip, a ledger and a proportional
   category bar; search hides its seven filters behind one disclosure that reports how many are
   on; settings splits fourteen controls into four groups with a sticky save bar; detail reads
-  content first and groups its actions; the inbox keeps its manual form collapsed.
+  content first and groups its actions; the inbox keeps its manual form **expanded by default**
+  (collapsible) so the primary action of the page needs no extra click.
+- Motion, fourth pass: toasts now have a full enter → dwell → 260 ms exit arc instead of
+  blinking out; section and Life-tab switches slide directionally (forward from the right,
+  back from the left); disclosure indicators rotate one chevron 90° instead of swapping two
+  icons; themed text selection, hairline scrollbars and a soft focus halo finish the chrome.
+  Every new animation is covered by the existing `prefers-reduced-motion` rule.
+
+### Fixed
+
+- The inbox manual form had been collapsed by default in a previous pass, which broke the
+  "add a candidate by hand" path (caught by the real-browser E2E flow). It opens by default
+  again; the slide-out transition stays.
+- List rows, reminder rows and sticker tiles used an entrance keyframe whose first frame was
+  `opacity: 0` with a stagger delay, leaving freshly created candidates invisible and
+  unclickable for a few hundred ms. They now use a translate-only `lmv-slide-in`.
+- `scripts/ui-e2e-flows.mjs` had drifted from the current markup: the health capsules render
+  `0 记忆总数` rather than `记忆总数: 0`, and the search box is a bare input with an
+  `aria-label` rather than a labelled `Field`. Both assertions were updated without weakening
+  them — the live service total is still required on screen.
 
 ### Verified
 
-- `npx tsc --noEmit` clean; `client-bundle` + `i18n-parity` + `dispatch-validation` green;
-  `check-rpc-contract` reports 49 host methods and every Life-page call has a branch.
+- `npx tsc --noEmit` clean (both configs); `npm run lint` clean (65 source files);
+  `client-bundle` + `i18n-parity` + `dispatch-validation` green; `check-rpc-contract`
+  reports 50 host methods and every Life-page call has a branch.
+- **Full suite:** `npm test` → 71 files / **1046 tests passed**, 0 failed.
+- **Real-browser E2E** (`ui-e2e-flows.mjs` against an isolated profile + CLI host + Chrome
+  over CDP): **61/61 checks passed**, no error panel, no uncaught page exceptions —
+  covering inbox confirm/reject/merge, search → detail → archive/restore/pin, raw Markdown
+  write, two-step delete, settings persistence and zh/en switching, batch pin and the merge
+  dialog. `ui-acceptance.mjs` also opened the page with all seven tabs and no step errors.
 - As always, the panel needs a full DeepSeek Harness restart: the client bundle is read from
   disk on demand, but the host keeps its modules in memory.
 

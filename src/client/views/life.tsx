@@ -16,7 +16,7 @@ import { call, errCode, useAsync, useMutation } from '../api.js'
 import { useT } from '../i18n.js'
 import { usePage } from '../page-api.js'
 import {
-  Button, Card, Checkbox, Collapse, Empty, ErrorNotice, Field, Icon, KvList, Loading, Notice, Select, TextArea, TextInput,
+  Button, Card, Checkbox, Collapse, DisclosureChevron, Empty, ErrorNotice, Field, Icon, KvList, Loading, Notice, Select, TextArea, TextInput,
 } from '../ui.js'
 import type { IconName } from '../ui.js'
 import { ERROR_CODES } from '../../shared/protocol.js'
@@ -109,6 +109,13 @@ export function LifeView(props: { onChanged: () => void }): ReactElement {
   const t = useT()
   const [tab, setTab] = useState<LifeTab>('overview')
   const active = TABS.find((entry) => entry.key === tab) ?? TABS[0]!
+  const tabRank = TABS.findIndex((entry) => entry.key === tab)
+  const lastRank = useRef(tabRank)
+  const dir = useRef<'forward' | 'back'>('forward')
+  if (lastRank.current !== tabRank) {
+    dir.current = tabRank >= lastRank.current ? 'forward' : 'back'
+    lastRank.current = tabRank
+  }
 
   return (
     <div className="lmv-life">
@@ -127,7 +134,7 @@ export function LifeView(props: { onChanged: () => void }): ReactElement {
           </button>
         ))}
       </nav>
-      <div className="lmv-life-body" key={tab} role="tabpanel" aria-label={t(active.labelKey)}>
+      <div className="lmv-life-body" data-dir={dir.current} key={tab} role="tabpanel" aria-label={t(active.labelKey)}>
         <div className="lmv-life-lead">
           <h2>{t(active.labelKey)}</h2>
           <p>{t(`life.lead.${active.key}`)}</p>
@@ -633,7 +640,7 @@ function PersonaPane(props: { onChanged: () => void }): ReactElement {
             ariaExpanded={showAnchors}
             onClick={() => { setShowAnchors((current) => !current) }}
           >
-            <Icon name={showAnchors ? 'close' : 'chevron'} size={13} />
+            <DisclosureChevron open={showAnchors} />
             {showAnchors ? t('common.less') : t('common.more')}
           </Button>
         }
@@ -1375,7 +1382,8 @@ function RemindersPane(): ReactElement {
             ariaExpanded={showOptions}
             onClick={() => { setShowOptions((current) => !current) }}
           >
-            <Icon name={showOptions ? 'close' : 'settings'} size={13} />
+            <Icon name="settings" size={13} />
+            <DisclosureChevron open={showOptions} />
             {showOptions ? t('common.less') : t('common.more')}
           </Button>
         }
@@ -1532,7 +1540,7 @@ function RemindersPane(): ReactElement {
         {rows.map((row) => {
           if (row.kind === 'head') {
             const chevron = row.collapsible === true
-              ? <Icon name={row.collapsed === true ? 'chevron' : 'close'} size={11} />
+              ? <DisclosureChevron open={row.collapsed !== true} />
               : null
             return (
               <button

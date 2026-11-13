@@ -20,7 +20,7 @@ import type { MemoryStatus, MemoryType } from '../../shared/types.js'
 import { call, useAsync, useDebounced } from '../api.js'
 import { useT } from '../i18n.js'
 import { usePage } from '../page-api.js'
-import { Badge, Button, Card, Checkbox, Collapse, Empty, EnumChips, ErrorNotice, Field, Icon, Loading, NumberInput, TextInput } from '../ui.js'
+import { Badge, Button, Card, Checkbox, Collapse, DisclosureChevron, Empty, EnumChips, ErrorNotice, Field, Icon, Loading, NumberInput, TextInput } from '../ui.js'
 import { statusLabel, typeLabel } from '../util.js'
 import { HitRow } from './hit-row.js'
 import { MergeDialog } from './merge.js'
@@ -202,7 +202,8 @@ export function SearchView(props: { tag: string; onTagChange: (tag: string) => v
               setFiltersOpen((open) => !open)
             }}
           >
-            <Icon name={filtersOpen ? 'chevron' : 'manage'} size={13} />
+            <Icon name="manage" size={13} />
+            <DisclosureChevron open={filtersOpen} />
             {translate('search.filters')}
             {activeChips.length === 0 ? null : <span className="lmv-nav-count">{String(activeChips.length)}</span>}
           </Button>

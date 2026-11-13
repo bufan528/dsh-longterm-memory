@@ -56,6 +56,15 @@ export const CLIENT_CSS = `
 .lmv-page *{box-sizing:border-box}
 .lmv-page button,.lmv-page input,.lmv-page select,.lmv-page textarea{font-family:inherit}
 .lmv-page :focus-visible{outline:2px solid color-mix(in srgb, var(--dsw-alias-brand-primary,#4a8cff) 70%, transparent);outline-offset:2px}
+/* Polished chrome: themed text selection, hairline scrollbars and a soft
+   focus halo. Apple's restraint is mostly about what you remove — the default
+   OS scrollbar and bright blue selection were the loudest things left. */
+.lmv-page ::selection{background:var(--lmv-tint-strong);color:var(--dsw-alias-label-primary,#e6e6e6)}
+.lmv-page :focus-visible{box-shadow:0 0 0 4px var(--lmv-tint)}
+.lmv-main,.lmv-life,.lmv-side,.lmv-pre,.lmv-modal-body,.lmv-chips-scroll{scrollbar-width:thin;scrollbar-color:color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 18%, transparent) transparent}
+.lmv-main::-webkit-scrollbar,.lmv-life::-webkit-scrollbar,.lmv-side::-webkit-scrollbar,.lmv-pre::-webkit-scrollbar,.lmv-modal-body::-webkit-scrollbar,.lmv-chips-scroll::-webkit-scrollbar{width:8px;height:8px}
+.lmv-main::-webkit-scrollbar-thumb,.lmv-life::-webkit-scrollbar-thumb,.lmv-side::-webkit-scrollbar-thumb,.lmv-pre::-webkit-scrollbar-thumb,.lmv-modal-body::-webkit-scrollbar-thumb,.lmv-chips-scroll::-webkit-scrollbar-thumb{border-radius:999px;background:color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 16%, transparent);border:2px solid transparent;background-clip:padding-box}
+.lmv-main::-webkit-scrollbar-thumb:hover,.lmv-life::-webkit-scrollbar-thumb:hover,.lmv-pre::-webkit-scrollbar-thumb:hover{background:color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 30%, transparent);border:2px solid transparent;background-clip:padding-box}
 
 /* ================================================================ shell === */
 .lmv-head{display:flex;align-items:flex-end;gap:16px;padding:18px 24px 12px;flex:0 0 auto;min-width:0}
@@ -89,6 +98,14 @@ export const CLIENT_CSS = `
 
 .lmv-body{flex:1 1 auto;min-height:0;display:flex}
 .lmv-fade{flex:1 1 auto;min-width:0;min-height:0;display:flex;flex-direction:column;animation:lmv-fade var(--lmv-base) var(--lmv-ease-out) both}
+/* Directional navigation (arcs + anticipation): forward enters from the
+   right, back from the left. Small travel so it reads as depth, not a slide. */
+.lmv-fade[data-dir="forward"]{animation:lmv-enter-forward var(--lmv-base) var(--lmv-ease-out) both}
+.lmv-fade[data-dir="back"]{animation:lmv-enter-back var(--lmv-base) var(--lmv-ease-out) both}
+@keyframes lmv-enter-forward{from{opacity:0;transform:translate3d(10px,0,0)}to{opacity:1;transform:none}}
+@keyframes lmv-enter-back{from{opacity:0;transform:translate3d(-10px,0,0)}to{opacity:1;transform:none}}
+.lmv-life-body[data-dir="forward"]{animation:lmv-enter-forward var(--lmv-fast) linear both}
+.lmv-life-body[data-dir="back"]{animation:lmv-enter-back var(--lmv-fast) linear both}
 .lmv-main{flex:1 1 auto;min-width:0;min-height:0;overflow:auto;padding:4px 24px 40px;display:flex;flex-direction:column;gap:14px}
 .lmv-main>*{animation:lmv-rise var(--lmv-slow) var(--lmv-ease-out) both}
 .lmv-main>*:nth-child(2){animation-delay:34ms}
@@ -103,6 +120,12 @@ export const CLIENT_CSS = `
 .lmv-card-title{font-size:13.5px;font-weight:620;letter-spacing:-.005em;display:flex;align-items:center;gap:7px}
 .lmv-card-title svg{color:var(--dsw-alias-label-tertiary,#8a8a8a)}
 .lmv-card-actions{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+/* Disclosure: one glyph, one continuous turn (no icon swap). */
+.lmv-chev{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;transition:transform var(--lmv-base) var(--lmv-ease-spring)}
+.lmv-chev-open{transform:rotate(90deg)}
+/* Secondary action: the title glyph answers the pointer while the card lifts. */
+.lmv-card-title svg{transition:transform var(--lmv-base) var(--lmv-ease-spring)}
+.lmv-card:hover .lmv-card-title svg{transform:translateY(-1px)}
 .lmv-kicker{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dsw-alias-label-tertiary,#8a8a8a);font-weight:600}
 .lmv-kicker-row{display:flex;align-items:center;gap:7px;margin-top:5px;min-width:0}
 .lmv-kicker-count{font-size:10px;font-weight:600;letter-spacing:0;padding:0 5px;border-radius:999px;background:color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 11%, transparent);color:var(--dsw-alias-label-tertiary,#8a8a8a);font-variant-numeric:tabular-nums}
@@ -191,7 +214,11 @@ button.lmv-attn-cell:hover{transform:translateY(-1px);border-color:var(--dsw-ali
 
 /* ============================================================== surfaces === */
 .lmv-list{display:flex;flex-direction:column;gap:6px;min-width:0}
-.lmv-row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;padding:9px 11px;border:1px solid var(--dsw-alias-border-l1,#2e2e2e);border-radius:var(--lmv-r-md);background:color-mix(in srgb, var(--dsw-alias-bg-layer-2,#2d2d2e) 55%, transparent);min-width:0;transition:border-color var(--lmv-base) var(--lmv-ease-out),background var(--lmv-base) var(--lmv-ease-out),transform var(--lmv-fast) var(--lmv-ease-out);animation:lmv-rise var(--lmv-base) var(--lmv-ease-out) both}
+.lmv-row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;padding:9px 11px;border:1px solid var(--dsw-alias-border-l1,#2e2e2e);border-radius:var(--lmv-r-md);background:color-mix(in srgb, var(--dsw-alias-bg-layer-2,#2d2d2e) 55%, transparent);min-width:0;transition:border-color var(--lmv-base) var(--lmv-ease-out),background var(--lmv-base) var(--lmv-ease-out),transform var(--lmv-fast) var(--lmv-ease-out);animation:lmv-slide-in var(--lmv-base) var(--lmv-ease-out) both}
+/* Slide, never fade: a row is interactive the moment it exists. An opacity-0
+   first frame made freshly added candidates invisible-and-unclickable for a
+   few hundred ms, which the real-browser E2E caught. */
+@keyframes lmv-slide-in{from{transform:translateY(7px)}to{transform:none}}
 /* Entrance wave across list rows, capped so long lists land quickly. */
 .lmv-row:nth-child(2){animation-delay:24ms}
 .lmv-row:nth-child(3){animation-delay:48ms}
@@ -242,7 +269,8 @@ button.lmv-attn-cell:hover{transform:translateY(-1px);border-color:var(--dsw-ali
 .lmv-notice-ok .lmv-notice-icon{background:color-mix(in srgb, var(--dsw-alias-state-success-primary,#3fb950) 20%, transparent)}
 .lmv-empty{padding:18px;text-align:center;font-size:12px;color:var(--dsw-alias-label-tertiary,#8a8a8a)}
 .lmv-empty-state{display:flex;flex-direction:column;align-items:center;gap:6px;padding:26px 16px;text-align:center}
-.lmv-empty-icon{width:44px;height:44px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:var(--dsw-alias-label-tertiary,#8a8a8a);background:color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 6%, transparent);border:1px solid var(--dsw-alias-border-l1,#2e2e2e)}
+.lmv-empty-icon{width:44px;height:44px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:var(--dsw-alias-label-tertiary,#8a8a8a);background:color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 6%, transparent);border:1px solid var(--dsw-alias-border-l1,#2e2e2e);animation:lmv-float 3.6s var(--lmv-ease-in-out) infinite}
+@keyframes lmv-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
 .lmv-empty-title{font-size:13px;font-weight:580;color:var(--dsw-alias-label-primary,#e6e6e6)}
 .lmv-empty-hint{font-size:12px;color:var(--dsw-alias-label-tertiary,#8a8a8a);max-width:44ch;line-height:1.6}
 .lmv-empty-action{margin-top:4px}
@@ -257,6 +285,9 @@ button.lmv-attn-cell:hover{transform:translateY(-1px);border-color:var(--dsw-ali
 .lmv-toast{display:flex;align-items:flex-start;gap:8px;padding:10px 14px;border-radius:var(--lmv-r-md);font-size:12.5px;background:var(--dsw-alias-bg-layer-2,#2d2d2e);border:1px solid var(--dsw-alias-border-l2,#3a3a3a);color:var(--dsw-alias-label-primary,#e6e6e6);overflow-wrap:anywhere;box-shadow:var(--lmv-shadow-2);animation:lmv-toast var(--lmv-slow) var(--lmv-ease-spring) both}
 .lmv-toast-error{border-color:color-mix(in srgb, var(--dsw-alias-state-error-primary,#e5534b) 55%, transparent);color:var(--dsw-alias-state-error-primary,#e5534b)}
 .lmv-toast-ok{border-color:color-mix(in srgb, var(--dsw-alias-state-success-primary,#3fb950) 55%, transparent);color:var(--dsw-alias-state-success-primary,#3fb950)}
+/* Follow-through: the exit is a motion, not a disappearance. */
+.lmv-toast-out{animation:lmv-toast-out 260ms var(--lmv-ease-in-out) forwards;pointer-events:none}
+@keyframes lmv-toast-out{from{opacity:1;transform:none}to{opacity:0;transform:translateY(6px) scale(.98)}}
 .lmv-history{display:flex;flex-direction:column;gap:8px}
 .lmv-history-item{border-left:2px solid var(--dsw-alias-border-l2,#3a3a3a);padding-left:10px;display:flex;flex-direction:column;gap:3px;font-size:12px;min-width:0}
 
@@ -349,7 +380,7 @@ button.lmv-kicker-toggle:hover .lmv-kicker-count{background:color-mix(in srgb, v
 .lmv-seg-btn:active{transform:scale(.95)}
 .lmv-seg-btn-on{background:var(--dsw-alias-bg-layer-1,#252526);color:var(--dsw-alias-label-primary,#f5f5f5);box-shadow:var(--lmv-shadow-1)}
 .lmv-sticker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}
-.lmv-sticker{display:flex;flex-direction:column;gap:8px;padding:9px;border-radius:var(--lmv-r-md);border:1px solid var(--dsw-alias-border-l1,#2e2e2e);background:color-mix(in srgb, var(--dsw-alias-bg-layer-2,#2d2d2e) 42%, transparent);min-width:0;transition:transform var(--lmv-base) var(--lmv-ease-spring),border-color var(--lmv-base) var(--lmv-ease-out),box-shadow var(--lmv-base) var(--lmv-ease-out);animation:lmv-rise var(--lmv-base) var(--lmv-ease-out) both}
+.lmv-sticker{display:flex;flex-direction:column;gap:8px;padding:9px;border-radius:var(--lmv-r-md);border:1px solid var(--dsw-alias-border-l1,#2e2e2e);background:color-mix(in srgb, var(--dsw-alias-bg-layer-2,#2d2d2e) 42%, transparent);min-width:0;transition:transform var(--lmv-base) var(--lmv-ease-spring),border-color var(--lmv-base) var(--lmv-ease-out),box-shadow var(--lmv-base) var(--lmv-ease-out);animation:lmv-slide-in var(--lmv-base) var(--lmv-ease-out) both}
 /* Entrance wave across the grid: one delay step per tile, capped so a big
    library does not turn into a slow parade. */
 .lmv-sticker:nth-child(2){animation-delay:20ms}
@@ -403,7 +434,7 @@ button.lmv-chip{cursor:pointer;font:inherit;font-size:11.5px;transition:backgrou
 button.lmv-chip:hover{background:var(--lmv-tint-strong)}
 button.lmv-chip:active{transform:scale(.95)}
 button.lmv-chip.lmv-chip-warn:hover{background:color-mix(in srgb, var(--dsw-alias-state-warn-primary,#d29922) 20%, transparent)}
-.lmv-reminder{display:flex;gap:11px;align-items:center;padding:11px 13px;border-radius:var(--lmv-r-md);border:1px solid var(--dsw-alias-border-l1,#2e2e2e);background:color-mix(in srgb, var(--dsw-alias-bg-layer-2,#2d2d2e) 42%, transparent);transition:border-color var(--lmv-base) var(--lmv-ease-out),background var(--lmv-base) var(--lmv-ease-out);animation:lmv-rise var(--lmv-base) var(--lmv-ease-out) both}
+.lmv-reminder{display:flex;gap:11px;align-items:center;padding:11px 13px;border-radius:var(--lmv-r-md);border:1px solid var(--dsw-alias-border-l1,#2e2e2e);background:color-mix(in srgb, var(--dsw-alias-bg-layer-2,#2d2d2e) 42%, transparent);transition:border-color var(--lmv-base) var(--lmv-ease-out),background var(--lmv-base) var(--lmv-ease-out);animation:lmv-slide-in var(--lmv-base) var(--lmv-ease-out) both}
 .lmv-reminder:hover{border-color:var(--dsw-alias-border-l2,#3a3a3a);background:color-mix(in srgb, var(--dsw-alias-bg-layer-2,#2d2d2e) 62%, transparent)}
 .lmv-reminder-dot{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--dsw-alias-brand-primary,#4a8cff);box-shadow:0 0 0 3px var(--lmv-tint)}
 .lmv-reminder-soon .lmv-reminder-dot{background:var(--dsw-alias-state-warn-primary,#d29922);box-shadow:0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-warn-primary,#d29922) 18%, transparent)}
