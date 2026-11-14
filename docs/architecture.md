@@ -172,6 +172,16 @@ DSH 有两条通道：
 ctx.effect(() => webServer.register({ kind: 'prefix', path: '/dsh-longterm-memory/api', handler }), '…')
 ```
 
+`RPC_METHODS` 共 **59** 个方法（下表的数字之和就是 59，逐个方法名核对过）：
+
+| 组 | 数量 | 方法 |
+|---|---|---|
+| 记忆与索引 | 23 | `status` `discover` `initialize` `chooseVault` `overview` `search` `get` `readRaw` `writeRaw` `save` `confirm` `reject` `setStatus` `setPinned` `delete` `merge` `resolveConflict` `rebuildIndex` `syncIndex` `history` `candidates` `addCandidate` `openVault` |
+| 设置与预览 | 4 | `getSettings` `setSettings` `previewRecall` `previewStanding` |
+| 身份与可见性 | 7 | `qqLinkage` `setQqLinkage` `ownerBindingStatus` `ownerBindingCreatePairCode` `ownerBindingUnbind` `visibilityReview` `setVisibility` |
+| 伙伴中心（0.2.0） | 16 | `companionStatus` `updateCompanion` `companionPresets` `companionApplyPreset` `companionFillAnchors` `personaTry` `stickerLibrary` `stickerThumb` `stickerImport` `stickerUpdate` `stickerDelete` `reminderList` `reminderCreate` `reminderCancel` `reminderComplete` `reminderReschedule` |
+| 策略与进化（0.2.0） | 9 | `evolutionList` `evolutionScan` `evolutionApply` `evolutionDismiss` `evolutionRevert` `reminderPolicy` `reminderPolicyUpdate` `stickerPolicy` `stickerPolicyUpdate` |
+
 ### 3.6 信任围栏
 
 路由必须防止任意网页读取/改写用户记忆。实现照抄 `dsh-better-sidebar` 的
@@ -228,8 +238,11 @@ renderStandingBlock()
 放入系统提示词（不写会话历史，不重复计费历史上限）
 ```
 
-按需检索由 4 个模型工具承担：`memory_search` / `memory_get` / `memory_save` /
-`memory_forget`。
+按需检索由 4 个**记忆**工具承担：`memory_search` / `memory_get` / `memory_save` /
+`memory_forget`。另有 5 个**动作**工具（0.2.0 新增）：`sticker_pick` / `sticker_ingest` /
+`reminder_create` / `reminder_list` / `reminder_complete`——记忆回答「我知道什么」，
+动作回答「我能做什么」。两者共用同一套 Owner 门禁，但贴纸刻意**不做** owner 门控
+（用户自己挑的公开表情），提醒则必须门控（日程是私密的）。
 
 **可选**通道：`enablePerStepRecall`（默认关闭）会把检索结果作为用户消息插入
 `agent/pre-step`。该消息会变成**持久会话历史**，本会话后续每轮都要重复计费，因此
@@ -258,11 +271,20 @@ renderStandingBlock()
 | `src/host/core/llm-extraction.ts` | 模型提取的纯逻辑：提示词构建、响应解析、边界（第二轮新增） |
 | `src/host/dsh/llm.ts` | 真实 DSH 模型适配器：prepareCall + 流式收集，不可解析即降级（第二轮新增） |
 | `src/host/config.ts` | zod 配置校验（不依赖 Schemastery） |
-| `src/host/dsh/tools.ts` | 4 个模型工具的定义与执行 |
+| `src/host/owner-gate.ts` | 统一 Owner 门禁：classify → decide，始终返回 ALLOW/DENY（R1 fail-closed） |
+| `src/shared/owner-access.ts` | 来源分类与决策矩阵的纯逻辑 |
+| `src/shared/sticker-pick.ts` | 贴纸候选打分与发送策略（冷却/24h 上限/静默标签/概率），纯函数 |
+| `src/shared/reminder-policy.ts` | 静默时段、指数退避、可投递判定，纯函数 |
+| `src/host/companion/stickers.ts` | 贴纸库存储：catalog.json 与 QQ 侧字节兼容 |
+| `src/host/companion/documents.ts` | 人格文档（Persona/Examples）读写与校验 |
+| `src/host/companion/evolution.ts` | 确定式进化建议：变量层、可回滚、队列持久化 |
+| `src/host/tasks/reminder-store.ts` / `reminder-service.ts` | 提醒存储（Vault 侧）与页面操作 |
+| `src/host/dsh/life-tools.ts` | 5 个动作工具的定义与执行（duck-typed surface，可脱离 Vault 测试） |
+| `src/host/dsh/tools.ts` | 4 个记忆工具的定义与执行 |
 | `src/host/dsh/inject.ts` | 提示词 section、turn 提取、可选每步注入 |
 | `src/host/dsh/routes.ts` | HTTP RPC + 信任围栏 + 方法分发 |
 | `src/host/index.ts` | 插件入口（`apply`/`inject`/`name`） |
-| `src/client/**` | 侧边栏图标、管理页面、5 个视图、自有控件、i18n、样式 |
+| `src/client/**` | 侧边栏图标、管理页面、7 个记忆视图 + 8 个伙伴面板、自有控件、i18n、样式 |
 
 ## 7. 关键设计取舍
 
@@ -418,3 +440,29 @@ interface QqLinkageReport {
 本插件**不 import 官方包、不复制官方连接代码、不读写任何凭据**。AppSecret 由官方插件
 明文写入 `<profile>/cordis.patch.yml`（证据文档 §4.3），本插件不读取、不保存、不回显；
 也不自动修改任何 profile。策略默认关闭，升级不改变既有行为。
+
+## 11. 桌面会话与 Owner 门禁（0.2.0 决策）
+
+**问题。** 门禁的正向证据只有一条：`qqbotContext.getContext(sessionId)` 返回的 `platform`
+落在 `{desktop, pc, local, trusted-pc}`。桌面会话不是 QQ 会话，该服务对它返回 `null`，
+于是**单人本机安装的桌面会话读不到任何个人记忆**——门禁本身没错，但它把合法场景一起挡了。
+
+**三条路，选了 B：**
+
+| 方案 | 代价 | 结论 |
+|---|---|---|
+| A. 加 trusted-PC producer（session header / ingress 出证） | 宿主已有 `verifyDesktop`，但它是**按消息**的（要 messageId + text + source），常驻注入这条读路径拿不到 messageId | 方向正确，前提不具备 |
+| **B. 显式「仅本机」开关 `trustLocalSessions`** | 门禁十几行 + 默认关闭的开关 + 8 个用例 | **采用** |
+| C. 让 QQ 插件对桌面会话返回 `platform: 'desktop'` | 代码最少 | **否**：职责错位；用户卸载 QQ 插件（PC-only 安装本就是支持场景）后立刻失效 |
+
+**B 的边界（它没变成后门的原因）。** 开启后只补「**没有 live 来源**」这一格，且必须同时
+满足「不属于任何已知 QQ 会话」与「QQ 注册表可读」。三类始终拒绝：
+
+- `qq-missing`：已登记为 QQ、但 live 来源消失——这是异常，不是本机；
+- 注册表读取失败：`unknown` 里可能藏着 QQ 会话；
+- live 来源存在但平台不可识别（如 `wechat`）：那是「我们不认识的通道」，不是「没有通道」。
+
+**A 的后续。** `verifyDesktop` 已在 `@deepseek-ai/dsh-host-plugin-ingress`：桌面宿主为每条
+用户消息登记 `desktop-owner` 凭据（packageId `@deepseek-ai/host-desktop`）。升级成 A 需要的
+是**按会话的出证**——收到首批已验消息后记住「该会话已取得桌面凭据」，常驻注入据此放行。
+那条路打通后，B 就退回成「宿主不出证时的兜底」，而不是默认答案。

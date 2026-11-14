@@ -376,6 +376,14 @@ export interface PluginSettings {
    * 上下文，模型据此调用 `sticker_ingest`。关掉后模型不再被提示，显式要求仍可收录。
    */
   enableStickerAutoCollect?: boolean
+  /**
+   * 显式「本机信任」模式：桌面/本机会话没有 QQ 来源时也允许读写个人记忆。
+   *
+   * 默认关闭，门禁保持 fail-closed。开启后只补「无 live 来源且不属于任何已知
+   * QQ 会话且注册表健康」这一格；QQ 矩阵、注册表异常、未知平台一律不受影响。
+   * 单人本机安装（尤其是没装 QQ 插件的 PC-only 场景）需要它才能让桌面会话读到记忆。
+   */
+  trustLocalSessions?: boolean
   /** ISO instant of the last index rebuild. */
   lastIndexRebuild: string | null
   /**
@@ -408,6 +416,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   sensitiveNeedsConfirmation: true,
   maxCandidatesPerTurn: 5,
   enableStickerAutoCollect: true,
+  trustLocalSessions: false,
   lastIndexRebuild: null,
   qqLinkage: DEFAULT_QQ_LINKAGE,
 }

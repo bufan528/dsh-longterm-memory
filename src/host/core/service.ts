@@ -2245,6 +2245,8 @@ const BOOLEAN_SETTINGS = [
   // Typed so a stray `"no"` cannot be read as "on" by the prompt builder, which
   // tests `!== false`.
   'enableStickerAutoCollect',
+  // Fail-closed by default; a stray "yes" must not open the gate.
+  'trustLocalSessions',
 ] as const
 
 const NUMERIC_SETTINGS = [

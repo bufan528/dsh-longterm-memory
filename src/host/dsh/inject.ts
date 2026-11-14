@@ -217,7 +217,7 @@ export function installStandingSection(
         }
 
         // 跨端身份：fail-closed — 门禁始终返回 decision，无「跳过=放行」
-        const ownerDecision = ownerAccessForAgent(ctx, agent)
+        const ownerDecision = ownerAccessForAgent(ctx, agent, () => service.getSettings().trustLocalSessions === true)
         if (!ownerDecision.allowed) {
           ctx.logger?.info('dsh-longterm-memory: standing memory withheld (%s)', ownerDecision.reason)
           return ''
@@ -351,7 +351,7 @@ function handleSessionEvent(
         }
       }
       // Owner 门禁：fail-closed — 未绑定/缺来源/服务缺失 → 强制收件箱
-      const ownerWrite = ownerAccessForSession(ctx, session, sessionId)
+      const ownerWrite = ownerAccessForSession(ctx, session, sessionId, () => service.getSettings().trustLocalSessions === true)
       if (!ownerWrite.allowed) {
         forceInbox = true
         ctx.logger?.info('dsh-longterm-memory: write forced to inbox (%s)', ownerWrite.reason)
@@ -445,7 +445,7 @@ export function installPerStepRecall(
         }
       }
       // Owner 门禁：与 standing 同源，fail-closed
-      const ownerDecision = ownerAccessForAgent(ctx, agent)
+      const ownerDecision = ownerAccessForAgent(ctx, agent, () => service.getSettings().trustLocalSessions === true)
       if (!ownerDecision.allowed) {
         ctx.logger?.info('dsh-longterm-memory: per-step recall withheld (%s)', ownerDecision.reason)
         return decision
@@ -660,6 +660,7 @@ function describeError(error: unknown): string {
 function ownerAccessForAgent(
   ctx: CordisLike,
   agent: unknown,
+  trustLocalSessions: () => boolean = () => false,
 ): OwnerAccessDecision {
   const gate = createOwnerGate(
     () => {
@@ -672,6 +673,7 @@ function ownerAccessForAgent(
     {
       // WP-NEXT-01F: authorized production enable (Stage F)
       qqPersonalMemory: true,
+      trustLocalSessions: trustLocalSessions(),
       getIngress: () => {
         try {
           return ctx.get('hostPluginIngress') as never
@@ -689,6 +691,7 @@ function ownerAccessForSession(
   ctx: CordisLike,
   _session: unknown,
   sessionId: string,
+  trustLocalSessions: () => boolean = () => false,
 ): OwnerAccessDecision {
   const gate = createOwnerGate(
     () => {
@@ -700,6 +703,7 @@ function ownerAccessForSession(
     },
     {
       qqPersonalMemory: true,
+      trustLocalSessions: trustLocalSessions(),
       getIngress: () => {
         try {
           return ctx.get('hostPluginIngress') as never

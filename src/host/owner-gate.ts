@@ -49,6 +49,20 @@ export interface OwnerGateOptions {
    * Unit tests that omit this option keep historical ALLOW behavior for bound C2C.
    */
   qqPersonalMemory?: boolean
+  /**
+   * 显式「本机信任」模式（默认关闭，fail-closed 不变）。
+   *
+   * 单人本机场景下，桌面会话拿不到任何 live 来源（qqbotContext 只认识 QQ 会话），
+   * 而宿主虽然会为桌面消息登记 desktop-owner 凭据（`verifyDesktop`），那份凭据是
+   * **按消息**的，常驻注入这条读路径拿不到 messageId，因此无法据此放行。
+   *
+   * 打开后，只有「没有 live 来源、且不属于任何已知 QQ 会话、且 QQ 注册表健康」
+   * 的会话才按本机会话放行。以下三类**始终**拒绝，开关不覆盖：
+   *  - 已知 QQ 会话但 live 来源消失（qq-missing，异常而非本机）；
+   *  - 注册表读取失败（unknown 里可能藏着 QQ 会话）；
+   *  - live 来源存在但平台不可识别（是我们不理解的通道，不是「没有通道」）。
+   */
+  trustLocalSessions?: boolean
   /** Host ingress for provenance verify when hostSource is plugin-user. */
   getIngress?: () => {
     verify?: (input: {
@@ -64,6 +78,11 @@ function deny(reason: string): OwnerAccessDecision {
   return { allowed: false, reason, ownerId: null, channel: 'unknown' }
 }
 
+/** 本机信任模式放行：ownerId 为 null（本机会话没有 QQ Owner 身份）。 */
+function allowLocal(reason: string): OwnerAccessDecision {
+  return { allowed: true, reason, ownerId: null, channel: 'desktop' }
+}
+
 /**
  * 构建绑定到 ctx 的 Owner 门禁。
  *
@@ -76,6 +95,7 @@ export function createOwnerGate(
 ) {
   const qqPersonalMemory = options?.qqPersonalMemory !== false
   const getIngress = options?.getIngress
+  const trustLocal = options?.trustLocalSessions === true
   return function ownerGate(input: OwnerGateInput): OwnerAccessDecision {
     try {
       const sessionId = input.sessionId ?? input.explicitSessionId ?? null
@@ -100,6 +120,10 @@ export function createOwnerGate(
 
       // R2：服务缺失 / getContext 不可用 → 无独立可信 PC 证明 → DENY
       if (!qq || typeof qq.getContext !== 'function') {
+        // PC-only 安装没有 QQ 插件，也就没有 QQ 会话可言：本机信任模式下放行。
+        if (trustLocal && sessionId !== null && sessionId.length > 0) {
+          return allowLocal('本机信任模式：无 QQ 身份服务，按本机会话处理')
+        }
         return deny('QQ 身份服务缺失，无独立可信 PC 证明，拒绝个人记忆访问')
       }
 
@@ -114,6 +138,10 @@ export function createOwnerGate(
         return deny('来源查询失败，拒绝个人记忆访问')
       }
 
+      // A source object exists but is malformed (no `platform`) is *not* the same
+      // as having no source: it is a service that answered something we do not
+      // understand. That must never be promoted to "local" by the trust switch.
+      const hasRawSource = raw !== null && raw !== undefined
       const source: OwnerSourceView | null =
         raw !== null && raw !== undefined && typeof raw.platform === 'string'
           ? {
@@ -136,6 +164,19 @@ export function createOwnerGate(
         knownQqSession,
         registryHealthy,
       })
+
+      // 本机信任模式只补「没有 live 来源」这一格。
+      // 已知 QQ 会话（qq-missing）、注册表异常、以及平台不可识别的 live 来源
+      // 都不在此列：那三种情况分别意味着异常、不可信、和「我们不认识的通道」。
+      if (
+        trustLocal
+        && provenance.kind === 'unknown'
+        && !hasRawSource
+        && !knownQqSession
+        && registryHealthy
+      ) {
+        return allowLocal('本机信任模式：会话无 live 来源且不属于任何已知 QQ 会话，按本机会话处理')
+      }
       // WP-NEXT-01E: QQ personal memory disabled until WP-NEXT-01F canary.
       // trusted-pc (Desktop) path is unaffected.
       if (provenance.kind === 'qq' && !qqPersonalMemory) {

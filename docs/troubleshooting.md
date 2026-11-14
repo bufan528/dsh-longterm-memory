@@ -162,7 +162,7 @@
 ## 模型不调用 `memory_search`
 
 1. 设置里 `enableTools` 是否为 `true`；
-2. 能力里 `registeredTools` 是否列出了 4 个工具；
+2. 能力里 `registeredTools` 是否列出了 9 个工具（4 个记忆 + 5 个动作）；
 3. 工具的 `description` 会告诉模型何时使用——若模型不调用，通常是它认为当前任务不需要
    长期记忆，这是正常行为。
 

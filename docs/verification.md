@@ -183,7 +183,7 @@ $ npx vitest run
 | 测试文件 | 用例数 | 覆盖 |
 |---|---|---|
 | `tests/integration/service.test.ts` | 63 | 完整服务回路、索引生命周期、写入并发、合并/冲突/删除、turn 处理 |
-| `tests/unit/dsh-adapters.test.ts` | 47 | 提示词分区、turn 提取、4 个工具、HTTP RPC + 信任围栏、配置 |
+| `tests/unit/dsh-adapters.test.ts` | 47 | 提示词分区、turn 提取、工具注册（当前 9 个）、HTTP RPC + 信任围栏、配置 |
 | `tests/unit/llm-extraction.test.ts` | 47 | 模型提取全过程（本轮新增） |
 | `tests/unit/engine.test.ts` | 44 | 机密/敏感/去重/冲突/置信度策略 |
 | `tests/integration/vault.test.ts` | 38 | Obsidian 检测、候选路径、初始化幂等、损坏修复 |

@@ -33,6 +33,12 @@ DSH Memory/
 ├── Conflicts/                    status = conflict
 ├── Index/                        插件生成的人类可读索引
 ├── History/                      说明性目录
+├── Companion/                    伙伴数据（0.2.0 起）
+│   ├── Persona.md                人格：称呼/语气/口头禅/回避
+│   ├── Examples/                 声音锚点，一个预设一份
+│   ├── Stickers/                 catalog.json + policy.json + 图片
+│   └── Evolution/                suggestions.json（待审队列）
+├── Reminders/                    提醒（一条一文件）+ policy.json
 └── .dsh-memory/                  插件私有
     ├── config.json              仓库标记 + 用户设置
     ├── index.json               可重建索引

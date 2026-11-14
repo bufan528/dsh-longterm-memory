@@ -7,7 +7,7 @@
 <p align="center"><strong>给 DeepSeek Harness 的长期记忆，存成一份完全属于你自己的 Markdown 仓库。</strong></p>
 
 <p align="center">
-  一级侧边栏页面、四个模型工具、按 token 预算召回、可崩溃恢复的历史日志 ——
+  一级侧边栏页面、九个模型工具、按 token 预算召回、可崩溃恢复的历史日志 ——
   无数据库、无遥测、无云端。记忆就是磁盘上 Obsidian 兼容的 <code>.md</code> 文件。
 </p>
 
@@ -33,7 +33,7 @@
   <a href="../README.md"><strong>English</strong></a>
 </p>
 
-> **项目状态（2026-10-29）**：`dsh-longterm-memory@0.1.8` 已发布到 npm，并附带在
+> **项目状态（2026-11-14）**：本仓库当前为 `0.2.0`（升级前请先读「更新内容」——页签、RPC 与工具都变了；`0.1.8` 是 npm 上最后发布的版本）。0.2.0 已附带在
 > [最新 GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest)
 > 中（含不带版本号的 `dsh-longterm-memory.tgz`），并且**已进入两个社区目录**：
 > [DSH 插件市场](https://awesome-dsh-plugin.com/p/bufan528/dsh-longterm-memory/)
@@ -50,6 +50,14 @@
 > [0.1.4 更新内容](#014-更新内容) 与 [项目状态与限制](#项目状态与限制)。
 
 ---
+
+## 0.2.0 更新内容
+
+**破坏性版本**：管理页多出一个一级页签「伙伴中心」（八个面板，页签总数变为 7），RPC 从 50
+个增至 59 个，模型工具从 4 个增加到 9 个（新增贴纸/提醒五个动作工具）。贴纸、提醒与人格文档成为 Vault 自有文件
+（`Companion/`、`Reminders/`），各自带投递节奏；人格进化先进待审队列、可回滚；Owner 门禁
+新增「本机会话」开关，让纯本机安装的桌面会话能读到自己的记忆。存储文件保持兼容，只有对外
+接口变大。完整清单与核验中发现并修掉的四个问题见 [CHANGELOG.md](../CHANGELOG.md)。
 
 ## 0.1.8 更新内容
 
@@ -107,7 +115,7 @@
 | | |
 |---|---|
 | **一级侧边栏页面** | 注册 `sidebar.panellist` 一级入口与完整管理页（总览 / 检索 / 管理 / 收件箱 / QQ 接入 / 设置），不是聊天标签页。 |
-| **四个模型工具** | `memory_search`、`memory_get`、`memory_save`、`memory_forget`（保存前拒绝凭据类内容）。 |
+| **九个模型工具** | 记忆：`memory_search`、`memory_get`、`memory_save`、`memory_forget`（保存前拒绝凭据类内容）。动作（0.2.0）：`sticker_pick`、`sticker_ingest`、`reminder_create`、`reminder_list`、`reminder_complete`。 |
 | **自动提取** | 在真实 `turn/end` 边界做**本地规则**候选提取；可选的模型辅助提取**默认关闭**。 |
 | **排序召回** | 基于 Markdown 的 BM25 风格词法排序，支持类别 / 状态 / 标签过滤与 token 预算。 |
 | **记忆生命周期** | `pending → active → stale / superseded / archived / conflict`，置信度 `low/medium/high`；低置信度与敏感内容进入收件箱等待人工确认。 |
@@ -281,7 +289,7 @@ DSH Memory/
 |---|---|---|
 | `vaultPath` | 自动发现 / 初始化 | 记忆仓库绝对路径 |
 | `language` | `zh` | 界面语言（`zh` / `en`） |
-| `enableTools` | `true` | 暴露四个模型工具 |
+| `enableTools` | `true` | 暴露全部模型工具（9 个） |
 | `enablePromptSection` | `true` | 注入常驻记忆段 |
 | `standingBudgetTokens` | `700` | 常驻段 token 上限 |
 | `standingMaxItems` | `12` | 常驻段条数上限 |
@@ -296,8 +304,8 @@ DSH Memory/
 
 ## QQ 接入（可选，0.1.5 起）
 
-第六个页签是 **QQ 接入**，导航顺序为
-`记忆总览 | 记忆检索 | 记忆管理 | 收件箱 | QQ 接入 | 设置`。它只做**状态展示、导航
+第五个页签是 **QQ 接入**，完整导航顺序为
+`记忆总览 | 记忆检索 | 记忆管理 | 收件箱 | QQ 接入 | 伙伴中心 | 设置`。它只做**状态展示、导航
 指引、联动策略与诊断**，不重新实现 QQ 协议，也不复制官方连接代码。
 
 ### 页面做什么

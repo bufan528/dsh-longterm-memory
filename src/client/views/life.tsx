@@ -21,7 +21,7 @@ import {
 import type { IconName } from '../ui.js'
 import { ERROR_CODES } from '../../shared/protocol.js'
 import type {
-  CompanionWire, PersonaExampleWire, ReminderCreateRequest, RpcResultMap, StickerImportRequest, StickerWire,
+  CompanionWire, PersonaExampleWire, PluginSettings, ReminderCreateRequest, RpcResultMap, StickerImportRequest, StickerWire,
   VisibilityReviewRow,
 } from '../../shared/protocol.js'
 import { parseReminderInput } from '../reminder-parse.js'
@@ -2332,7 +2332,11 @@ function PrivacyPane(props: { onChanged: () => void }): ReactElement {
   const owner = useAsync(() => call('ownerBindingStatus', {}), [])
   const review = useAsync(() => call('visibilityReview', {}), [])
   const unbind = useMutation(() => call('ownerBindingUnbind', {}))
+  const status = useAsync(() => call('status', {}), [])
+  const save = useMutation((patch: Partial<PluginSettings>) => call('setSettings', patch))
+  const trustLocal = status.data?.settings.trustLocalSessions === true
   return (
+    <div className="lmv-stack">
     <Card title={t('life.privacy.title')}>
       <KvList items={[
         { key: t('life.overview.owner'), value: owner.data?.bound === true ? t('life.common.bound') : t('life.common.unbound') },
@@ -2344,6 +2348,22 @@ function PrivacyPane(props: { onChanged: () => void }): ReactElement {
         void unbind.run().then(() => { owner.reload(); review.reload(); props.onChanged() })
       }}>{t('life.privacy.unbind')}</Button>
     </Card>
+
+    {/* 桌面会话没有任何 live 来源，门禁默认拒绝；这个开关只补那一格。 */}
+    <Card title={<><Icon name="privacy" />{t('life.privacy.localTitle')}</>}>
+      <Checkbox
+        checked={trustLocal}
+        label={t('life.privacy.localTrust')}
+        onChange={(checked) => {
+          void save.run({ trustLocalSessions: checked })
+            .then(() => { status.reload(); props.onChanged() })
+            .catch(() => undefined)
+        }}
+      />
+      <span className="lmv-subhead">{t('life.privacy.localHint')}</span>
+      {save.error === null ? null : <PaneError error={save.error} />}
+    </Card>
+    </div>
   )
 }
 

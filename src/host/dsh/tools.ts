@@ -667,6 +667,8 @@ export function installTools(
       {
         // WP-NEXT-01F: authorized production enable (Stage F)
         qqPersonalMemory: true,
+        // Read live: flipping the switch must apply to the next tool call.
+        trustLocalSessions: service.getSettings().trustLocalSessions === true,
         getIngress: () => {
           try {
             return ctx.get('hostPluginIngress') as never

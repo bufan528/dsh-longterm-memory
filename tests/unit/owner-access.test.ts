@@ -369,3 +369,111 @@ describe('sessionIdOfAgent', () => {
     expect(sessionIdOfAgent({})).toBeNull()
   })
 })
+
+/**
+ * 本机信任模式（trustLocalSessions）。
+ *
+ * 这个开关的存在理由：桌面会话没有 live 来源，常驻注入拿不到按消息的
+ * desktop-owner 凭据，于是单人本机安装的桌面会话读不到任何个人记忆。
+ * 它只允许补「没有 live 来源」这一格——下面每条「不得放行」的用例，
+ * 都是为了让这个开关不能变成「任何情况都放行」。
+ */
+describe('createOwnerGate — 本机信任模式', () => {
+  const noService = () => undefined
+  const serviceWithoutSource = {
+    getContext: () => null,
+    isKnownQqSession: () => false,
+    isRegistryHealthy: () => true,
+  }
+  const knownQqNoLive = {
+    getContext: () => null,
+    isKnownQqSession: () => true,
+    isRegistryHealthy: () => true,
+  }
+  const brokenRegistry = {
+    getContext: () => null,
+    isKnownQqSession: () => false,
+    isRegistryHealthy: () => false,
+  }
+  const unknownPlatform = {
+    getContext: () => ({
+      platform: 'wechat',
+      conversationType: 'c2c',
+      isPrivate: true,
+      ownerId: 'x',
+      identified: true,
+    }),
+    isKnownQqSession: () => false,
+    isRegistryHealthy: () => true,
+  }
+
+  it('默认（关闭）时 PC-only 安装仍然拒绝', () => {
+    const gate = createOwnerGate(noService, { qqPersonalMemory: true })
+    const decision = gate({ sessionId: 'sess-desktop' })
+    expect(decision.allowed).toBe(false)
+  })
+
+  it('开启后，无 QQ 服务的本机会话放行到 desktop 通道', () => {
+    const gate = createOwnerGate(noService, { qqPersonalMemory: true, trustLocalSessions: true })
+    const decision = gate({ sessionId: 'sess-desktop' })
+    expect(decision.allowed).toBe(true)
+    expect(decision.channel).toBe('desktop')
+    // 本机会话没有 QQ Owner 身份：不能伪造出一个 ownerId。
+    expect(decision.ownerId).toBeNull()
+  })
+
+  it('开启后，无 live 来源且非 QQ 会话的会话放行', () => {
+    const gate = createOwnerGate(() => serviceWithoutSource, { qqPersonalMemory: true, trustLocalSessions: true })
+    expect(gate({ sessionId: 'sess-desktop' }).allowed).toBe(true)
+  })
+
+  it('已知 QQ 会话但 live 来源消失时，开关不得放行（qq-missing）', () => {
+    const gate = createOwnerGate(() => knownQqNoLive, { qqPersonalMemory: true, trustLocalSessions: true })
+    const decision = gate({ sessionId: 'sess-qq-orphan' })
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toContain('来源')
+  })
+
+  it('注册表读取失败时不得放行（unknown 里可能藏着 QQ 会话）', () => {
+    const gate = createOwnerGate(() => brokenRegistry, { qqPersonalMemory: true, trustLocalSessions: true })
+    expect(gate({ sessionId: 'sess-unknown' }).allowed).toBe(false)
+  })
+
+  it('live 来源的平台不可识别时不得放行（那不是「没有通道」）', () => {
+    const gate = createOwnerGate(() => unknownPlatform, { qqPersonalMemory: true, trustLocalSessions: true })
+    expect(gate({ sessionId: 'sess-wechat' }).allowed).toBe(false)
+  })
+
+  it('来源对象畸形（有对象但缺 platform）时不得放行', () => {
+    // 服务「回答了但不完整」和「什么都没回答」不是一回事：前者是我们不理解的
+    // 响应，不能因为开关打开就当成没有通道。
+    const malformed = {
+      getContext: () => ({}) as never,
+      isKnownQqSession: () => false,
+      isRegistryHealthy: () => true,
+    }
+    const gate = createOwnerGate(() => malformed, { qqPersonalMemory: true, trustLocalSessions: true })
+    expect(gate({ sessionId: 'sess-malformed' }).allowed).toBe(false)
+  })
+
+  it('缺少 sessionId 时不得放行', () => {
+    const gate = createOwnerGate(noService, { qqPersonalMemory: true, trustLocalSessions: true })
+    expect(gate({ sessionId: null }).allowed).toBe(false)
+  })
+
+  it('开关不影响 QQ 群聊的拒绝矩阵', () => {
+    const groupSource = {
+      getContext: () => ({
+        platform: 'qq',
+        conversationType: 'group',
+        isPrivate: false,
+        ownerId: 'owner-uuid',
+        identified: true,
+      }),
+      isKnownQqSession: () => true,
+      isRegistryHealthy: () => true,
+    }
+    const gate = createOwnerGate(() => groupSource, { qqPersonalMemory: true, trustLocalSessions: true })
+    expect(gate({ sessionId: 'sess-group' }).allowed).toBe(false)
+  })
+})

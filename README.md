@@ -7,7 +7,7 @@
 <p align="center"><strong>Long-term memory for DeepSeek Harness, stored as a plain Markdown vault you own.</strong></p>
 
 <p align="center">
-  A first-level sidebar page, four model tools, token-budgeted recall, and a durable
+  A first-level sidebar page, nine model tools, token-budgeted recall, and a durable
   history journal — no database, no telemetry, no cloud. Your memories stay as
   Obsidian-compatible <code>.md</code> files on disk.
 </p>
@@ -34,8 +34,9 @@
   <a href="docs/README.zh-CN.md"><strong>简体中文</strong></a>
 </p>
 
-> **Project status (2026-10-29).** `dsh-longterm-memory@0.1.8` is published on npm and
-> attached to the
+> **Project status (2026-11-14).** This repository is at `0.2.0`; `0.1.8` is the last version
+> published on npm. 0.2.0 adds a first-level tab, 9 RPCs and 5 model tools, so upgrading is a
+> deliberate step — read [What's new](#whats-new) first. The release is attached to the
 > [latest GitHub Release](https://github.com/bufan528/dsh-longterm-memory/releases/latest)
 > (with a version-agnostic `dsh-longterm-memory.tgz` asset), and the plugin is **listed in
 > two community registries**:
@@ -56,6 +57,15 @@
 ---
 
 ## What's new
+
+**0.2.0** is a breaking release: the management page gains a first-level tab (伙伴中心 / Companion
+centre) with eight panes — seven tabs in total — the RPC surface grows from 50 to 59 methods, and
+the model gets five action tools alongside the four memory tools. Stickers, reminders and persona documents become
+vault-owned files (`Companion/`, `Reminders/`), each with its own delivery rhythm; persona
+evolution is queued for review and undoable; and the Owner gate gains an opt-in local-session
+switch so a desktop install can read its own memory. Stored files remain compatible — only the
+surface grew. See [CHANGELOG.md](CHANGELOG.md) for the full list and the four bugs found by
+round-trip verification.
 
 **0.1.8** removes an experimental QQ message-merge control surface from the QQ tab. The tab
 is back to what this plugin owns: connection status, memory-linkage policy, session
@@ -119,8 +129,8 @@ Vault makes the opposite trade-off:
 
 | | |
 |---|---|
-| **First-level sidebar page** | Registers a `sidebar.panellist` entry and a full management page (**overview / search / manage / inbox / QQ integration / settings**) — not a chat tab. |
-| **Four model tools** | `memory_search`, `memory_get`, `memory_save`, `memory_forget` (save refuses credential-like content). |
+| **First-level sidebar page** | Registers a `sidebar.panellist` entry and a full management page (**overview / search / manage / inbox / QQ integration / companion centre / settings**) — not a chat tab. |
+| **Nine model tools** | Memory: `memory_search`, `memory_get`, `memory_save`, `memory_forget` (save refuses credential-like content). Life: `sticker_pick`, `sticker_ingest`, `reminder_create`, `reminder_list`, `reminder_complete`. |
 | **Automatic extraction** | Rule-based, fully local candidate extraction at the real `turn/end` boundary. Optional model-assisted extraction is **off by default**. |
 | **Ranked recall** | BM25-style lexical ranking over Markdown, with type/status/tag filters and a token budget. |
 | **Memory lifecycle** | `pending → active → stale / superseded / archived / conflict`, plus `low/medium/high` confidence. Low confidence and sensitive content wait in the Inbox for human confirmation. |
@@ -128,6 +138,9 @@ Vault makes the opposite trade-off:
 | **Conflict handling** | Conflicting facts are kept side by side, never silently overwritten; a conflict-resolution page supports keep / merge / both. |
 | **Crash-safe writes** | Single-file atomic replace, per-file lock, optimistic checksum concurrency, durable journal outbox with idempotent recovery. |
 | **Obsidian compatible** | The vault carries `.obsidian/`, `[[wikilinks]]`, stable frontmatter and a human-readable `Index/`. |
+| **Companion centre (since 0.2.0)** | A first-level tab with eight panes: overview, persona, shared memory, inbox, stickers, reminders, privacy, diagnostics. Persona voice anchors, a sticker library with previews and a send rhythm, reminder capture in natural language, and persona evolution that stays review-gated and undoable. |
+| **Delivery rhythms, not hope** | Stickers obey a cooldown, a 24 h ceiling, quiet tags and an optional probability gate; reminders obey quiet hours (22:00-08:00) and exponential backoff (15 min × 1.6, five attempts). Both live in the vault, and a refusal always carries the reason and the retry instant. |
+| **Auto-collect from chat** | Reaction images from a chat are saved to the library on the model's own initiative — at most three a day, never screenshots, documents or real photos. Toggle it under Settings → extraction. |
 | **Bilingual UI** | Chinese and English (`language: zh | en`). |
 | **Optional QQ integration tab** | Status / detection / linkage policy / diagnostics for the official `@tencent-connect/dsh-qqbot` — read-only where it can be, never reimplements the QQ protocol, never touches credentials. |
 | **No runtime dependency on `@deepseek-ai/*`** | The host half only uses the Cordis context passed in, so DSH internals can change without breaking the bundle. |
@@ -287,6 +300,12 @@ DSH Memory/
 ├── Archive/  Conflicts/       # retired / contradictory memories
 ├── Index/                     # human-readable index (regenerated)
 ├── History/                   # change-history notes
+├── Companion/                 # persona documents (since 0.2.0)
+│   ├── Persona.md             # name, address, tone, catchphrases, avoid
+│   ├── Examples/              # voice anchors, one file per preset
+│   ├── Stickers/              # catalog.json, policy.json, image files
+│   └── Evolution/             # suggestions.json (review queue)
+├── Reminders/                 # one note per reminder, plus policy.json
 └── .dsh-memory/               # config.json, index.json, journal/, quarantine/
 ```
 
@@ -319,9 +338,9 @@ from your profile's `cordis.patch.yml`.
 
 ## QQ integration (optional, since 0.1.5)
 
-The sixth tab is **QQ 接入 / QQ access**; the tab order is
-`记忆总览 | 记忆检索 | 记忆管理 | 收件箱 | QQ 接入 | 设置`
-(overview · search · manage · inbox · QQ access · settings). It is a **status,
+The fifth tab is **QQ 接入 / QQ access**; the full tab order is
+`记忆总览 | 记忆检索 | 记忆管理 | 收件箱 | QQ 接入 | 伙伴中心 | 设置`
+(overview · search · manage · inbox · QQ access · companion centre · settings). It is a **status,
 navigation, policy and diagnostics** page: it never reimplements the QQ protocol and
 never copies the official connector's code.
 
@@ -393,6 +412,42 @@ Then bind it from the in-app **设置 → QQ 机器人** panel or the right-side
 **QQ 机器人绑定** tab (0.5.1+ ships the in-app UI; older versions only print a
 terminal QR code). The official plugin is a separate project; this plugin only reads
 its binding status.
+
+## Companion centre (since 0.2.0)
+
+A first-level tab, not a chat tab. Eight panes share one set of vault-owned stores, so the page
+works without the QQ plugin being installed at all:
+
+| Pane | What it is for |
+|---|---|
+| 总览 Overview | Four numbers: memories, pending review, conflicts, link state. |
+| 人格中心 Persona | `Persona.md` plus voice anchors. Six presets, a two-sided preview, and an evolution queue where every suggestion names the memories it came from. |
+| 共享记忆 Shared | Per-memory visibility between desktop and QQ. |
+| 记忆收件箱 Inbox | Candidate memories waiting for a decision. |
+| 表情图库 Stickers | Import, preview, tag, favourite, and the send rhythm. |
+| 提醒中心 Reminders | Natural-language capture (`明天下午三点`), grouping by local midnight, and the delivery rhythm. |
+| 隐私安全 Privacy | Owner binding, and the local-session trust switch described below. |
+| 运行诊断 Diagnostics | Which execution points the host actually gave us, rather than a green tick that means nothing. |
+
+**Two rhythms, both in the vault.** Stickers: a minimum gap, a 24 h ceiling, quiet tags, optional
+probability. Reminders: quiet hours and an exponential backoff. A refusal is information — the
+model gets the reason and the instant it may try again, so it says "give it a few minutes"
+instead of pretending.
+
+**Persona evolution is review-gated.** Proposals are deterministic (no model call), touch only
+the variable layer (address, catchphrases, avoid, tone), never the fixed core (name, identity,
+boundaries), and stay undoable after acceptance.
+
+### The desktop session gate
+
+Personal memory sits behind an Owner gate that is fail-closed by default. A QQ C2C session is
+allowed by its bound owner; a desktop session has **no** QQ provenance, so it reads nothing —
+which is correct for a shared machine and useless for a single-user install.
+
+`trustLocalSessions` (Settings → 本机会话, off by default) resolves that: when enabled, a session
+with no live provenance, not known to the QQ registry, and with a readable registry is treated as
+local. QQ groups, QQ sessions whose live source vanished, a broken registry, and unrecognised
+platforms are still refused — the switch fills exactly one gap, it does not open the gate.
 
 ## Data safety
 

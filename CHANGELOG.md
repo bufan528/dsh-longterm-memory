@@ -4,7 +4,7 @@ All notable changes to **DSH Memory Vault (`dsh-longterm-memory`)** are document
 here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.2.0] - 2026-11-14
 
 ### Added
 
@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   is never proposed, and nothing applies without a click: the research consensus (GLA, MeKB-Sim)
   is that a persona may drift, but traceably and on purpose.
 - Four RPCs back the queue: `evolutionList` / `evolutionScan` / `evolutionApply` /
-  `evolutionDismiss` (54 host methods, 29 Life-page calls, all with branches).
+  `evolutionDismiss` (59 host methods in total, 35 Life-page calls, all with branches).
 - **伙伴中心（Life Agent）.** An eighth first-level tab with eight panes — overview, persona,
   sharing, review, stickers, reminders, privacy, diagnostics — backed by Vault-owned stores
   (`companion@v1`, `sticker-library@v1`, `reminder-service@v1`). Stickers and reminders moved
@@ -53,6 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **This release is breaking for anything that pinned the old surface.** The management page went
+  from 6 to 7 first-level tabs (`伙伴中心` inserted before `设置`), `RPC_METHODS` grew to 59, and
+  the model now has 9 tools instead of 4. Settings, vault layout and stored files stay backward
+  compatible; the JSON RPC names did not change, only grew. Version bumped 0.1.8 → **0.2.0**.
 - **The entire management UI was rebuilt** against two explicit references: the Apple HIG
   (one primary action per view, content before chrome, depth through surfaces rather than
   outlines) and Disney's animation principles (press-scale as anticipation, a blurred backdrop
@@ -88,6 +92,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   "not before 08:00" instead of implying it will speak at night. Delivery itself remains the
   chat plugin's call; this side provides the decision.
 
+- **Desktop sessions can read memory (opt-in).** The Owner gate's only positive evidence was a
+  live QQ source, which a desktop session never has — so a single-user install saw nothing. New
+  `trustLocalSessions` switch (Settings → 本机会话, **off by default**) treats a session with no
+  live provenance as local, but only when it is not a known QQ session and the QQ registry is
+  readable. QQ groups, QQ sessions whose live source vanished, a broken registry and unrecognised
+  platforms stay refused; the switch fills one gap instead of opening the gate. Design record
+  and the rejected alternatives are in `docs/architecture.md` §11.
 - **Automatic sticker capture from chats.** The chat plugin already downloads incoming images
   and renders `Image: <path>` into the model's context, so capture needs no change on that side:
   the standing prompt block now tells the model when a reusable reaction image is worth keeping,
@@ -138,9 +149,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   restart the suggestion queue appeared empty, and a scan would then rewrite the file from that
   empty cache and erase every applied/dismissed decision. The service now loads once per process
   before list/scan/apply/revert.
-
-### Fixed
-
 - The inbox manual form had been collapsed by default in a previous pass, which broke the
   "add a candidate by hand" path (caught by the real-browser E2E flow). It opens by default
   again; the slide-out transition stays.
@@ -154,10 +162,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Verified
 
-- `npx tsc --noEmit` clean (both configs); `npm run lint` clean (65 source files);
+- `npx tsc --noEmit` clean (both configs); `npm run lint` clean (69 source files);
   `client-bundle` + `i18n-parity` + `dispatch-validation` green; `check-rpc-contract`
-  reports 50 host methods and every Life-page call has a branch.
-- **Full suite:** `npm test` → 71 files / **1046 tests passed**, 0 failed.
+  reports 59 host methods and every Life-page call (35) has a branch.
+- **Full suite** (`scripts/run-isolated-suite.mjs all`, each suite in its own process):
+  **78/78 suites, 1148 cases passed, 0 failed, 0 skipped**, no guard interception.
 - **Real-browser E2E** (`ui-e2e-flows.mjs` against an isolated profile + CLI host + Chrome
   over CDP): **61/61 checks passed**, no error panel, no uncaught page exceptions —
   covering inbox confirm/reject/merge, search → detail → archive/restore/pin, raw Markdown
