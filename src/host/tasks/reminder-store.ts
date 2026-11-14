@@ -22,6 +22,8 @@ import { readFile, readdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
 import { joinFrontmatter, splitFrontmatter } from '../../shared/markdown.js'
+import { DEFAULT_REMINDER_POLICY, normalizeReminderPolicy } from '../../shared/reminder-policy.js'
+import type { ReminderPolicy } from '../../shared/reminder-policy.js'
 import { writeFileAtomic } from '../core/fsx.js'
 
 export const REMINDER_STORE_CONTRACT = 'reminder-store@v1'
@@ -50,6 +52,8 @@ export interface ReminderRecord {
 }
 
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/
+/** Beside the notes, never read as one (load() filters `*.md`). */
+export const REMINDER_POLICY_FILE = 'policy.json'
 const STATUSES: readonly string[] = ['pending', 'done', 'cancelled']
 const DELIVERIES: readonly string[] = ['waiting', 'deferred', 'delivered']
 const UNITS: readonly string[] = ['day', 'week', 'month']
@@ -126,6 +130,36 @@ export class ReminderStore {
   get available(): boolean { return this.root !== null }
   get droppedCount(): number { return this.dropped }
   get recoveredCount(): number { return this.recovered }
+
+  /**
+   * Delivery policy, stored beside the notes.
+   *
+   * `policy.json` is not a reminder: `load()` only reads `*.md`, so the file can
+   * live in the same directory without ever being mistaken for one.
+   */
+  async readPolicy(): Promise<ReminderPolicy> {
+    const root = this.root
+    if (root === null) return { ...DEFAULT_REMINDER_POLICY }
+    try {
+      const raw = JSON.parse(await readFile(join(root, REMINDER_POLICY_FILE), 'utf8')) as unknown
+      // The file is `{ schemaVersion, policy }`. Normalising the wrapper would
+      // find no fields and silently fall back to defaults on every read — which
+      // is exactly the bug this line exists to prevent. A bare policy object is
+      // also accepted, so an older hand-written file still works.
+      const wrapped = (raw !== null && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+      return normalizeReminderPolicy(wrapped['policy'] ?? raw)
+    } catch {
+      return { ...DEFAULT_REMINDER_POLICY }
+    }
+  }
+
+  async writePolicy(policy: ReminderPolicy): Promise<ReminderPolicy> {
+    const root = this.root
+    if (root === null) return policy
+    const normalized = normalizeReminderPolicy(policy)
+    await writeFileAtomic(join(root, REMINDER_POLICY_FILE), `${JSON.stringify({ schemaVersion: 1, policy: normalized }, null, 2)}\n`)
+    return normalized
+  }
 
   /**
    * Read every reminder note.

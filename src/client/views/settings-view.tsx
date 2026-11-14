@@ -65,6 +65,7 @@ export function SettingsView(props: { vault: VaultInfo | null; onChanged: () => 
       redactSecrets: draft.redactSecrets,
       sensitiveNeedsConfirmation: draft.sensitiveNeedsConfirmation,
       maxCandidatesPerTurn: draft.maxCandidatesPerTurn,
+      enableStickerAutoCollect: draft.enableStickerAutoCollect !== false,
     }
     try {
       const result = await save.run(payload)
@@ -228,6 +229,14 @@ export function SettingsView(props: { vault: VaultInfo | null; onChanged: () => 
             patch({ enableLlmExtraction: checked })
           }}
         />
+        <Checkbox
+          checked={draft.enableStickerAutoCollect !== false}
+          label={translate('settings.enableStickerAutoCollect')}
+          onChange={(checked) => {
+            patch({ enableStickerAutoCollect: checked })
+          }}
+        />
+        <span className="lmv-subhead">{translate('settings.enableStickerAutoCollectHint')}</span>
         <Notice kind="warn">{translate('settings.llmPrivacy')}</Notice>
         <Field label={translate('settings.maxCandidatesPerTurn')}>
           <NumberInput

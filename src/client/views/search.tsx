@@ -20,7 +20,7 @@ import type { MemoryStatus, MemoryType } from '../../shared/types.js'
 import { call, useAsync, useDebounced } from '../api.js'
 import { useT } from '../i18n.js'
 import { usePage } from '../page-api.js'
-import { Badge, Button, Card, Checkbox, Collapse, DisclosureChevron, Empty, EnumChips, ErrorNotice, Field, Icon, Loading, NumberInput, TextInput } from '../ui.js'
+import { Badge, Button, Card, Checkbox, Collapse, DisclosureChevron, Empty, EnumChips, ErrorNotice, Field, Icon, NumberInput, Skeleton, TextInput } from '../ui.js'
 import { statusLabel, typeLabel } from '../util.js'
 import { HitRow } from './hit-row.js'
 import { MergeDialog } from './merge.js'
@@ -296,7 +296,7 @@ export function SearchView(props: { tag: string; onTagChange: (tag: string) => v
           <span className="lmv-meta">{translate('search.indexRefreshed')}</span>
         ) : null}
 
-        {results.loading ? <Loading /> : null}
+        {results.loading ? <Skeleton variant="rows" count={4} /> : null}
         {results.error === null ? null : <ErrorNotice error={results.error} onRetry={results.reload} />}
         {results.error !== null || results.loading ? null : hits.length === 0 ? (
           <Empty

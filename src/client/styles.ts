@@ -48,6 +48,13 @@ export const CLIENT_CSS = `
   --lmv-tint:color-mix(in srgb, var(--dsw-alias-brand-primary,#4a8cff) 12%, transparent);
   --lmv-tint-strong:color-mix(in srgb, var(--dsw-alias-brand-primary,#4a8cff) 20%, transparent);
   --lmv-hover:var(--dsw-alias-interactive-bg-hover,#383838);
+  /* Surfaces are mixed *relative to the label colour*, so one rule works in both
+     themes: mixing toward the text colour darkens a white card and lightens a
+     dark one. Absolute tokens cannot do that — in light mode layer-1 and the page
+     are the same white, which is why cards had no visible edge. */
+  --lmv-tray:color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 5%, var(--dsw-alias-bg-layer-1,#252526));
+  --lmv-border:color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 11%, transparent);
+  --lmv-lift:0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 7%, transparent),0 10px 24px -20px color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 30%, transparent);
   --lmv-shadow-1:0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 10%, transparent);
   --lmv-shadow-2:0 1px 2px color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 9%, transparent),0 14px 34px -18px color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 55%, transparent);
   --lmv-shadow-3:0 2px 6px color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 12%, transparent),0 32px 64px -28px color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 70%, transparent);
@@ -55,12 +62,11 @@ export const CLIENT_CSS = `
 .lmv-page{display:flex;flex-direction:column;height:100%;min-height:0;box-sizing:border-box;color:var(--dsw-alias-label-primary,#e6e6e6);background:var(--dsw-alias-bg-base,#1e1e1e);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;font-size:13px;line-height:1.55;-webkit-font-smoothing:antialiased}
 .lmv-page *{box-sizing:border-box}
 .lmv-page button,.lmv-page input,.lmv-page select,.lmv-page textarea{font-family:inherit}
-.lmv-page :focus-visible{outline:2px solid color-mix(in srgb, var(--dsw-alias-brand-primary,#4a8cff) 70%, transparent);outline-offset:2px}
+.lmv-page :focus-visible{outline:2px solid color-mix(in srgb, var(--dsw-alias-brand-primary,#4a8cff) 72%, transparent);outline-offset:2px;border-radius:var(--lmv-r-xs)}
 /* Polished chrome: themed text selection, hairline scrollbars and a soft
    focus halo. Apple's restraint is mostly about what you remove — the default
    OS scrollbar and bright blue selection were the loudest things left. */
 .lmv-page ::selection{background:var(--lmv-tint-strong);color:var(--dsw-alias-label-primary,#e6e6e6)}
-.lmv-page :focus-visible{box-shadow:0 0 0 4px var(--lmv-tint)}
 .lmv-main,.lmv-life,.lmv-side,.lmv-pre,.lmv-modal-body,.lmv-chips-scroll{scrollbar-width:thin;scrollbar-color:color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 18%, transparent) transparent}
 .lmv-main::-webkit-scrollbar,.lmv-life::-webkit-scrollbar,.lmv-side::-webkit-scrollbar,.lmv-pre::-webkit-scrollbar,.lmv-modal-body::-webkit-scrollbar,.lmv-chips-scroll::-webkit-scrollbar{width:8px;height:8px}
 .lmv-main::-webkit-scrollbar-thumb,.lmv-life::-webkit-scrollbar-thumb,.lmv-side::-webkit-scrollbar-thumb,.lmv-pre::-webkit-scrollbar-thumb,.lmv-modal-body::-webkit-scrollbar-thumb,.lmv-chips-scroll::-webkit-scrollbar-thumb{border-radius:999px;background:color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 16%, transparent);border:2px solid transparent;background-clip:padding-box}
@@ -69,7 +75,7 @@ export const CLIENT_CSS = `
 /* ================================================================ shell === */
 .lmv-head{display:flex;align-items:flex-end;gap:16px;padding:18px 24px 12px;flex:0 0 auto;min-width:0}
 .lmv-head-titles{display:flex;flex-direction:column;gap:3px;min-width:0}
-.lmv-title{font-size:21px;line-height:1.2;font-weight:650;letter-spacing:-.015em;margin:0}
+.lmv-title{font-size:21px;line-height:1.2;font-weight:650;letter-spacing:-.015em;margin:0;text-wrap:balance}
 .lmv-subtitle{font-size:11.5px;color:var(--dsw-alias-label-tertiary,#8a8a8a);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:7px;min-width:0}
 .lmv-path{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;opacity:.9}
 .lmv-build{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:10.5px;letter-spacing:.01em;color:var(--dsw-alias-label-tertiary,#8a8a8a);cursor:help;flex:none;opacity:.85}
@@ -77,7 +83,7 @@ export const CLIENT_CSS = `
 .lmv-head-actions{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 
 /* Health capsules: the four numbers that answer "is anything wrong?". */
-.lmv-health{display:flex;align-items:center;gap:6px;padding:3px;border-radius:999px;background:var(--dsw-alias-bg-layer-1,#252526);border:1px solid var(--dsw-alias-border-l1,#2e2e2e)}
+.lmv-health{display:flex;align-items:center;gap:6px;padding:3px;border-radius:999px;background:var(--lmv-tray);border:1px solid var(--lmv-border)}
 .lmv-pill{display:inline-flex;align-items:baseline;gap:5px;padding:3px 10px;border-radius:999px;font-size:11px;color:var(--dsw-alias-label-tertiary,#8a8a8a);white-space:nowrap;transition:background var(--lmv-base) var(--lmv-ease-out)}
 .lmv-pill-value{font-size:12px;font-weight:620;color:var(--dsw-alias-label-primary,#e6e6e6);font-variant-numeric:tabular-nums}
 .lmv-pill-warn .lmv-pill-value{color:var(--dsw-alias-state-warn-primary,#d29922)}
@@ -86,13 +92,13 @@ export const CLIENT_CSS = `
 .lmv-pill-ok .lmv-pill-label{color:var(--dsw-alias-state-success-primary,#3fb950)}
 
 /* Segmented control. The active segment lifts onto its own surface. */
-.lmv-nav{display:flex;gap:2px;margin:0 24px 14px;padding:4px;border-radius:var(--lmv-r-md);background:var(--dsw-alias-bg-layer-1,#252526);border:1px solid var(--dsw-alias-border-l1,#2e2e2e);flex:0 0 auto;overflow-x:auto;scrollbar-width:none}
+.lmv-nav{display:flex;gap:2px;margin:0 24px 14px;padding:4px;border-radius:var(--lmv-r-md);background:var(--lmv-tray);border:1px solid var(--lmv-border);flex:0 0 auto;overflow-x:auto;scrollbar-width:none}
 .lmv-nav::-webkit-scrollbar{display:none}
 .lmv-nav-btn{appearance:none;font:inherit;font-size:12.5px;font-weight:500;display:inline-flex;align-items:center;gap:6px;border:1px solid transparent;background:transparent;color:var(--dsw-alias-label-secondary,#b8b8b8);padding:5px 12px;border-radius:var(--lmv-r-sm);cursor:pointer;white-space:nowrap;transition:color var(--lmv-fast) var(--lmv-ease-out),background var(--lmv-base) var(--lmv-ease-out),transform var(--lmv-fast) var(--lmv-ease-out)}
 .lmv-nav-btn:hover{background:color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 6%, transparent);color:var(--dsw-alias-label-primary,#f5f5f5)}
 .lmv-nav-btn:active{transform:scale(.97)}
 .lmv-nav-btn svg{opacity:.75;flex:0 0 auto}
-.lmv-nav-btn-on{background:var(--dsw-alias-bg-layer-2,#2d2d2e);color:var(--dsw-alias-label-primary,#f5f5f5);border-color:var(--dsw-alias-border-l2,#3a3a3a);box-shadow:var(--lmv-shadow-1)}
+.lmv-nav-btn-on{background:var(--dsw-alias-bg-layer-2,#2d2d2e);color:var(--dsw-alias-label-primary,#f5f5f5);border-color:var(--dsw-alias-border-l2,#3a3a3a);box-shadow:var(--lmv-shadow-1),inset 0 -1px 0 color-mix(in srgb, var(--dsw-alias-brand-primary,#4a8cff) 45%, transparent)}
 .lmv-nav-btn-on svg{opacity:1;color:var(--dsw-alias-brand-primary,#4a8cff)}
 .lmv-nav-count{font-size:10.5px;font-weight:600;padding:0 5px;border-radius:999px;background:color-mix(in srgb, var(--dsw-alias-state-warn-primary,#d29922) 22%, transparent);color:var(--dsw-alias-state-warn-primary,#d29922);font-variant-numeric:tabular-nums}
 
@@ -104,18 +110,18 @@ export const CLIENT_CSS = `
 .lmv-fade[data-dir="back"]{animation:lmv-enter-back var(--lmv-base) var(--lmv-ease-out) both}
 @keyframes lmv-enter-forward{from{opacity:0;transform:translate3d(10px,0,0)}to{opacity:1;transform:none}}
 @keyframes lmv-enter-back{from{opacity:0;transform:translate3d(-10px,0,0)}to{opacity:1;transform:none}}
-.lmv-life-body[data-dir="forward"]{animation:lmv-enter-forward var(--lmv-fast) linear both}
-.lmv-life-body[data-dir="back"]{animation:lmv-enter-back var(--lmv-fast) linear both}
-.lmv-main{flex:1 1 auto;min-width:0;min-height:0;overflow:auto;padding:4px 24px 40px;display:flex;flex-direction:column;gap:14px}
+.lmv-life-body[data-dir="forward"]{animation:lmv-enter-forward var(--lmv-base) var(--lmv-ease-out) both}
+.lmv-life-body[data-dir="back"]{animation:lmv-enter-back var(--lmv-base) var(--lmv-ease-out) both}
+.lmv-main{flex:1 1 auto;min-width:0;min-height:0;overflow:auto;scrollbar-gutter:stable;overscroll-behavior:contain;padding:4px 24px 40px;display:flex;flex-direction:column;gap:14px}
 .lmv-main>*{animation:lmv-rise var(--lmv-slow) var(--lmv-ease-out) both}
 .lmv-main>*:nth-child(2){animation-delay:34ms}
 .lmv-main>*:nth-child(3){animation-delay:68ms}
 .lmv-main>*:nth-child(4){animation-delay:102ms}
 .lmv-main>*:nth-child(n+5){animation-delay:132ms}
-.lmv-side{flex:0 0 264px;min-height:0;overflow:auto;border-right:1px solid var(--dsw-alias-border-l1,#2e2e2e);padding:14px;display:flex;flex-direction:column;gap:10px}
+.lmv-side{flex:0 0 264px;min-height:0;overflow:auto;overscroll-behavior:contain;border-right:1px solid var(--dsw-alias-border-l1,#2e2e2e);padding:14px;display:flex;flex-direction:column;gap:10px}
 
 /* ================================================================= card === */
-.lmv-card{background:var(--dsw-alias-bg-layer-1,#252526);border:1px solid var(--dsw-alias-border-l1,#2e2e2e);border-radius:var(--lmv-r-lg);padding:16px 18px 18px;display:flex;flex-direction:column;gap:12px;min-width:0;box-shadow:var(--lmv-shadow-1)}
+.lmv-card{background:var(--dsw-alias-bg-layer-1,#252526);border:1px solid var(--lmv-border);border-radius:var(--lmv-r-lg);padding:16px 18px 18px;display:flex;flex-direction:column;gap:12px;min-width:0;box-shadow:var(--lmv-lift)}
 .lmv-card-head{display:flex;align-items:center;gap:10px;min-width:0;flex-wrap:wrap}
 .lmv-card-title{font-size:13.5px;font-weight:620;letter-spacing:-.005em;display:flex;align-items:center;gap:7px}
 .lmv-card-title svg{color:var(--dsw-alias-label-tertiary,#8a8a8a)}
@@ -123,9 +129,6 @@ export const CLIENT_CSS = `
 /* Disclosure: one glyph, one continuous turn (no icon swap). */
 .lmv-chev{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;transition:transform var(--lmv-base) var(--lmv-ease-spring)}
 .lmv-chev-open{transform:rotate(90deg)}
-/* Secondary action: the title glyph answers the pointer while the card lifts. */
-.lmv-card-title svg{transition:transform var(--lmv-base) var(--lmv-ease-spring)}
-.lmv-card:hover .lmv-card-title svg{transform:translateY(-1px)}
 .lmv-kicker{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dsw-alias-label-tertiary,#8a8a8a);font-weight:600}
 .lmv-kicker-row{display:flex;align-items:center;gap:7px;margin-top:5px;min-width:0}
 .lmv-kicker-count{font-size:10px;font-weight:600;letter-spacing:0;padding:0 5px;border-radius:999px;background:color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 11%, transparent);color:var(--dsw-alias-label-tertiary,#8a8a8a);font-variant-numeric:tabular-nums}
@@ -140,6 +143,12 @@ export const CLIENT_CSS = `
 .lmv-stat-value{font-size:20px;line-height:1.15;font-weight:640;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .lmv-stat-label{font-size:11px;color:var(--dsw-alias-label-tertiary,#8a8a8a);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lmv-grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:14px;align-items:start;min-width:0}
+/* Purpose-built form rows. auto-fit with a 310px minimum produced three
+   columns plus one orphan on a 1044px card — an even split is the whole point. */
+.lmv-form-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 14px;min-width:0}
+.lmv-form-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 14px;min-width:0}
+@media (max-width:1180px){.lmv-form-4{grid-template-columns:repeat(2,minmax(0,1fr))}.lmv-form-3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.lmv-form-4,.lmv-form-3{grid-template-columns:minmax(0,1fr)}}
 
 /* Overview hero: path, state, and the one primary action, all on one band. */
 .lmv-hero{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;padding:16px 18px;border-radius:var(--lmv-r-xl);border:1px solid var(--dsw-alias-border-l1,#2e2e2e);background:linear-gradient(132deg, var(--lmv-tint), transparent 56%), var(--dsw-alias-bg-layer-1,#252526);box-shadow:var(--lmv-shadow-1);min-width:0}
@@ -177,12 +186,20 @@ button.lmv-attn-cell:hover{transform:translateY(-1px);border-color:var(--dsw-ali
 .lmv-ripple{position:absolute;border-radius:50%;pointer-events:none;background:currentColor;opacity:.18;transform:scale(0);animation:lmv-ripple 320ms var(--lmv-ease-out) forwards}
 @keyframes lmv-ripple{to{transform:scale(1);opacity:0}}
 .lmv-btn:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,#383838)}
-.lmv-btn:active:not(:disabled){transform:scale(.965)}
+/* The lift is for standalone actions only. In a dense row or a sticker tray a
+   1px hop on every icon button reads as jitter, so small controls keep colour
+   feedback and skip the movement. */
+.lmv-btn:not(.lmv-btn-sm):not(.lmv-icon-btn):hover:not(:disabled){transform:translateY(-1px);box-shadow:var(--lmv-shadow-2)}
+/* Explicit opt-out beats a complex :not() — one unsupported selector there would
+   drop the whole rule and silently remove the lift everywhere. */
+.lmv-sticker-actions .lmv-btn:hover:not(:disabled){transform:none;box-shadow:none}
+.lmv-btn:active:not(:disabled){transform:translateY(0) scale(.965);box-shadow:none}
 /* Secondary action: the lift shadow melts away while pressed — the button is
    physically down, not just smaller. */
 .lmv-btn-primary:active:not(:disabled){box-shadow:none}
 .lmv-btn:disabled{opacity:.42;cursor:not-allowed}
-.lmv-btn svg{flex:0 0 auto}
+.lmv-btn svg{flex:0 0 auto;transition:transform var(--lmv-base) var(--lmv-ease-out)}
+.lmv-btn:hover:not(:disabled) svg{transform:translateX(1px)}
 .lmv-btn-primary{background:linear-gradient(180deg, color-mix(in srgb, var(--dsw-alias-button-primary-fill,#3b6fd4) 84%, var(--dsw-alias-label-primary-foreground,#fff)), var(--dsw-alias-button-primary-fill,#3b6fd4));border-color:color-mix(in srgb, var(--dsw-alias-button-primary-fill,#3b6fd4) 70%, var(--dsw-alias-border-l2,#3a3a3a));color:var(--dsw-alias-label-primary-foreground,#ffffff);box-shadow:var(--lmv-shadow-1)}
 .lmv-btn-primary:hover:not(:disabled){background:var(--dsw-alias-brand-primary,#4a8cff);border-color:var(--dsw-alias-brand-primary,#4a8cff)}
 .lmv-btn-ghost{background:transparent;border-color:transparent;color:var(--dsw-alias-label-secondary,#b8b8b8)}
@@ -208,24 +225,28 @@ button.lmv-attn-cell:hover{transform:translateY(-1px);border-color:var(--dsw-ali
 .lmv-check{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--dsw-alias-label-secondary,#b8b8b8);cursor:pointer;user-select:none;min-height:26px}
 .lmv-check input{accent-color:var(--dsw-alias-brand-primary,#4a8cff);margin:0;width:14px;height:14px}
 .lmv-field{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 170px}
+/* A checkbox inside a field sits where an input would: same 30px baseline, so a
+   row of mixed controls reads as one line instead of two. */
+.lmv-field .lmv-check{min-height:30px}
 .lmv-field-label{font-size:11px;font-weight:560;color:var(--dsw-alias-label-tertiary,#8a8a8a);letter-spacing:.01em}
 .lmv-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
 .lmv-toolbar>.lmv-field{flex:0 1 auto}
 
 /* ============================================================== surfaces === */
 .lmv-list{display:flex;flex-direction:column;gap:6px;min-width:0}
-.lmv-row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;padding:9px 11px;border:1px solid var(--dsw-alias-border-l1,#2e2e2e);border-radius:var(--lmv-r-md);background:color-mix(in srgb, var(--dsw-alias-bg-layer-2,#2d2d2e) 55%, transparent);min-width:0;transition:border-color var(--lmv-base) var(--lmv-ease-out),background var(--lmv-base) var(--lmv-ease-out),transform var(--lmv-fast) var(--lmv-ease-out);animation:lmv-slide-in var(--lmv-base) var(--lmv-ease-out) both}
+.lmv-row{display:flex;gap:9px;align-items:center;flex-wrap:wrap;padding:9px 11px;border:1px solid var(--dsw-alias-border-l1,#2e2e2e);border-radius:var(--lmv-r-md);background:color-mix(in srgb, var(--dsw-alias-bg-layer-2,#2d2d2e) 55%, transparent);min-width:0;transition:border-color var(--lmv-base) var(--lmv-ease-out),background var(--lmv-base) var(--lmv-ease-out),transform var(--lmv-fast) var(--lmv-ease-out);animation:lmv-slide-in 170ms var(--lmv-ease-out) both}
 /* Slide, never fade: a row is interactive the moment it exists. An opacity-0
    first frame made freshly added candidates invisible-and-unclickable for a
    few hundred ms, which the real-browser E2E caught. */
 @keyframes lmv-slide-in{from{transform:translateY(7px)}to{transform:none}}
 /* Entrance wave across list rows, capped so long lists land quickly. */
 .lmv-row:nth-child(2){animation-delay:24ms}
-.lmv-row:nth-child(3){animation-delay:48ms}
-.lmv-row:nth-child(4){animation-delay:72ms}
-.lmv-row:nth-child(5){animation-delay:96ms}
-.lmv-row:nth-child(n+6){animation-delay:120ms}
+.lmv-row:nth-child(3){animation-delay:28ms}
+.lmv-row:nth-child(4){animation-delay:42ms}
+.lmv-row:nth-child(5){animation-delay:56ms}
+.lmv-row:nth-child(n+6){animation-delay:62ms}
 .lmv-list>.lmv-row:hover{border-color:var(--dsw-alias-border-l2,#3a3a3a)}
+button.lmv-row:active{transform:scale(.994);background:color-mix(in srgb, var(--dsw-alias-bg-layer-2,#2d2d2e) 78%, transparent)}
 .lmv-row-click{cursor:pointer;text-align:left;font:inherit;color:inherit;width:100%;background:transparent;border:0;padding:0;border-radius:var(--lmv-r-xs);display:flex;gap:9px;align-items:flex-start}
 .lmv-row-click:hover .lmv-row-title{color:var(--dsw-alias-brand-primary,#4a8cff)}
 .lmv-row-on{border-color:color-mix(in srgb, var(--dsw-alias-brand-primary,#4a8cff) 65%, transparent);background:var(--lmv-tint)}
@@ -235,11 +256,26 @@ button.lmv-attn-cell:hover{transform:translateY(-1px);border-color:var(--dsw-ali
 .lmv-row-title{font-size:13px;font-weight:540;overflow-wrap:anywhere;transition:color var(--lmv-fast) var(--lmv-ease-out)}
 .lmv-row-preview{font-size:12px;color:var(--dsw-alias-label-secondary,#b8b8b8);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .lmv-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:var(--dsw-alias-label-tertiary,#8a8a8a);min-width:0}
+/* Skeleton: a list that is arriving should look like the list, not like a
+   spinner. The shimmer is a single travelling highlight (slow-in/slow-out), so
+   the eye reads "content is on its way" without a rotating distraction. */
+.lmv-skel{position:relative;overflow:hidden;border-radius:var(--lmv-r-sm);background:color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 7%, transparent)}
+.lmv-skel::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 11%, transparent),transparent);animation:lmv-shimmer 1.2s var(--lmv-ease-in-out) infinite}
+.lmv-skel-line{height:9px}
+.lmv-skel-title{height:12px;width:36%}
+.lmv-skel-card{padding:14px 16px;border:1px solid var(--dsw-alias-border-l1,#2e2e2e);border-radius:var(--lmv-r-lg);background:var(--dsw-alias-bg-layer-1,#252526);display:flex;flex-direction:column;gap:9px}
+.lmv-skel-row{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l1,#2e2e2e);border-radius:var(--lmv-r-md)}
+.lmv-skel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}
+.lmv-skel-tile{aspect-ratio:1/1;border-radius:var(--lmv-r-md)}
+@keyframes lmv-shimmer{to{transform:translateX(100%)}}
+
 .lmv-badge{font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid var(--dsw-alias-border-l2,#3a3a3a);color:var(--dsw-alias-label-secondary,#b8b8b8);white-space:nowrap;background:color-mix(in srgb, var(--dsw-alias-bg-layer-2,#2d2d2e) 60%, transparent)}
 .lmv-badge-ok{color:var(--dsw-alias-state-success-primary,#3fb950);border-color:color-mix(in srgb, var(--dsw-alias-state-success-primary,#3fb950) 45%, transparent)}
 .lmv-badge-warn{color:var(--dsw-alias-state-warn-primary,#d29922);border-color:color-mix(in srgb, var(--dsw-alias-state-warn-primary,#d29922) 45%, transparent)}
 .lmv-badge-error{color:var(--dsw-alias-state-error-primary,#e5534b);border-color:color-mix(in srgb, var(--dsw-alias-state-error-primary,#e5534b) 45%, transparent)}
 .lmv-badge-brand{color:var(--dsw-alias-brand-primary,#4a8cff);border-color:color-mix(in srgb, var(--dsw-alias-brand-primary,#4a8cff) 45%, transparent);background:var(--lmv-tint)}
+/* Context, not a count: no border, so "今晚" stops competing with the numbers. */
+.lmv-badge-quiet{border-color:transparent;background:transparent;color:var(--dsw-alias-label-tertiary,#8a8a8a);padding-left:2px}
 .lmv-tag{cursor:pointer;font:inherit;font-size:11.5px;padding:2px 10px;border-radius:999px;background:color-mix(in srgb, var(--dsw-alias-bg-layer-2,#2d2d2e) 70%, transparent);border:1px solid var(--dsw-alias-border-l2,#3a3a3a);color:var(--dsw-alias-label-secondary,#b8b8b8);transition:color var(--lmv-fast) var(--lmv-ease-out),background var(--lmv-fast) var(--lmv-ease-out),border-color var(--lmv-fast) var(--lmv-ease-out),transform var(--lmv-fast) var(--lmv-ease-out)}
 .lmv-tag:hover{color:var(--dsw-alias-label-primary,#f5f5f5);background:var(--dsw-alias-interactive-bg-hover,#383838)}
 .lmv-tag:active{transform:scale(.96)}
@@ -269,19 +305,20 @@ button.lmv-attn-cell:hover{transform:translateY(-1px);border-color:var(--dsw-ali
 .lmv-notice-ok .lmv-notice-icon{background:color-mix(in srgb, var(--dsw-alias-state-success-primary,#3fb950) 20%, transparent)}
 .lmv-empty{padding:18px;text-align:center;font-size:12px;color:var(--dsw-alias-label-tertiary,#8a8a8a)}
 .lmv-empty-state{display:flex;flex-direction:column;align-items:center;gap:6px;padding:26px 16px;text-align:center}
-.lmv-empty-icon{width:44px;height:44px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:var(--dsw-alias-label-tertiary,#8a8a8a);background:color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 6%, transparent);border:1px solid var(--dsw-alias-border-l1,#2e2e2e);animation:lmv-float 3.6s var(--lmv-ease-in-out) infinite}
-@keyframes lmv-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
-.lmv-empty-title{font-size:13px;font-weight:580;color:var(--dsw-alias-label-primary,#e6e6e6)}
+.lmv-empty-icon{width:44px;height:44px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:var(--dsw-alias-label-tertiary,#8a8a8a);background:color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 6%, transparent);border:1px solid var(--dsw-alias-border-l1,#2e2e2e);animation:lmv-float 4s var(--lmv-ease-in-out) 1 both}
+@keyframes lmv-float{0%{transform:translateY(0)}38%{transform:translateY(-4px)}100%{transform:translateY(0)}}
+.lmv-empty-title{font-size:13px;font-weight:580;color:var(--dsw-alias-label-primary,#e6e6e6);text-wrap:balance}
 .lmv-empty-hint{font-size:12px;color:var(--dsw-alias-label-tertiary,#8a8a8a);max-width:44ch;line-height:1.6}
 .lmv-empty-action{margin-top:4px}
 .lmv-loading{display:flex;gap:9px;align-items:center;font-size:12px;color:var(--dsw-alias-label-secondary,#b8b8b8);padding:8px 0}
 .lmv-spin{width:13px;height:13px;border-radius:50%;border:2px solid var(--dsw-alias-border-l2,#3a3a3a);border-top-color:var(--dsw-alias-brand-primary,#4a8cff);animation:lmv-spin .75s linear infinite;flex:0 0 auto}
-.lmv-backdrop{position:fixed;inset:0;background:color-mix(in srgb, var(--dsw-alias-bg-base,#1e1e1e) 82%, transparent);backdrop-filter:blur(6px) saturate(120%);display:flex;align-items:center;justify-content:center;z-index:60;padding:24px;animation:lmv-fade var(--lmv-fast) linear both}
+.lmv-backdrop{position:fixed;inset:0;background:color-mix(in srgb, var(--dsw-alias-bg-base,#1e1e1e) 82%, transparent);backdrop-filter:blur(6px) saturate(120%);display:flex;align-items:center;justify-content:center;z-index:60;padding:24px;animation:lmv-fade var(--lmv-base) var(--lmv-ease-out) both}
 .lmv-modal{background:var(--dsw-alias-bg-layer-1,#252526);border:1px solid var(--dsw-alias-border-l2,#3a3a3a);border-radius:var(--lmv-r-xl);max-width:620px;width:100%;max-height:82vh;display:flex;flex-direction:column;color:var(--dsw-alias-label-primary,#e6e6e6);min-width:0;box-shadow:var(--lmv-shadow-3);animation:lmv-sheet var(--lmv-slow) var(--lmv-ease-spring) both}
 .lmv-modal-head{padding:14px 16px;border-bottom:1px solid var(--dsw-alias-border-l1,#2e2e2e);font-size:13.5px;font-weight:620;display:flex;align-items:center;gap:8px}
 .lmv-modal-body{padding:16px;overflow:auto;display:flex;flex-direction:column;gap:11px;min-height:0}
 .lmv-modal-foot{padding:13px 16px;border-top:1px solid var(--dsw-alias-border-l1,#2e2e2e);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
-.lmv-toasts{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:70;max-width:380px}
+.lmv-toasts{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:70;max-width:380px;pointer-events:none}
+.lmv-toast{pointer-events:auto}
 .lmv-toast{display:flex;align-items:flex-start;gap:8px;padding:10px 14px;border-radius:var(--lmv-r-md);font-size:12.5px;background:var(--dsw-alias-bg-layer-2,#2d2d2e);border:1px solid var(--dsw-alias-border-l2,#3a3a3a);color:var(--dsw-alias-label-primary,#e6e6e6);overflow-wrap:anywhere;box-shadow:var(--lmv-shadow-2);animation:lmv-toast var(--lmv-slow) var(--lmv-ease-spring) both}
 .lmv-toast-error{border-color:color-mix(in srgb, var(--dsw-alias-state-error-primary,#e5534b) 55%, transparent);color:var(--dsw-alias-state-error-primary,#e5534b)}
 .lmv-toast-ok{border-color:color-mix(in srgb, var(--dsw-alias-state-success-primary,#3fb950) 55%, transparent);color:var(--dsw-alias-state-success-primary,#3fb950)}
@@ -304,12 +341,12 @@ button.lmv-attn-cell:hover{transform:translateY(-1px);border-color:var(--dsw-ali
 .lmv-tabs{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 
 /* ============================================================ companion === */
-.lmv-life{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:206px minmax(0,1fr);gap:20px;padding:2px 24px 34px;overflow:auto;align-items:start}
-.lmv-life-nav{display:flex;flex-direction:column;gap:2px;position:sticky;top:2px;padding:6px;border-radius:var(--lmv-r-md);background:color-mix(in srgb, var(--dsw-alias-bg-layer-1,#252526) 70%, transparent);border:1px solid var(--dsw-alias-border-l1,#2e2e2e)}
+.lmv-life{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:206px minmax(0,1fr);gap:20px;padding:2px 24px 34px;overflow:auto;overscroll-behavior:contain;align-items:start}
+.lmv-life-nav{display:flex;flex-direction:column;gap:2px;position:sticky;top:2px;padding:6px;border-radius:var(--lmv-r-md);background:var(--lmv-tray);border:1px solid var(--lmv-border)}
 .lmv-life-nav .lmv-nav-btn{justify-content:flex-start;width:100%;padding:7px 10px;border-radius:var(--lmv-r-sm);font-size:12.5px}
 .lmv-life-nav .lmv-nav-btn-on{background:var(--lmv-tint);border-color:color-mix(in srgb, var(--dsw-alias-brand-primary,#4a8cff) 34%, transparent);color:var(--dsw-alias-label-primary,#f5f5f5);box-shadow:none}
 .lmv-life-nav .lmv-nav-btn-on svg{color:var(--dsw-alias-brand-primary,#4a8cff)}
-.lmv-life-body{min-width:0;display:flex;flex-direction:column;gap:14px;animation:lmv-fade var(--lmv-fast) linear both}
+.lmv-life-body{min-width:0;display:flex;flex-direction:column;gap:14px;animation:lmv-fade var(--lmv-base) var(--lmv-ease-out) both}
 /* Staging (Disney): the pane fades in as a backdrop, then the content rises
    card by card — a wave, not a wall. Replacing the old double-rise. */
 .lmv-life-body>*{animation:lmv-rise var(--lmv-slow) var(--lmv-ease-out) both}
@@ -317,7 +354,7 @@ button.lmv-attn-cell:hover{transform:translateY(-1px);border-color:var(--dsw-ali
 .lmv-life-body>*:nth-child(3){animation-delay:60ms}
 .lmv-life-body>*:nth-child(n+4){animation-delay:90ms}
 .lmv-life-lead{display:flex;flex-direction:column;gap:3px;padding:2px 2px 0}
-.lmv-life-lead h2{margin:0;font-size:16px;font-weight:640;letter-spacing:-.01em}
+.lmv-life-lead h2{margin:0;font-size:16px;font-weight:640;letter-spacing:-.01em;text-wrap:balance}
 .lmv-life-lead p{margin:0;font-size:12px;color:var(--dsw-alias-label-tertiary,#8a8a8a);line-height:1.6}
 
 /* Persona: the preview is the content, the form is the editor. */
@@ -360,6 +397,8 @@ button.lmv-kicker-toggle{appearance:none;font:inherit;cursor:pointer;background:
 button.lmv-kicker-toggle:hover{color:var(--dsw-alias-label-primary,#f5f5f5)}
 button.lmv-kicker-toggle:hover .lmv-kicker-count{background:color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 18%, transparent)}
 .lmv-check-dot{flex:0 0 auto;width:7px;height:7px;border-radius:50%;margin-top:5px;background:var(--dsw-alias-label-tertiary,#8a8a8a)}
+/* An accepted suggestion is settled, not pending: green, no pulse. */
+.lmv-check-dot-ok{background:var(--dsw-alias-state-success-primary,#3fb950)}
 .lmv-check-error{border-color:color-mix(in srgb, var(--dsw-alias-state-error-primary,#e5534b) 42%, transparent)}
 .lmv-check-error .lmv-check-dot{background:var(--dsw-alias-state-error-primary,#e5534b)}
 .lmv-check-warn{border-color:color-mix(in srgb, var(--dsw-alias-state-warn-primary,#d29922) 40%, transparent)}
@@ -373,8 +412,13 @@ button.lmv-kicker-toggle:hover .lmv-kicker-count{background:color-mix(in srgb, v
 .lmv-drop:hover{border-color:color-mix(in srgb, var(--dsw-alias-brand-primary,#4a8cff) 55%, transparent);background:var(--lmv-tint)}
 .lmv-drop-on{border-color:var(--dsw-alias-brand-primary,#4a8cff);background:var(--lmv-tint-strong);transform:scale(1.004)}
 .lmv-drop-title{font-size:12.5px;font-weight:580;color:var(--dsw-alias-label-primary,#e6e6e6)}
+/* Once the library has content the drop zone is a secondary action, not an
+   onboarding hero: collapse it to one quiet row so the stickers start higher. */
+.lmv-drop-compact{flex-direction:row;justify-content:flex-start;align-items:center;text-align:left;padding:10px 14px;gap:10px;border-style:solid;border-width:1px;border-color:var(--lmv-border)}
+.lmv-drop-compact .lmv-drop-hint{display:none}
+.lmv-drop-compact .lmv-drop-title::before{content:"+";margin-right:8px;font-weight:600;color:var(--dsw-alias-brand-primary,#4a8cff)}
 .lmv-drop-hint{font-size:11.5px;color:var(--dsw-alias-label-tertiary,#8a8a8a)}
-.lmv-seg{display:inline-flex;padding:3px;gap:2px;border-radius:var(--lmv-r-sm);background:color-mix(in srgb, var(--dsw-alias-bg-layer-2,#2d2d2e) 70%, transparent);border:1px solid var(--dsw-alias-border-l1,#2e2e2e)}
+.lmv-seg{display:inline-flex;padding:3px;gap:2px;border-radius:var(--lmv-r-sm);background:var(--lmv-tray);border:1px solid var(--lmv-border)}
 .lmv-seg-btn{appearance:none;font:inherit;font-size:11.5px;padding:3px 10px;border-radius:var(--lmv-r-xs);border:0;background:transparent;color:var(--dsw-alias-label-tertiary,#8a8a8a);cursor:pointer;transition:background var(--lmv-fast) var(--lmv-ease-out),color var(--lmv-fast) var(--lmv-ease-out),transform var(--lmv-fast) var(--lmv-ease-out)}
 .lmv-seg-btn:hover{color:var(--dsw-alias-label-primary,#e6e6e6)}
 .lmv-seg-btn:active{transform:scale(.95)}
@@ -397,6 +441,11 @@ button.lmv-kicker-toggle:hover .lmv-kicker-count{background:color-mix(in srgb, v
 .lmv-sticker-ext{position:absolute;right:4px;bottom:4px;font-size:9.5px;letter-spacing:.05em;padding:0 4px;border-radius:4px;background:color-mix(in srgb, var(--dsw-alias-bg-base,#1e1e1e) 78%, transparent);color:var(--dsw-alias-label-tertiary,#8a8a8a);text-transform:uppercase}
 .lmv-sticker-name{font-size:11.5px;font-weight:560;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lmv-sticker-tags{font-size:10.5px;color:var(--dsw-alias-label-tertiary,#8a8a8a);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-height:14px}
+/* Provenance chip: quiet enough to ignore, precise enough to explain where a
+   sticker came from. Tint only — no icon, no border, no shouting. */
+.lmv-src{display:inline-block;margin-right:6px;padding:0 5px;border-radius:4px;font-size:9.5px;line-height:15px;letter-spacing:.02em;vertical-align:1px;background:color-mix(in srgb, var(--dsw-alias-label-primary,#e6e6e6) 10%, transparent);color:var(--dsw-alias-label-secondary,#b8b8b8)}
+.lmv-src-incoming{background:color-mix(in srgb, var(--dsw-alias-brand-primary,#4a8cff) 20%, transparent);color:color-mix(in srgb, var(--dsw-alias-brand-primary,#4a8cff) 55%, var(--dsw-alias-label-primary,#e6e6e6))}
+.lmv-src-stolen{background:color-mix(in srgb, var(--dsw-alias-state-warn-primary,#d29922) 20%, transparent);color:color-mix(in srgb, var(--dsw-alias-state-warn-primary,#d29922) 62%, var(--dsw-alias-label-primary,#e6e6e6))}
 .lmv-sticker-foot{display:flex;align-items:center;gap:4px;justify-content:space-between}
 .lmv-sticker-actions{display:flex;gap:2px;align-items:center}
 .lmv-sticker-actions .lmv-btn{min-height:24px;padding:2px 6px;font-size:11px}
@@ -418,7 +467,7 @@ button.lmv-kicker-toggle:hover .lmv-kicker-count{background:color-mix(in srgb, v
 /* Detail: title and the one contextual action share a head band. */
 .lmv-detail-head{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:var(--lmv-r-lg);border:1px solid var(--dsw-alias-border-l1,#2e2e2e);background:linear-gradient(132deg, var(--lmv-tint), transparent 58%), var(--dsw-alias-bg-layer-1,#252526);min-width:0;box-shadow:var(--lmv-shadow-1)}
 .lmv-detail-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:5px}
-.lmv-detail-title{margin:0;font-size:17px;line-height:1.35;font-weight:640;letter-spacing:-.012em;overflow-wrap:anywhere}
+.lmv-detail-title{margin:0;font-size:17px;line-height:1.35;font-weight:640;letter-spacing:-.012em;overflow-wrap:anywhere;text-wrap:balance}
 .lmv-detail-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
 .lmv-action-group{display:flex;flex-direction:column;gap:7px;min-width:0}
 .lmv-action-row{display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-width:0}
@@ -428,6 +477,11 @@ button.lmv-kicker-toggle:hover .lmv-kicker-count{background:color-mix(in srgb, v
 .lmv-capture .lmv-input{flex:1 1 auto;min-height:40px;font-size:14px;border-radius:var(--lmv-r-md);padding:8px 12px}
 .lmv-capture .lmv-btn{min-height:40px;padding:0 16px;border-radius:var(--lmv-r-md)}
 .lmv-chipbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:20px}
+/* One row, scrolled: twelve chips over two rows pushed the library itself below
+   the fold, which is the opposite of what this card is for. */
+.lmv-chipbar-scroll{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;padding-bottom:2px}
+.lmv-chipbar-scroll::-webkit-scrollbar{display:none}
+.lmv-chipbar-scroll .lmv-kicker{position:sticky;left:0;flex:0 0 auto;padding-right:6px;background:var(--dsw-alias-bg-layer-1,#252526)}
 .lmv-chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:2px 9px;border-radius:999px;background:var(--lmv-tint);border:1px solid color-mix(in srgb, var(--dsw-alias-brand-primary,#4a8cff) 38%, transparent);color:var(--dsw-alias-brand-primary,#4a8cff);animation:lmv-pop var(--lmv-base) var(--lmv-ease-spring) both}
 .lmv-chip-warn{background:color-mix(in srgb, var(--dsw-alias-state-warn-primary,#d29922) 12%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-warn-primary,#d29922) 40%, transparent);color:var(--dsw-alias-state-warn-primary,#d29922)}
 button.lmv-chip{cursor:pointer;font:inherit;font-size:11.5px;transition:background var(--lmv-fast) var(--lmv-ease-out),border-color var(--lmv-fast) var(--lmv-ease-out),transform var(--lmv-fast) var(--lmv-ease-out)}
@@ -446,6 +500,10 @@ button.lmv-chip.lmv-chip-warn:hover{background:color-mix(in srgb, var(--dsw-alia
 .lmv-reminder-when{font-size:11.5px;color:var(--dsw-alias-label-tertiary,#8a8a8a);display:flex;gap:7px;align-items:center;flex-wrap:wrap}
 .lmv-reminder-due{color:var(--dsw-alias-label-secondary,#b8b8b8);font-variant-numeric:tabular-nums}
 .lmv-reminder-overdue .lmv-reminder-due{color:var(--dsw-alias-state-error-primary,#e5534b);font-weight:560}
+/* How overdue a reminder is, in days. This class existed in the markup with no
+   rule behind it, so the one number that says "this is bad now" rendered as
+   ordinary grey text. */
+.lmv-reminder-late{color:var(--dsw-alias-state-error-primary,#e5534b);font-weight:560;font-variant-numeric:tabular-nums}
 .lmv-reminder-actions{display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end;opacity:.55;transition:opacity var(--lmv-base) var(--lmv-ease-out)}
 .lmv-reminder:hover .lmv-reminder-actions,.lmv-reminder:focus-within .lmv-reminder-actions{opacity:1}
 
@@ -466,12 +524,26 @@ button.lmv-chip.lmv-chip-warn:hover{background:color-mix(in srgb, var(--dsw-alia
 @keyframes lmv-spin{to{transform:rotate(360deg)}}
 @keyframes lmv-grow{from{transform:scaleX(.02)}to{transform:scaleX(1)}}
 
+/* Coarse pointers get real hit targets. Desktop keeps its density. */
+@media (pointer:coarse){
+  .lmv-btn,.lmv-btn-sm{min-height:34px;padding:6px 12px}
+  .lmv-icon-btn{width:34px;min-height:34px}
+  .lmv-nav-btn{padding:8px 13px}
+  .lmv-sticker-actions .lmv-btn{min-height:32px;padding:4px 8px}
+  .lmv-seg-btn{padding:6px 11px}
+  .lmv-reminder-actions{opacity:1}
+}
+/* No hover: hover-revealed actions must simply be visible. */
+@media (hover:none){
+  .lmv-reminder-actions{opacity:1}
+}
 @media (max-width:720px){
   .lmv-head{padding:14px 16px 8px;align-items:flex-start;flex-direction:column;gap:10px}
   .lmv-head-actions{margin-left:0}
   .lmv-nav{margin:0 16px 10px}
   .lmv-main{padding:2px 16px 32px}
   .lmv-life{grid-template-columns:minmax(0,1fr);padding:2px 16px 28px;gap:12px}
+  .lmv-nav{-webkit-mask-image:linear-gradient(90deg,transparent 0,black 12px,black calc(100% - 12px),transparent 100%);mask-image:linear-gradient(90deg,transparent 0,black 12px,black calc(100% - 12px),transparent 100%)}
   .lmv-life-nav{position:static;flex-direction:row;flex-wrap:wrap}
   .lmv-life-nav .lmv-nav-btn{width:auto}
   .lmv-example{grid-template-columns:minmax(0,1fr)}
@@ -481,6 +553,11 @@ button.lmv-chip.lmv-chip-warn:hover{background:color-mix(in srgb, var(--dsw-alia
 }
 @media (prefers-reduced-motion:reduce){
   .lmv-page *,.lmv-page *::before,.lmv-page *::after{animation-duration:1ms!important;animation-iteration-count:1!important;transition-duration:1ms!important}
-  .lmv-main>*{animation:none}
+  .lmv-main>*,.lmv-life-body>*,.lmv-row,.lmv-sticker,.lmv-reminder{animation:none}
+  /* The collapse relies on a delayed visibility flip; without the delay an
+     opened panel would be visible for one frame while still height:0. */
+  .lmv-collapse-inner{transition:visibility 0s linear .15s!important}
+  .lmv-collapse-open .lmv-collapse-inner{transition-delay:0s!important}
+  .lmv-skel::after{animation:none;opacity:0}
 }
 `

@@ -85,6 +85,22 @@ export const RPC_METHODS = [
   'reminderCancel',
   'reminderComplete',
   'reminderReschedule',
+  /**
+   * Persona evolution: a suggestion queue the user reviews.
+   *
+   * The engine never writes `Persona.md` on its own — `evolutionApply` is the
+   * only path, and it is triggered by a click.
+   */
+  'evolutionList',
+  'evolutionScan',
+  'evolutionApply',
+  'evolutionDismiss',
+  'evolutionRevert',
+  /** Sticker send rhythm: read and write `Companion/Stickers/policy.json`. */
+  'reminderPolicy',
+  'reminderPolicyUpdate',
+  'stickerPolicy',
+  'stickerPolicyUpdate',
 ] as const
 
 export type RpcMethod = (typeof RPC_METHODS)[number]
@@ -353,6 +369,13 @@ export interface PluginSettings {
   sensitiveNeedsConfirmation: boolean
   /** Maximum candidates extracted per turn. */
   maxCandidatesPerTurn: number
+  /**
+   * 允许模型把聊天里收到的反应图收进表情库。
+   *
+   * 只是「给模型一条指令」的开关：聊天插件本来就把入站图片下载到本地并写进
+   * 上下文，模型据此调用 `sticker_ingest`。关掉后模型不再被提示，显式要求仍可收录。
+   */
+  enableStickerAutoCollect?: boolean
   /** ISO instant of the last index rebuild. */
   lastIndexRebuild: string | null
   /**
@@ -384,6 +407,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   redactSecrets: true,
   sensitiveNeedsConfirmation: true,
   maxCandidatesPerTurn: 5,
+  enableStickerAutoCollect: true,
   lastIndexRebuild: null,
   qqLinkage: DEFAULT_QQ_LINKAGE,
 }
@@ -440,6 +464,26 @@ export interface RpcRequestMap {
   reminderCancel: { id: string }
   reminderComplete: { id: string }
   reminderReschedule: { id: string; dueAt: string }
+  evolutionList: Record<string, never>
+  evolutionScan: Record<string, never>
+  evolutionApply: { id: string }
+  evolutionDismiss: { id: string }
+  evolutionRevert: { id: string }
+  reminderPolicy: Record<string, never>
+  reminderPolicyUpdate: {
+    quietHours?: { start: number; end: number } | null
+    backoffBase?: number
+    backoffMinutes?: number
+    maxAttempts?: number
+  }
+  stickerPolicy: Record<string, never>
+  stickerPolicyUpdate: {
+    minGapMinutes?: number
+    maxPer24h?: number
+    /** 0..1. The page edits a percentage and converts once, here. */
+    probability?: number
+    quietTags?: string[]
+  }
 }
 
 export interface RpcResultMap {
@@ -494,6 +538,15 @@ export interface RpcResultMap {
   reminderCancel: { id: string; changed: boolean }
   reminderComplete: { id: string; nextId: string | null }
   reminderReschedule: ReminderWire
+  evolutionList: EvolutionListResponse
+  evolutionScan: { available: boolean; items: EvolutionWire[] }
+  evolutionApply: { id: string; applied: boolean }
+  evolutionDismiss: { id: string; dismissed: boolean }
+  evolutionRevert: { id: string; reverted: boolean }
+  reminderPolicy: ReminderPolicyResponse
+  reminderPolicyUpdate: ReminderPolicyResponse
+  stickerPolicy: StickerPolicyResponse
+  stickerPolicyUpdate: StickerPolicyResponse
 }
 
 /* ------------------------------------------------ WP-6 management centre --- */
@@ -634,6 +687,59 @@ export interface StickerWire {
   usedCount: number
   bytes: number
   addedAt: string
+  /** Provenance, so the tray can tell "came from chat" from "imported by hand". */
+  source?: 'import' | 'incoming' | 'stolen' | 'other'
+}
+
+/** One persona-evolution proposal, as the page sees it. */
+export interface EvolutionWire {
+  id: string
+  field: 'address' | 'catchphrases' | 'avoid' | 'tone'
+  proposed: string
+  reason: string
+  /** Memory ids that produced the proposal; the page can open each one. */
+  evidence: string[]
+  confidence: 'low' | 'medium' | 'high'
+  createdAt: string
+  status: 'pending' | 'applied' | 'dismissed' | 'reverted'
+}
+
+export interface EvolutionListResponse {
+  available: boolean
+  reason: string | null
+  items: EvolutionWire[]
+}
+
+/** The sticker send rhythm plus its live counters. */
+export interface StickerPolicyWire {
+  minGapMinutes: number
+  maxPer24h: number
+  /** 0..1. The page shows it as a percentage. */
+  probability: number
+  quietTags: string[]
+}
+
+/** Reminder delivery rhythm, plus what is waiting right now. */
+export interface ReminderPolicyResponse {
+  available: boolean
+  reason: string | null
+  policy: {
+    quietHours: { start: number; end: number } | null
+    backoffBase: number
+    backoffMinutes: number
+    maxAttempts: number
+  }
+  due: { dueNow: number; deferred: number; summary: string }
+}
+
+export interface StickerPolicyResponse {
+  available: boolean
+  reason: string | null
+  policy: StickerPolicyWire
+  state: {
+    lastSentAt: string | null
+    sentLast24h: number
+  }
 }
 
 export interface StickerLibraryResponse {

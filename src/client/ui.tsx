@@ -185,6 +185,46 @@ export function Loading(props: { label?: string }): ReactElement {
   )
 }
 
+/**
+ * A block skeleton for content that is being fetched.
+ *
+ * Replaces the spinner where the arriving content has a known shape (a list of
+ * rows, a grid of tiles). Perceived speed comes from the layout being right
+ * before the data is: nothing jumps when it lands, and the shimmer is a single
+ * travelling highlight rather than a rotating glyph that competes for attention.
+ */
+export function Skeleton(props: { variant?: 'rows' | 'grid' | 'card'; count?: number }): ReactElement {
+  const count = Math.max(1, Math.min(8, props.count ?? 3))
+  if (props.variant === 'grid') {
+    return (
+      <div className="lmv-skel-grid" role="status" aria-busy="true" aria-label={t('common.loading')}>
+        {Array.from({ length: count }, (_, index) => (
+          <div key={index} className="lmv-skel lmv-skel-tile" aria-hidden="true" />
+        ))}
+      </div>
+    )
+  }
+  if (props.variant === 'card') {
+    return (
+      <div className="lmv-skel-card" role="status" aria-busy="true" aria-label={t('common.loading')}>
+        <div className="lmv-skel lmv-skel-title" aria-hidden="true" />
+        <div className="lmv-skel lmv-skel-line" aria-hidden="true" />
+        <div className="lmv-skel lmv-skel-line" style={{ width: '72%' }} aria-hidden="true" />
+      </div>
+    )
+  }
+  return (
+    <div className="lmv-stack" role="status" aria-busy="true" aria-label={t('common.loading')}>
+      {Array.from({ length: count }, (_, index) => (
+        <div key={index} className="lmv-skel-row" aria-hidden="true">
+          <div className="lmv-skel lmv-skel-title" style={{ width: `${String(30 + (index % 3) * 12)}%` }} />
+          <div className="lmv-skel lmv-skel-line" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /** A "nothing here" placeholder.
  *
  * The bare form stays supported because half the panes call `<Empty />` with no

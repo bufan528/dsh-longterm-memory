@@ -21,8 +21,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { basename, join } from 'node:path'
 import type { MemoryVisibility } from '../../shared/types.js'
 import type {
-  CompanionWire, ReminderWire, StickerWire,
+  CompanionWire, EvolutionWire, ReminderPolicyResponse, ReminderWire, StickerPolicyResponse, StickerPolicyWire, StickerWire,
 } from '../../shared/protocol.js'
+import {
+  DEFAULT_STICKER_POLICY, normalizePolicy, normalizePolicyState,
+} from '../../shared/sticker-pick.js'
+import { DEFAULT_REMINDER_POLICY } from '../../shared/reminder-policy.js'
+import type { StickerPolicy, StickerPolicyState } from '../../shared/sticker-pick.js'
 import type { CompanionDocuments } from '../companion/documents.js'
 import type { CompanionService } from '../companion/service.js'
 import { buildVoicePreview, normalizeUtterance, sanitizeReply } from '../companion/try-voice.js'
@@ -216,8 +221,21 @@ export interface StickerLibraryLike {
   importBytes?: (
     bytes: Uint8Array,
     fileName: string,
-    input: { description?: string; tags?: string[] },
+    input: { description?: string; tags?: string[]; source?: 'import' | 'incoming' | 'stolen' | 'other' },
   ) => Promise<unknown>
+  /** Optional: the send rhythm lives beside the catalogue, not inside it. */
+  readPolicyFile?: () => Promise<{ policy: StickerPolicy; state: StickerPolicyState }>
+  writePolicyFile?: (policy: StickerPolicy, state: StickerPolicyState) => Promise<unknown>
+  pathOf?: (id: string) => string | null
+}
+
+/** Persona-evolution queue surface (see `companion/evolution.ts`). */
+export interface EvolutionServiceLike {
+  list: () => unknown | Promise<unknown>
+  scan: () => Promise<unknown>
+  apply: (id: string) => Promise<{ ok: boolean; reason?: string }>
+  dismiss: (id: string) => Promise<boolean>
+  revert: (id: string) => Promise<{ ok: boolean; reason?: string }>
 }
 
 /** Same shape for reminders: Vault `reminder-service@v1` or the plugin runtime. */
@@ -235,6 +253,18 @@ export interface ReminderServiceLike {
   reschedule: (id: string, dueAt: string) => Promise<unknown>
   queueSize?: unknown
   deliveryStatus?: unknown
+  /** Delivery rhythm. Optional: the QQ bridge does not implement it. */
+  policy?: () => Promise<ReminderPolicyShape>
+  updatePolicy?: (patch: Record<string, unknown>) => Promise<ReminderPolicyShape>
+  dueSummary?: () => Promise<{ dueNow: number; deferred: number; summary: string }>
+}
+
+/** The shape `reminderPolicy` returns; kept flat for the wire. */
+interface ReminderPolicyShape {
+  quietHours: { start: number; end: number } | null
+  backoffBase: number
+  backoffMinutes: number
+  maxAttempts: number
 }
 
 /** Why the management bridge is not usable, in words the page can show. */
@@ -252,6 +282,65 @@ function lifeAgentReason(life: LifeAgentLike | undefined, what: 'stickers' | 're
       : 'QQ 插件未建立提醒存储（缺少可写的 profile 目录）。'
   }
   return null
+}
+
+/** One evolution suggestion as the page sees it; unknown rows are dropped. */
+function toEvolutionWire(raw: unknown): EvolutionWire | null {
+  if (raw === null || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  const id = r['id']
+  const field = r['field']
+  const status = r['status']
+  if (typeof id !== 'string' || id.length === 0 || id.length > 64) return null
+  if (field !== 'address' && field !== 'catchphrases' && field !== 'avoid' && field !== 'tone') return null
+  if (status !== 'pending' && status !== 'applied' && status !== 'dismissed' && status !== 'reverted') return null
+  const confidence = r['confidence']
+  return {
+    id,
+    field,
+    proposed: typeof r['proposed'] === 'string' ? r['proposed'].slice(0, 60) : '',
+    reason: typeof r['reason'] === 'string' ? r['reason'].slice(0, 200) : '',
+    evidence: Array.isArray(r['evidence'])
+      ? r['evidence'].filter((v): v is string => typeof v === 'string').slice(0, 6)
+      : [],
+    confidence: confidence === 'high' || confidence === 'medium' ? confidence : 'low',
+    createdAt: typeof r['createdAt'] === 'string' ? r['createdAt'] : '',
+    status,
+  }
+}
+
+/** Normalise whatever a sticker surface returned into policy + counters. */
+function asPolicyState(raw: unknown): { policy: StickerPolicy; state: StickerPolicyState } {
+  const obj = (raw !== null && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  return { policy: normalizePolicy(obj['policy']), state: normalizePolicyState(obj['state']) }
+}
+
+/**
+ * The send rhythm as the page sees it.
+ *
+ * `available:false` rather than an error when the surface is a bridge without a
+ * policy: the page hides the card, and the rest of the library still works.
+ */
+async function readStickerPolicy(surface: StickerLibraryLike): Promise<StickerPolicyResponse> {
+  const empty: StickerPolicyResponse = {
+    available: false,
+    reason: '当前表情图库实现不支持发送策略。',
+    policy: { ...DEFAULT_STICKER_POLICY },
+    state: { lastSentAt: null, sentLast24h: 0 },
+  }
+  if (typeof surface.readPolicyFile !== 'function') return empty
+  const { policy, state } = asPolicyState(await surface.readPolicyFile().catch(() => null))
+  return {
+    available: true,
+    reason: null,
+    policy: {
+      minGapMinutes: policy.minGapMinutes,
+      maxPer24h: policy.maxPer24h,
+      probability: policy.probability,
+      quietTags: policy.quietTags,
+    },
+    state: { lastSentAt: state.lastSentAt, sentLast24h: state.sentLast24h },
+  }
 }
 
 function toStickerWire(raw: unknown): StickerWire | null {
@@ -274,6 +363,9 @@ function toStickerWire(raw: unknown): StickerWire | null {
     usedCount: typeof r['usedCount'] === 'number' && Number.isFinite(r['usedCount']) ? r['usedCount'] : 0,
     bytes: typeof r['bytes'] === 'number' && Number.isFinite(r['bytes']) ? r['bytes'] : 0,
     addedAt: typeof r['addedAt'] === 'string' ? r['addedAt'] : '',
+    ...(r['source'] === 'import' || r['source'] === 'incoming' || r['source'] === 'stolen' || r['source'] === 'other'
+      ? { source: r['source'] }
+      : {}),
   }
 }
 
@@ -437,6 +529,15 @@ export function installRoutes(
       return undefined
     }
   }
+  // Persona-evolution queue. Absent on a host that never built it (or on an
+  // older build), in which case the persona pane hides the section entirely.
+  const getEvolution = (): EvolutionServiceLike | undefined => {
+    try {
+      return ctx.get('evolutionService') as EvolutionServiceLike | undefined
+    } catch {
+      return undefined
+    }
+  }
 
   /*
    * The persona preview gets its own adapter, created on first use.
@@ -498,7 +599,7 @@ export function installRoutes(
             try {
               const data = await dispatch(
                 service, method, asRecord(payload), getQqContext, companion, getLifeAgent,
-                getStickerLibrary, getReminderService, getVoiceAdapter,
+                getStickerLibrary, getReminderService, getVoiceAdapter, getEvolution,
               )
               writeJson(response, 200, { ok: true, data })
             } catch (error) {
@@ -556,6 +657,8 @@ export async function dispatch(
    * must only be constructed when someone actually presses the button.
    */
   getVoiceAdapter?: () => Promise<DshLlmAdapter>,
+  /** Persona-evolution queue; absent on a host that never constructed it. */
+  getEvolution?: () => EvolutionServiceLike | undefined,
 ): Promise<unknown> {
   /** Vault library first, QQ plugin bridge second. */
   const resolveStickers = (): { surface: StickerLibraryLike; source: 'vault' | 'plugin' } | { reason: string } => {
@@ -574,6 +677,29 @@ export async function dispatch(
       return { surface: stickers as unknown as StickerLibraryLike, source: 'plugin' }
     }
     return { reason: lifeAgentReason(life, 'stickers') ?? '表情图库不可用。' }
+  }
+
+  /**
+   * Reminder delivery rhythm.
+   *
+   * Only the Vault-side service implements it. When the page is reading through
+   * the QQ bridge, the card says so instead of pretending the policy is default.
+   */
+  const readReminderPolicy = async (): Promise<ReminderPolicyResponse> => {
+    const reminders = getReminderService?.()
+    if (reminders === undefined || typeof reminders.policy !== 'function') {
+      return {
+        available: false,
+        reason: '投递策略需要本插件的提醒服务；当前仅连着 QQ 桥接。',
+        policy: { ...DEFAULT_REMINDER_POLICY, quietHours: DEFAULT_REMINDER_POLICY.quietHours },
+        due: { dueNow: 0, deferred: 0, summary: '' },
+      }
+    }
+    const policy = await reminders.policy()
+    const due = typeof reminders.dueSummary === 'function'
+      ? await reminders.dueSummary()
+      : { dueNow: 0, deferred: 0, summary: '' }
+    return { available: true, reason: null, policy: { ...policy }, due }
   }
 
   /** Same idea for reminders: Vault service first, plugin runtime as fallback. */
@@ -841,6 +967,98 @@ export async function dispatch(
       }
     }
     /* ----------------------- WP-6 cross-plugin management (life-agent@v1) --- */
+    case 'reminderPolicy': {
+      return await readReminderPolicy()
+    }
+    case 'reminderPolicyUpdate': {
+      const reminders = getReminderService?.()
+      if (reminders === undefined || typeof reminders.updatePolicy !== 'function') {
+        throw new ServiceError(ERROR_CODES.unsupported, '提醒服务不支持投递策略。')
+      }
+      await reminders.updatePolicy(asRecord(payload))
+      return await readReminderPolicy()
+    }
+    case 'stickerPolicy': {
+      const resolved = resolveStickers()
+      if ('reason' in resolved) {
+        return {
+          available: false,
+          reason: resolved.reason,
+          policy: { ...DEFAULT_STICKER_POLICY } satisfies StickerPolicyWire,
+          state: { lastSentAt: null, sentLast24h: 0 },
+        }
+      }
+      return await readStickerPolicy(resolved.surface)
+    }
+    case 'stickerPolicyUpdate': {
+      const resolved = resolveStickers()
+      if ('reason' in resolved) throw new ServiceError(ERROR_CODES.internal, resolved.reason)
+      const surface = resolved.surface
+      if (typeof surface.readPolicyFile !== 'function' || typeof surface.writePolicyFile !== 'function') {
+        throw new ServiceError(ERROR_CODES.unsupported, '当前表情图库实现不支持发送策略。')
+      }
+      const current = asPolicyState(await surface.readPolicyFile())
+      // Merge then clamp: a malformed payload can never write an unusable policy.
+      const merged = normalizePolicy({
+        ...current.policy,
+        ...(typeof payload['minGapMinutes'] === 'number' ? { minGapMinutes: payload['minGapMinutes'] } : {}),
+        ...(typeof payload['maxPer24h'] === 'number' ? { maxPer24h: payload['maxPer24h'] } : {}),
+        ...(typeof payload['probability'] === 'number' ? { probability: payload['probability'] } : {}),
+        ...(Array.isArray(payload['quietTags']) ? { quietTags: payload['quietTags'] } : {}),
+      })
+      await surface.writePolicyFile(merged, current.state)
+      return await readStickerPolicy(surface)
+    }
+    case 'evolutionList': {
+      const evolution = getEvolution?.()
+      if (evolution === undefined) {
+        return { available: false, reason: '人格进化服务未启用（vault 未就绪）。', items: [] }
+      }
+      const raw = await evolution.list()
+      const rows: unknown[] = Array.isArray(raw) ? raw : []
+      return {
+        available: true,
+        reason: null,
+        items: rows
+          .map((row) => toEvolutionWire(row))
+          .filter((row): row is EvolutionWire => row !== null),
+      }
+    }
+    case 'evolutionScan': {
+      const evolution = getEvolution?.()
+      if (evolution === undefined) throw new ServiceError(ERROR_CODES.internal, '人格进化服务未启用。')
+      const raw = await evolution.scan()
+      const rows: unknown[] = Array.isArray(raw) ? raw : []
+      return {
+        available: true,
+        items: rows.map((row) => toEvolutionWire(row)).filter((row): row is EvolutionWire => row !== null),
+      }
+    }
+    case 'evolutionApply': {
+      const evolution = getEvolution?.()
+      if (evolution === undefined) throw new ServiceError(ERROR_CODES.internal, '人格进化服务未启用。')
+      const id = typeof payload['id'] === 'string' ? payload['id'] : ''
+      if (id.length === 0) throw new ServiceError(ERROR_CODES.invalid, 'evolutionApply 需要 id。')
+      const result = await evolution.apply(id)
+      if (!result.ok) throw new ServiceError(ERROR_CODES.internal, result.reason ?? '应用建议失败。')
+      return { id, applied: true }
+    }
+    case 'evolutionRevert': {
+      const evolution = getEvolution?.()
+      if (evolution === undefined) throw new ServiceError(ERROR_CODES.internal, '人格进化服务未启用。')
+      const id = typeof payload['id'] === 'string' ? payload['id'] : ''
+      if (id.length === 0) throw new ServiceError(ERROR_CODES.invalid, 'evolutionRevert 需要 id。')
+      const result = await evolution.revert(id)
+      if (!result.ok) throw new ServiceError(ERROR_CODES.internal, result.reason ?? '撤销失败。')
+      return { id, reverted: true }
+    }
+    case 'evolutionDismiss': {
+      const evolution = getEvolution?.()
+      if (evolution === undefined) throw new ServiceError(ERROR_CODES.internal, '人格进化服务未启用。')
+      const id = typeof payload['id'] === 'string' ? payload['id'] : ''
+      if (id.length === 0) throw new ServiceError(ERROR_CODES.invalid, 'evolutionDismiss 需要 id。')
+      return { id, dismissed: await evolution.dismiss(id) }
+    }
     case 'stickerLibrary': {
       const resolved = resolveStickers()
       if ('reason' in resolved) {
@@ -930,6 +1148,8 @@ export async function dispatch(
         ...(optionalString(payload['description']) === undefined
           ? {} : { description: optionalString(payload['description']) }),
         ...(optionalStrings(payload['tags']) === undefined ? {} : { tags: optionalStrings(payload['tags']) }),
+        // Provenance for the tray badge: this path is always a hand import.
+        source: 'import',
       })
       return normalizeImportOutcome(rawOutcome)
     }

@@ -91,7 +91,10 @@ export function MemoryPage(_props: SlotProps): ReactElement {
   const toast = useCallback((message: string, kind: ToastKind = 'info'): void => {
     toastSeq += 1
     const id = toastSeq
-    setToasts((current) => [...current, { id, message, kind, leaving: false }])
+    // At most three at once: past that the stack starts covering the content it
+    // is reporting on. The oldest leaves immediately — its message is already
+    // superseded by the newest one.
+    setToasts((current) => [...current, { id, message, kind, leaving: false }].slice(-3))
     // Two-phase removal: mark leaving, let the exit animation finish, then
     // unmount. A toast that simply disappears breaks the motion arc.
     window.setTimeout(() => {

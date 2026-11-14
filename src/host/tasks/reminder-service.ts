@@ -13,6 +13,10 @@
 import { randomUUID } from 'node:crypto'
 
 import type { ReminderRecord, ReminderRepeat, ReminderStore } from './reminder-store.js'
+import {
+  DEFAULT_REMINDER_POLICY, shouldDeliver, summarizeDue,
+} from '../../shared/reminder-policy.js'
+import type { DeliveryDecision, ReminderPolicy } from '../../shared/reminder-policy.js'
 
 export const REMINDER_SERVICE_CONTRACT = 'reminder-service@v1'
 
@@ -158,6 +162,68 @@ export class ReminderService {
     }
     await this.store.upsert(next)
     return next
+  }
+
+  /**
+   * Delivery policy for the shared reminder list.
+   *
+   * Read-through rather than cached: the QQ runtime may rewrite the file while
+   * this page is open, and a stale policy would show the wrong quiet hours.
+   */
+  async policy(): Promise<ReminderPolicy> {
+    try {
+      return await this.store.readPolicy()
+    } catch {
+      return { ...DEFAULT_REMINDER_POLICY }
+    }
+  }
+
+  async updatePolicy(patch: Partial<ReminderPolicy>): Promise<ReminderPolicy> {
+    const current = await this.policy()
+    const merged: ReminderPolicy = {
+      quietHours: patch.quietHours === undefined ? current.quietHours : patch.quietHours,
+      backoffBase: patch.backoffBase ?? current.backoffBase,
+      backoffMinutes: patch.backoffMinutes ?? current.backoffMinutes,
+      maxAttempts: patch.maxAttempts ?? current.maxAttempts,
+    }
+    return this.store.writePolicy(merged)
+  }
+
+  /** Whether one reminder may be delivered now, and why not when it may not. */
+  async deliveryFor(id: string): Promise<{ decision: DeliveryDecision; policy: ReminderPolicy } | null> {
+    const record = await this.find(id)
+    if (record === null) return null
+    const policy = await this.policy()
+    return {
+      policy,
+      decision: shouldDeliver(
+        {
+          dueAt: record.dueAt,
+          attempts: record.attempts,
+          lastAttemptAt: record.lastAttemptAt,
+          status: record.status,
+        },
+        policy,
+        this.now().getTime(),
+      ),
+    }
+  }
+
+  /** A one-line answer to "anything I should be reminded of right now?" */
+  async dueSummary(): Promise<{ dueNow: number; deferred: number; summary: string }> {
+    const [records, policy] = await Promise.all([this.store.load(), this.policy()])
+    return summarizeDue(
+      records.records.map((record) => ({
+        id: record.id,
+        title: record.title,
+        dueAt: record.dueAt,
+        attempts: record.attempts,
+        lastAttemptAt: record.lastAttemptAt,
+        status: record.status,
+      })),
+      policy,
+      this.now().getTime(),
+    )
   }
 
   private async find(id: string): Promise<ReminderRecord | null> {

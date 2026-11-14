@@ -31,6 +31,7 @@ import {
   type MemoryVisibility,
 } from '../../shared/types.js'
 import { visibilitiesFor, type OwnerAccessDecision } from '../../shared/owner-access.js'
+import { buildLifeTools, type LifeToolExtras } from './life-tools.js'
 import { scanSecrets } from '../core/engine.js'
 
 /** Minimal JSON value type used by tool render output. */
@@ -66,7 +67,11 @@ export interface ToolExecContext {
 export type OwnerGateForAgent = (agent: unknown) => OwnerAccessDecision
 
 /** Names of the tools this plugin registers. */
-export const TOOL_NAMES = ['memory_search', 'memory_get', 'memory_save', 'memory_forget'] as const
+export const TOOL_NAMES = [
+  'memory_search', 'memory_get', 'memory_save', 'memory_forget',
+  'sticker_pick', 'sticker_ingest',
+  'reminder_create', 'reminder_list', 'reminder_complete',
+] as const
 
 const TYPE_ENUM = [...MEMORY_TYPES]
 
@@ -109,6 +114,8 @@ export function buildToolDefinitions(
   service: MemoryService,
   linkage?: QqLinkageRuntime,
   ownerGate?: OwnerGateForAgent,
+  /** Life surfaces (stickers, reminders). Omitted → only the memory tools. */
+  extras?: LifeToolExtras,
 ): ToolDefinition[] {
   return [
     {
@@ -517,6 +524,19 @@ export function buildToolDefinitions(
         return { id, status, note: 'The memory is retained for traceability and will not be used as current fact.' }
       },
     },
+
+    // Stickers and reminders are their own module: they answer questions about
+    // the *user's day*, not about stored facts, and their failure modes are
+    // different (a cooldown refusal is a feature, not an error).
+    ...buildLifeTools({
+      ...(extras?.stickers === undefined ? {} : { stickers: extras.stickers }),
+      ...(extras?.reminders === undefined ? {} : { reminders: extras.reminders }),
+      // Reminders are personal data, so they go through the same owner gate as
+      // memories. Stickers deliberately do not: they are user-curated images
+      // meant to be sent in public, and gating them would disable the feature in
+      // the group chats where it is actually used.
+      assertAllowed: (exec) => { assertToolsAllowed(linkage, exec, ownerGate) },
+    }),
   ]
 }
 
@@ -627,6 +647,7 @@ export function installTools(
   ctx: { get: (name: string) => unknown; effect: (fn: () => unknown, label?: string) => unknown; logger?: { warn: (message: string, ...rest: unknown[]) => void } },
   service: MemoryService,
   linkage?: QqLinkageRuntime,
+  extras?: LifeToolExtras,
 ): { registered: string[]; notes: Record<string, string> } {
   const notes: Record<string, string> = {}
   const tools = (ctx.get('tools') ?? null) as ToolRegistryLike | null
@@ -658,7 +679,7 @@ export function installTools(
     return gate({ sessionId: sessionIdOfAgent(agent) })
   }
   const registered: string[] = []
-  const definitions = buildToolDefinitions(service, linkage, ownerGate)
+  const definitions = buildToolDefinitions(service, linkage, ownerGate, extras)
   ctx.effect(
     () => {
       const disposers: unknown[] = []

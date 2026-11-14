@@ -16,7 +16,7 @@ import { call, errCode, useAsync, useMutation } from '../api.js'
 import { useT } from '../i18n.js'
 import { usePage } from '../page-api.js'
 import {
-  Button, Card, Checkbox, Collapse, DisclosureChevron, Empty, ErrorNotice, Field, Icon, KvList, Loading, Notice, Select, TextArea, TextInput,
+  Button, Card, Checkbox, Collapse, DisclosureChevron, Empty, ErrorNotice, Field, Icon, KvList, Loading, Notice, NumberInput, Select, Skeleton, TextArea, TextInput,
 } from '../ui.js'
 import type { IconName } from '../ui.js'
 import { ERROR_CODES } from '../../shared/protocol.js'
@@ -50,10 +50,11 @@ const VISIBILITY_OPTIONS: readonly { value: MemoryVisibility; label: string }[] 
 ]
 
 /** Sticker tray filters. Kept out of the component so the type stays literal. */
-const STICKER_FILTERS: readonly { key: 'all' | 'enabled' | 'favorite' | 'unused'; labelKey: string }[] = [
+const STICKER_FILTERS: readonly { key: 'all' | 'enabled' | 'favorite' | 'frequent' | 'unused'; labelKey: string }[] = [
   { key: 'all', labelKey: 'life.stickers.filterAll' },
   { key: 'enabled', labelKey: 'life.stickers.filterEnabled' },
   { key: 'favorite', labelKey: 'life.stickers.filterFavorite' },
+  { key: 'frequent', labelKey: 'life.stickers.filterFrequent' },
   { key: 'unused', labelKey: 'life.stickers.filterUnused' },
 ]
 
@@ -241,7 +242,7 @@ function PersonaPane(props: { onChanged: () => void }): ReactElement {
     }).catch(() => undefined)
   }
 
-  if (state.loading) return <Loading label={t('common.loading')} />
+  if (state.loading) return (<div className="lmv-stack"><Skeleton variant="card" /><Skeleton variant="card" /></div>)
   if (state.error !== null) return <PaneError error={state.error} onRetry={state.reload} />
   if (state.data === null || draft === null) return <Notice kind="warn">{t('life.persona.unavailable')}</Notice>
   const set = (key: keyof CompanionWire['documents'], value: string): void => {
@@ -313,7 +314,7 @@ function PersonaPane(props: { onChanged: () => void }): ReactElement {
         {dirty ? <span className="lmv-badge lmv-badge-warn">{t('life.persona.dirtyBadge')}</span> : null}
         <Button
           variant="primary"
-          disabled={save.busy || !dirty}
+          disabled={save.busy}
           onClick={saveNow}
         >
           <Icon name="check" />{t('life.common.save')}
@@ -323,6 +324,10 @@ function PersonaPane(props: { onChanged: () => void }): ReactElement {
       {save.error !== null ? <PaneError error={save.error} /> : null}
       {applyPreset.error !== null ? <PaneError error={applyPreset.error} /> : null}
       {fillAnchors.error !== null ? <PaneError error={fillAnchors.error} /> : null}
+
+      {/* Suggestions come from the user's own memories and are applied one by
+          one — the engine never rewrites the persona on its own. */}
+      <EvolutionCard onApplied={() => { state.reload(); props.onChanged() }} />
 
       {/* The check runs on the draft, so a contradiction is caught while typing
           rather than after it has been written into Persona.md. */}
@@ -727,6 +732,135 @@ function PersonaPane(props: { onChanged: () => void }): ReactElement {
 }
 
 /**
+ * Persona evolution: a reviewable queue, never an automatic rewrite.
+ *
+ * The engine reads the user's memories and proposes a handful of small changes
+ * (how to address them, a habitual phrase, something they said they dislike, a
+ * tone shift). Each row shows its evidence count and confidence; applying is a
+ * click, and applying writes `Persona.md` through the normal validated path.
+ */
+function EvolutionCard(props: { onApplied: () => void }): ReactElement {
+  const t = useT()
+  const { toast } = usePage()
+  const state = useAsync(() => call('evolutionList', {}), [])
+  const scan = useMutation(() => call('evolutionScan', {}))
+  const apply = useMutation((id: string) => call('evolutionApply', { id }))
+  const dismiss = useMutation((id: string) => call('evolutionDismiss', { id }))
+  const revert = useMutation((id: string) => call('evolutionRevert', { id }))
+
+  const all = state.data?.items ?? []
+  const items = all.filter((item) => item.status === 'pending')
+  // Applied rows stay visible: accepting something is a decision worth being
+  // able to undo a week later, and hiding it would make the undo impossible.
+  const applied = all.filter((item) => item.status === 'applied').slice(-5).reverse()
+
+  const fieldLabel = (field: 'address' | 'catchphrases' | 'avoid' | 'tone'): string => {
+    if (field === 'address') return t('life.persona.address')
+    if (field === 'catchphrases') return t('life.persona.catchphrases')
+    if (field === 'avoid') return t('life.persona.avoid')
+    return t('life.persona.tone')
+  }
+
+  return (
+    <Card
+      title={<><Icon name="spark" />{t('life.persona.evolution.title')}</>}
+      actions={
+        <div className="lmv-wrap">
+          {items.length === 0 ? null : <span className="lmv-badge lmv-badge-brand">{items.length}</span>}
+          <Button
+            variant="ghost"
+            disabled={scan.busy}
+            onClick={() => {
+              void scan.run()
+                .then((result) => {
+                  const count = result === undefined ? 0 : result.items.length
+                  toast(t('life.persona.evolution.scanToast', { count }), 'ok')
+                })
+                .catch(() => undefined)
+            }}
+          >
+            <Icon name="refresh" size={13} />
+            {scan.busy ? t('life.persona.evolution.scanning') : t('life.persona.evolution.scan')}
+          </Button>
+        </div>
+      }
+    >
+      <p className="lmv-subhead">{t('life.persona.evolution.hint')}</p>
+      {state.loading ? <Loading label={t('common.loading')} /> : null}
+      {state.error !== null ? <PaneError error={state.error} onRetry={state.reload} /> : null}
+      {state.data !== null && state.data !== undefined && !state.data.available ? (
+        <Notice kind="warn">{state.data.reason ?? t('life.persona.evolution.unavailable')}</Notice>
+      ) : null}
+      {state.data?.available === true && items.length === 0 ? (
+        <span className="lmv-subhead">{t('life.persona.evolution.empty')}</span>
+      ) : null}
+
+      {items.map((item) => (
+        <div key={item.id} className="lmv-check-row lmv-check-tip">
+          <span className="lmv-check-dot" aria-hidden="true" />
+          <span className="lmv-grow">
+            <span className="lmv-check-title">
+              {`${fieldLabel(item.field)} → ${item.proposed}`}
+            </span>
+            <span className="lmv-check-hint">
+              {item.reason}
+              {item.evidence.length === 0 ? '' : ` · ${t('life.persona.evolution.evidence', { count: item.evidence.length })}`}
+              {` · ${t(`life.persona.evolution.confidence.${item.confidence}`)}`}
+            </span>
+          </span>
+          <div className="lmv-wrap">
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={apply.busy}
+              onClick={() => {
+                void apply.run(item.id)
+                  .then(() => { state.reload(); props.onApplied(); toast(t('life.persona.evolution.appliedToast'), 'ok') })
+                  .catch(() => undefined)
+              }}
+            >{t('life.persona.evolution.apply')}</Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={dismiss.busy}
+              onClick={() => {
+                void dismiss.run(item.id).then(() => { state.reload() }).catch(() => undefined)
+              }}
+            >{t('life.persona.evolution.dismiss')}</Button>
+          </div>
+        </div>
+      ))}
+      {applied.length === 0 ? null : (
+        <div className="lmv-stack">
+          <span className="lmv-kicker">{t('life.persona.evolution.appliedTitle')}</span>
+          {applied.map((item) => (
+            <div key={item.id} className="lmv-check-row">
+              <span className="lmv-check-dot lmv-check-dot-ok" aria-hidden="true" />
+              <span className="lmv-grow">
+                <span className="lmv-check-title">{`${fieldLabel(item.field)} → ${item.proposed}`}</span>
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={revert.busy}
+                onClick={() => {
+                  void revert.run(item.id)
+                    .then(() => { state.reload(); props.onApplied(); toast(t('life.persona.evolution.revertedToast'), 'ok') })
+                    .catch(() => undefined)
+                }}
+              >{t('life.persona.evolution.revert')}</Button>
+            </div>
+          ))}
+        </div>
+      )}
+      {apply.error === null ? null : <PaneError error={apply.error} />}
+      {revert.error === null ? null : <PaneError error={revert.error} />}
+      {scan.error === null ? null : <PaneError error={scan.error} />}
+    </Card>
+  )
+}
+
+/**
  * Migration wizard. One row, one explicit decision, one RPC call. There is no
  * "select all" and no bulk endpoint (§六 / §十一).
  */
@@ -737,7 +871,7 @@ function SharingPane(props: { onChanged: () => void }): ReactElement {
     call('setVisibility', { id, visibility, reason: '用户在共享记忆页面逐条确认' }))
   const [choices, setChoices] = useState<Record<string, MemoryVisibility>>({})
 
-  if (state.loading) return <Loading label={t('common.loading')} />
+  if (state.loading) return <Skeleton variant="rows" count={4} />
   if (state.error !== null) return <PaneError error={state.error} onRetry={state.reload} />
   const review: RpcResultMap['visibilityReview'] = state.data ?? { rows: [], byVisibility: { shared: 0, 'desktop-private': 0, 'qq-private': 0 } }
   const rows: readonly VisibilityReviewRow[] = review.rows
@@ -797,7 +931,7 @@ function ReviewPane(props: { onChanged: () => void }): ReactElement {
   const reject = useMutation((id: string) => call('reject', { id }))
   const [shared, setShared] = useState<Record<string, boolean>>({})
 
-  if (state.loading) return <Loading label={t('common.loading')} />
+  if (state.loading) return <Skeleton variant="rows" count={4} />
   if (state.error !== null) return <PaneError error={state.error} onRetry={state.reload} />
   const candidates = state.data?.candidates ?? []
   return (
@@ -845,6 +979,100 @@ function ReviewPane(props: { onChanged: () => void }): ReactElement {
  * `life-agent@v1` management bridge. Every mutation is per-id: there is no
  * bulk enable/disable/delete endpoint, by design.
  */
+/**
+ * Sticker send rhythm.
+ *
+ * The policy is what stops the bot from answering every message with a sticker.
+ * It was already enforced by `sticker_pick`; without a control surface the user
+ * could only discover the limit by hitting it. Values save explicitly (not on
+ * every keystroke): a half-typed "1" for the gap would briefly mean "no gap".
+ */
+function StickerRhythmCard(): ReactElement | null {
+  const t = useT()
+  const { toast } = usePage()
+  const state = useAsync(() => call('stickerPolicy', {}), [])
+  const save = useMutation((patch: { minGapMinutes: number; maxPer24h: number; probability: number; quietTags: string[] }) =>
+    call('stickerPolicyUpdate', patch))
+  const [gap, setGap] = useState('4')
+  const [cap, setCap] = useState('40')
+  const [chance, setChance] = useState('100')
+  const [quiet, setQuiet] = useState('')
+
+  const data = state.data
+  // Seed the form once per load, not on every render: the user may be mid-edit.
+  const seeded = useRef<string | null>(null)
+  useEffect(() => {
+    if (data === null || data === undefined || !data.available) return
+    const stamp = `${data.policy.minGapMinutes}/${data.policy.maxPer24h}/${data.policy.probability}/${data.policy.quietTags.join(',')}`
+    if (seeded.current === stamp) return
+    seeded.current = stamp
+    setGap(String(data.policy.minGapMinutes))
+    setCap(String(data.policy.maxPer24h))
+    setChance(String(Math.round(data.policy.probability * 100)))
+    setQuiet(data.policy.quietTags.join('，'))
+  }, [data])
+
+  if (state.loading) return null
+  // Absent on a bridge without a policy: the library itself still works.
+  if (data === null || data === undefined || !data.available) return null
+
+  const dirty =
+    Number(gap) !== data.policy.minGapMinutes
+    || Number(cap) !== data.policy.maxPer24h
+    || Math.round(data.policy.probability * 100) !== Number(chance)
+    || quiet !== data.policy.quietTags.join('，')
+
+  const commit = (): void => {
+    void save.run({
+      minGapMinutes: Math.max(0, Math.min(720, Number(gap) || 0)),
+      maxPer24h: Math.max(0, Math.min(500, Number(cap) || 0)),
+      probability: Math.max(0, Math.min(100, Number(chance) || 0)) / 100,
+      quietTags: quiet.split(/[,，\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0),
+    })
+      .then((result) => {
+        if (result === undefined) return
+        seeded.current = null
+        state.reload()
+        toast(t('life.stickers.rhythmSaved'), 'ok')
+      })
+      .catch(() => undefined)
+  }
+
+  const lastSent = data.state.lastSentAt === null
+    ? t('life.stickers.rhythmNever')
+    : new Date(data.state.lastSentAt).toLocaleString()
+
+  return (
+    <Card
+      title={<><Icon name="clock" />{t('life.stickers.rhythmTitle')}</>}
+      actions={<span className="lmv-meta">{t('life.stickers.rhythmSent', { count: data.state.sentLast24h })}</span>}
+    >
+      <p className="lmv-subhead">{t('life.stickers.rhythmHint')}</p>
+      <div className="lmv-form-4">
+        <Field label={t('life.stickers.rhythmGap')}>
+          <NumberInput value={Number(gap)} min={0} max={720} ariaLabel={t('life.stickers.rhythmGap')} onChange={(value) => { setGap(String(value)) }} />
+        </Field>
+        <Field label={t('life.stickers.rhythmCap')}>
+          <NumberInput value={Number(cap)} min={0} max={500} ariaLabel={t('life.stickers.rhythmCap')} onChange={(value) => { setCap(String(value)) }} />
+        </Field>
+        <Field label={t('life.stickers.rhythmChance')}>
+          <NumberInput value={Number(chance)} min={0} max={100} ariaLabel={t('life.stickers.rhythmChance')} onChange={(value) => { setChance(String(value)) }} />
+        </Field>
+        <Field label={t('life.stickers.rhythmQuiet')}>
+          <TextInput value={quiet} placeholder={t('life.stickers.rhythmQuietPlaceholder')} ariaLabel={t('life.stickers.rhythmQuiet')} onChange={setQuiet} />
+        </Field>
+      </div>
+      <div className="lmv-wrap">
+        <Button variant={dirty ? 'primary' : 'default'} disabled={!dirty || save.busy} onClick={commit}>
+          {save.busy ? t('common.saving') : t('life.common.save')}
+        </Button>
+        <span className="lmv-meta">{t('life.stickers.rhythmLast', { at: lastSent })}</span>
+      </div>
+      {save.error === null ? null : <PaneError error={save.error} />}
+    </Card>
+  )
+}
+
 function StickersPane(): ReactElement {
   const t = useT()
   const { toast } = usePage()
@@ -858,7 +1086,7 @@ function StickersPane(): ReactElement {
   const [description, setDescription] = useState('')
   const [tags, setTags] = useState('')
   const [importError, setImportError] = useState<string | null>(null)
-  const [filter, setFilter] = useState<'all' | 'enabled' | 'favorite' | 'unused'>('all')
+  const [filter, setFilter] = useState<'all' | 'enabled' | 'favorite' | 'frequent' | 'unused'>('all')
   const [tagFilter, setTagFilter] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [dragging, setDragging] = useState(false)
@@ -868,7 +1096,7 @@ function StickersPane(): ReactElement {
 
   const refresh = (): void => { state.reload() }
 
-  if (state.loading) return <Loading label={t('common.loading')} />
+  if (state.loading) return (<div className="lmv-stack"><Skeleton variant="card" /><Skeleton variant="grid" count={6} /></div>)
   if (state.error !== null) return <PaneError error={state.error} onRetry={state.reload} />
   const library = state.data
   if (library === null || library === undefined) return <Notice kind="warn">{t('life.stickers.unavailable')}</Notice>
@@ -943,7 +1171,11 @@ function StickersPane(): ReactElement {
           ? item.favorite
           : filter === 'unused'
             ? item.usedCount === 0
-            : true,
+            : filter === 'frequent'
+              // "Frequently used" is the tray most people actually want: the ones
+              // the bot has already reached for, most-used first.
+              ? item.usedCount > 0
+              : true,
     )
     .filter((item) => (tagFilter === null ? true : item.tags.includes(tagFilter)))
     .filter((item) => {
@@ -978,6 +1210,8 @@ function StickersPane(): ReactElement {
 
   return (
     <div className="lmv-stack">
+      {/* Rhythm sits above the library: it decides whether anything gets sent. */}
+      <StickerRhythmCard />
       <Card
         title={<><Icon name="image" />{t('life.stickers.title')}</>}
         actions={<span className="lmv-meta">{library.source === 'vault' ? t('life.stickers.sourceVault') : t('life.stickers.sourcePlugin')}</span>}
@@ -990,7 +1224,7 @@ function StickersPane(): ReactElement {
         <p className="lmv-subhead">{t('life.stickers.owner')}</p>
 
         <div
-          className={`lmv-drop${dragging ? ' lmv-drop-on' : ''}`}
+          className={`lmv-drop${dragging ? ' lmv-drop-on' : ''}${library.total > 0 ? ' lmv-drop-compact' : ''}`}
           role="button"
           tabIndex={0}
           onClick={() => { fileRef.current?.click() }}
@@ -1164,6 +1398,9 @@ function StickersPane(): ReactElement {
                       {item.description === '' ? item.file : item.description}
                     </span>
                     <span className="lmv-sticker-tags">
+                      {item.source === undefined ? null : (
+                        <span className={`lmv-src lmv-src-${item.source}`}>{t(`life.stickers.source.${item.source}`)}</span>
+                      )}
                       {item.tags.length === 0
                         ? `${t('life.stickers.used')} ${String(item.usedCount)}`
                         : `${item.tags.map((tag) => `#${tag}`).join(' ')} · ${String(item.usedCount)}`}
@@ -1234,6 +1471,95 @@ function StickersPane(): ReactElement {
  * see why a due reminder has not been delivered yet instead of assuming the
  * system forgot.
  */
+/**
+ * Reminder delivery rhythm.
+ *
+ * Only this side can decide "not at night, and not every five minutes" — the
+ * chat plugin sends, but it has no idea what time it is for the user. Values
+ * save explicitly so a half-typed hour cannot briefly silence everything.
+ */
+function ReminderRhythmCard(): ReactElement | null {
+  const t = useT()
+  const { toast } = usePage()
+  const state = useAsync(() => call('reminderPolicy', {}), [])
+  const save = useMutation((patch: { quietHours: { start: number; end: number } | null; backoffBase: number; backoffMinutes: number; maxAttempts: number }) =>
+    call('reminderPolicyUpdate', patch))
+  const data = state.data
+  const [start, setStart] = useState('22')
+  const [end, setEnd] = useState('8')
+  const [base, setBase] = useState('1.6')
+  const [minutes, setMinutes] = useState('15')
+  const [attempts, setAttempts] = useState('5')
+  const [quietOn, setQuietOn] = useState(true)
+  const seeded = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (data === null || data === undefined || !data.available) return
+    const p = data.policy
+    const stamp = `${p.quietHours === null ? 'off' : `${String(p.quietHours.start)}-${String(p.quietHours.end)}`}/${p.backoffBase}/${p.backoffMinutes}/${p.maxAttempts}`
+    if (seeded.current === stamp) return
+    seeded.current = stamp
+    setQuietOn(p.quietHours !== null)
+    if (p.quietHours !== null) {
+      setStart(String(p.quietHours.start))
+      setEnd(String(p.quietHours.end))
+    }
+    setBase(String(p.backoffBase))
+    setMinutes(String(p.backoffMinutes))
+    setAttempts(String(p.maxAttempts))
+  }, [data])
+
+  if (state.loading) return null
+  if (data === null || data === undefined || !data.available) return null
+
+  return (
+    <Card
+      title={<><Icon name="clock" />{t('life.reminders.rhythmTitle')}</>}
+      actions={<span className="lmv-meta">{data.due.summary}</span>}
+    >
+      <p className="lmv-subhead">{t('life.reminders.rhythmHint')}</p>
+      <div className="lmv-form-3">
+        <Field label={t('life.reminders.rhythmQuiet')}>
+          <Checkbox checked={quietOn} label={t('life.reminders.rhythmQuietOn')} onChange={setQuietOn} />
+        </Field>
+        <Field label={t('life.reminders.rhythmStart')}>
+          <NumberInput value={Number(start)} min={0} max={23} ariaLabel={t('life.reminders.rhythmStart')} onChange={(value) => { setStart(String(value)) }} />
+        </Field>
+        <Field label={t('life.reminders.rhythmEnd')}>
+          <NumberInput value={Number(end)} min={0} max={23} ariaLabel={t('life.reminders.rhythmEnd')} onChange={(value) => { setEnd(String(value)) }} />
+        </Field>
+        <Field label={t('life.reminders.rhythmBase')}>
+          <NumberInput value={Number(base)} min={1} max={3} ariaLabel={t('life.reminders.rhythmBase')} onChange={(value) => { setBase(String(value)) }} />
+        </Field>
+        <Field label={t('life.reminders.rhythmFirst')}>
+          <NumberInput value={Number(minutes)} min={1} max={720} ariaLabel={t('life.reminders.rhythmFirst')} onChange={(value) => { setMinutes(String(value)) }} />
+        </Field>
+        <Field label={t('life.reminders.rhythmAttempts')}>
+          <NumberInput value={Number(attempts)} min={1} max={20} ariaLabel={t('life.reminders.rhythmAttempts')} onChange={(value) => { setAttempts(String(value)) }} />
+        </Field>
+      </div>
+      <div className="lmv-wrap">
+        <Button
+          variant="primary"
+          disabled={save.busy}
+          onClick={() => {
+            void save.run({
+              quietHours: quietOn ? { start: Math.max(0, Math.min(23, Number(start) || 0)), end: Math.max(0, Math.min(23, Number(end) || 0)) } : null,
+              backoffBase: Math.max(1, Math.min(3, Number(base) || 1.6)),
+              backoffMinutes: Math.max(1, Math.min(720, Number(minutes) || 15)),
+              maxAttempts: Math.max(1, Math.min(20, Number(attempts) || 5)),
+            })
+              .then(() => { seeded.current = null; state.reload(); toast(t('life.reminders.rhythmSaved'), 'ok') })
+              .catch(() => undefined)
+          }}
+        >{save.busy ? t('common.saving') : t('life.common.save')}</Button>
+        <span className="lmv-meta">{t('life.reminders.rhythmTakesEffect')}</span>
+      </div>
+      {save.error === null ? null : <PaneError error={save.error} />}
+    </Card>
+  )
+}
+
 function RemindersPane(): ReactElement {
   const t = useT()
   const { toast } = usePage()
@@ -1269,7 +1595,7 @@ function RemindersPane(): ReactElement {
   }, [])
   const parsed = parseReminderInput(quick)
 
-  if (state.loading) return <Loading label={t('common.loading')} />
+  if (state.loading) return <Skeleton variant="rows" count={4} />
   if (state.error !== null) return <PaneError error={state.error} onRetry={state.reload} />
   const list = state.data
   if (list === null || list === undefined) return <Notice kind="warn">{t('life.reminders.unavailable')}</Notice>
@@ -1374,6 +1700,7 @@ function RemindersPane(): ReactElement {
 
   return (
     <div className="lmv-stack">
+      <ReminderRhythmCard />
       <Card
         title={<><Icon name="plus" />{t('life.reminders.quick')}</>}
         actions={
@@ -1496,7 +1823,7 @@ function RemindersPane(): ReactElement {
             <span className={`lmv-badge${todayCount > 0 ? ' lmv-badge-brand' : ''}`}>
               {t('life.reminders.todayBadge', { count: todayCount })}
             </span>
-            <span className="lmv-badge">{window}</span>
+            <span className="lmv-badge lmv-badge-quiet">{window}</span>
             {/* One decision per overdue backlog beats fifteen identical clicks. */}
             {overdueItems.length === 0 ? null : (
               <Button
@@ -1754,7 +2081,7 @@ function EmotionChipBar(props: { tags: string; onChange: (next: string) => void 
   const t = useT()
   const current = props.tags.split(/[,，\s]+/).map((tag) => tag.trim()).filter((tag) => tag.length > 0)
   return (
-    <div className="lmv-chipbar">
+    <div className="lmv-chipbar lmv-chipbar-scroll">
       <span className="lmv-kicker">{t('life.stickers.emotionTags')}</span>
       {EMOTION_TAGS.map((emotion) => {
         const on = current.includes(emotion)

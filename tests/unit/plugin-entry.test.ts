@@ -14,6 +14,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { join } from 'node:path'
 import { cleanup, makeTempRoot } from '../helpers.js'
 import { ROUTE_PREFIX, type CapabilityReport } from '../../src/shared/protocol.js'
+import { TOOL_NAMES } from '../../src/host/dsh/tools.js'
 
 const entryModule = await import('../../src/host/index.js')
 const { apply, name, inject } = entryModule
@@ -144,7 +145,11 @@ describe('activation with a full profile', () => {
 
     expect(ctx.routes.map((route) => route.path)).toEqual([ROUTE_PREFIX])
     expect(ctx.sections).toHaveLength(1)
-    expect(ctx.tools.map((tool) => tool.name)).toEqual(['memory_search', 'memory_get', 'memory_save', 'memory_forget'])
+    // The registered set must equal the declared contract, in order: the four
+    // memory tools first, then the life tools.
+    expect(ctx.tools.map((tool) => tool.name)).toEqual([...TOOL_NAMES])
+    expect(ctx.tools.slice(0, 4).map((tool) => tool.name))
+      .toEqual(['memory_search', 'memory_get', 'memory_save', 'memory_forget'])
     expect(ctx.listeners.map((listener) => listener.name)).toContain('session/event')
     expect(ctx.warnings).toEqual([])
   })
@@ -159,7 +164,7 @@ describe('activation with a full profile', () => {
     expect(capabilities.sessionEvents).toBe(true)
     // The route itself was registered, so this one is true too.
     expect(capabilities.webServer).toBe(true)
-    expect(capabilities.registeredTools).toHaveLength(4)
+    expect(capabilities.registeredTools).toHaveLength(TOOL_NAMES.length)
     // Model-assisted extraction is deliberately not implemented.
     expect(capabilities.llmExtraction).toBe(false)
     expect(capabilities.notes['llmExtraction']).toMatch(/默认关闭/)
@@ -176,7 +181,7 @@ describe('activation with a full profile', () => {
 
     for (const callback of ctx.deferred.splice(0)) callback()
     expect(ctx.routes).toHaveLength(1)
-    expect(ctx.tools).toHaveLength(4)
+    expect(ctx.tools).toHaveLength(TOOL_NAMES.length)
     expect(ctx.sections).toHaveLength(1)
   })
 
@@ -226,7 +231,7 @@ describe('graceful degradation', () => {
     const ctx = fakeCtx({ withPrompt: false })
     activate(ctx, { vaultPath: vault })
     expect(ctx.routes).toHaveLength(1)
-    expect(ctx.tools).toHaveLength(4)
+    expect(ctx.tools).toHaveLength(TOOL_NAMES.length)
     expect(ctx.sections).toEqual([])
   })
 

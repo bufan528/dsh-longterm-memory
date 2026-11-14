@@ -22,16 +22,25 @@ import { createHash } from 'node:crypto'
 import { readFile, rm, stat } from 'node:fs/promises'
 import { basename, extname, join, resolve } from 'node:path'
 
+import {
+  DEFAULT_STICKER_POLICY, EMPTY_POLICY_STATE, chooseSticker, normalizePolicy, normalizePolicyState, noteSend,
+} from '../../shared/sticker-pick.js'
+import type { StickerPolicy, StickerPolicyState, StickerQuery } from '../../shared/sticker-pick.js'
 import { VAULT_DIRS } from '../../shared/types.js'
 import { writeFileAtomic } from '../core/fsx.js'
 
 export const STICKER_LIBRARY_CONTRACT = 'sticker-library@v1'
 export const STICKER_CATALOG_FILE = 'catalog.json'
+/** Policy lives beside the catalogue; the QQ plugin ignores files it does not know. */
+export const STICKER_POLICY_FILE = 'policy.json'
 
 export const STICKER_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'] as const
 export const STICKER_MAX_BYTES = 5 * 1024 * 1024
 export const STICKER_TAG_LIMIT = 12
 export const STICKER_DESC_LIMIT = 200
+
+/** Where a row came from. Optional so old catalogues keep loading unchanged. */
+export type StickerSource = 'import' | 'incoming' | 'stolen' | 'other'
 
 export interface StickerRecord {
   id: string
@@ -45,11 +54,21 @@ export interface StickerRecord {
   enabled: boolean
   addedAt: string
   usedCount: number
+  /** Last time the model actually sent this one; drives the "just used" penalty. */
+  lastUsedAt?: string
+  /** Provenance, for the library UI ("来自聊天" vs "手动导入"). */
+  source?: StickerSource
 }
 
 interface StickerCatalogFile {
   schemaVersion: 1
   stickers: StickerRecord[]
+}
+
+interface StickerPolicyFile {
+  schemaVersion: 1
+  policy: StickerPolicy
+  state: StickerPolicyState
 }
 
 const SAFE_BASENAME = /^[A-Za-z0-9._-]+$/
@@ -177,7 +196,7 @@ export class StickerStore {
   async importBytes(
     bytes: Uint8Array,
     fileName: string,
-    input: { description?: string; tags?: string[] } = {},
+    input: { description?: string; tags?: string[]; source?: StickerSource } = {},
   ): Promise<StickerImportOutcome> {
     const root = this.rootDir
     if (root === null) return { ok: false, reason: 'vault not ready' }
@@ -186,9 +205,13 @@ export class StickerStore {
     const sniffed = detectImageExt(bytes)
     if (sniffed === null) return { ok: false, reason: 'unsupported image format' }
     const declared = extname(fileName).replace('.', '').toLowerCase()
-    if (declared.length > 0 && !(STICKER_EXTS as readonly string[]).includes(declared)) {
-      return { ok: false, reason: `unsupported extension: ${declared}` }
-    }
+    // The declared extension is advisory, never a gate.
+    //
+    // Chat platforms save images under names like `1234_abc.image` (OneBot/QQ)
+    // that are not in the whitelist, and rejecting those made auto-collection
+    // fail on every real message. The magic bytes are authoritative: `sniffed`
+    // is non-null at this point, so the stored name is always `<sha256>.<sniffed>`
+    // and a renamed executable is still refused above.
     const ext = sniffed === 'jpg' && declared === 'jpeg' ? 'jpeg' : sniffed
     const sha256 = createHash('sha256').update(bytes).digest('hex')
     const file = `${sha256}.${ext}`
@@ -210,6 +233,7 @@ export class StickerStore {
       enabled: true,
       addedAt: this.now().toISOString(),
       usedCount: 0,
+      ...(input.source === undefined ? {} : { source: input.source }),
     }
 
     // Bytes first, then the row: a crash in between leaves an orphan file,
@@ -248,7 +272,89 @@ export class StickerStore {
   }
 
   async recordUse(id: string): Promise<boolean> {
-    return this.patch(id, (s) => ({ ...s, usedCount: s.usedCount + 1 }))
+    const at = this.now().toISOString()
+    return this.patch(id, (s) => ({ ...s, usedCount: s.usedCount + 1, lastUsedAt: at }))
+  }
+
+  /**
+   * Read the send policy, falling back to the conservative defaults.
+   *
+   * Kept out of `catalog.json` on purpose: that file is shared byte-for-byte
+   * with the QQ plugin, and putting our own keys in it would be the first step
+   * towards the two sides disagreeing about the schema.
+   */
+  async readPolicyFile(): Promise<{ policy: StickerPolicy; state: StickerPolicyState }> {
+    const root = this.rootDir
+    if (root === null) return { policy: { ...DEFAULT_STICKER_POLICY }, state: { ...EMPTY_POLICY_STATE } }
+    let raw: unknown = null
+    try {
+      raw = JSON.parse(await readFile(join(root, STICKER_POLICY_FILE), 'utf8')) as unknown
+    } catch {
+      raw = null
+    }
+    const obj = (raw !== null && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+    return { policy: normalizePolicy(obj['policy']), state: normalizePolicyState(obj['state']) }
+  }
+
+  async writePolicyFile(policy: StickerPolicy, state: StickerPolicyState): Promise<void> {
+    const root = this.rootDir
+    if (root === null) return
+    const body: StickerPolicyFile = { schemaVersion: 1, policy, state }
+    await writeFileAtomic(join(root, STICKER_POLICY_FILE), `${JSON.stringify(body, null, 2)}\n`)
+  }
+
+  /** Absolute path of one sticker's bytes, or null when the row is unknown. */
+  pathOf(id: string): string | null {
+    const root = this.rootDir
+    const record = this.get(id)
+    if (root === null || record === undefined) return null
+    return join(root, record.file)
+  }
+
+  /**
+   * Pick a sticker for a mood, enforcing the send policy.
+   *
+   * The catalogue is re-read first: the QQ side writes the same file, so a stale
+   * in-memory copy could pick a row the user just deleted. On success the use is
+   * recorded and the rolling counter advanced — the caller may still fail to
+   * send, but counting the attempt keeps a retry loop from draining the library.
+   */
+  async pick(query: StickerQuery): Promise<
+    | { ok: true; id: string; path: string; description: string; tags: string[]; reason: string }
+    | { ok: false; blocked: string; reason: string; retryAt?: string }
+  > {
+    await this.load()
+    const { policy, state } = await this.readPolicyFile()
+    const now = this.now().getTime()
+    const decision = chooseSticker(this.stickers, query, policy, state, now)
+    if (!decision.ok) {
+      return {
+        ok: false,
+        blocked: decision.blocked,
+        reason: decision.reason,
+        ...(decision.retryAt === undefined ? {} : { retryAt: decision.retryAt }),
+      }
+    }
+    const record = this.get(decision.id)
+    const path = this.pathOf(decision.id)
+    if (record === undefined || path === null) {
+      return { ok: false, blocked: 'empty', reason: '挑中的表情已不存在，可能刚被删除。' }
+    }
+    await this.recordUse(record.id)
+    await this.writePolicyFile(policy, noteSend(state, now))
+    return { ok: true, id: record.id, path, description: record.description, tags: record.tags, reason: decision.reason }
+  }
+
+  /** Import from a local file path (the shape a chat media cache gives us). */
+  async importPath(
+    absolutePath: string,
+    input: { description?: string; tags?: string[]; source?: StickerSource } = {},
+  ): Promise<StickerImportOutcome> {
+    const info = await stat(absolutePath).catch(() => null)
+    if (info === null || !info.isFile()) return { ok: false, reason: 'file not found' }
+    if (info.size > STICKER_MAX_BYTES) return { ok: false, reason: `file exceeds ${String(STICKER_MAX_BYTES)} bytes` }
+    const bytes = await readFile(absolutePath)
+    return this.importBytes(new Uint8Array(bytes), basename(absolutePath), input)
   }
 
   /** Removes the row and, best-effort, the image file it points at. */

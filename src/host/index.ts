@@ -24,6 +24,7 @@ import { resolveConfig } from './config.js'
 import { MemoryService } from './core/service.js'
 import { installStandingSection, installTurnExtraction, installPerStepRecall } from './dsh/inject.js'
 import { CompanionService } from './companion/service.js'
+import { EvolutionService, EvolutionStore } from './companion/evolution.js'
 import { StickerStore } from './companion/stickers.js'
 import { ReminderStore } from './tasks/reminder-store.js'
 import { ReminderService } from './tasks/reminder-service.js'
@@ -175,6 +176,43 @@ export function apply(ctx: CordisContextLike, config?: unknown): void {
     }
   }
 
+  // ------------------------------------------------ persona evolution (WP-9)
+  // Suggestions are produced from the user's own memories by deterministic
+  // rules; applying one is an explicit click on the page. No timer, no hook into
+  // the conversation — a persona cannot drift while the user is not looking.
+  const evolutionStore = new EvolutionStore({
+    vaultPath: () => service.getVaultPath(),
+    ...(ctx.logger === undefined ? {} : { logger: { warn: ctx.logger.warn.bind(ctx.logger) } }),
+  })
+  const evolutionService = new EvolutionService({
+    companion,
+    store: evolutionStore,
+    listMemories: async (limit) => {
+      try {
+        const result = service.search({ text: '', limit, includeNonCurrent: false })
+        return result.hits.map((hit) => ({
+          id: hit.record.id,
+          title: hit.record.title,
+          // The index keeps a truncated preview rather than the full summary;
+          // that is what the rules read, and it is enough for phrase counting.
+          summary: hit.record.preview ?? '',
+          tags: hit.record.tags,
+        }))
+      } catch {
+        // Index not ready yet: an empty scan is honest, a thrown one blanks the page.
+        return []
+      }
+    },
+  })
+  if (typeof ctx.provide === 'function') {
+    try {
+      ctx.provide('evolutionService', evolutionService)
+      ctx.logger?.info('dsh-longterm-memory: evolutionService provided (persona suggestions)')
+    } catch (error) {
+      ctx.logger?.warn('dsh-longterm-memory: evolutionService 服务注册失败: %o', error)
+    }
+  }
+
   // ---------------------------------------------------------------- web API
   ctx.inject(['webServer'], (scoped) => {
     const result = installRoutes(scoped, service, undefined, companion)
@@ -200,7 +238,10 @@ export function apply(ctx: CordisContextLike, config?: unknown): void {
   // --------------------------------------------------------------- LLM tools
   if (settings.enableTools !== false) {
     ctx.inject(['tools'], (scoped) => {
-      const result = installTools(scoped, service, service.linkage)
+      const result = installTools(scoped, service, service.linkage, {
+        stickers: stickerStore,
+        reminders: reminderService,
+      })
       service.linkage.setEnforcement({ tools: result.registered.length > 0, registeredTools: result.registered })
       service.setCapabilities({
         tools: result.registered.length > 0,

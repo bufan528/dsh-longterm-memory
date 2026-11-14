@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Sticker and reminder tools for the model.** `sticker_pick`, `sticker_ingest`,
+  `reminder_create`, `reminder_list` and `reminder_complete` join the four memory tools, so
+  "remind me at three tomorrow" and "send a sticker for that" finally have something to call.
+  They live in `host/dsh/life-tools.ts` and are built from duck-typed surfaces, which keeps them
+  testable without a vault. Stickers are deliberately **not** owner-gated (they are user-curated
+  images meant for public chat); reminders are, because a schedule is personal.
+- **Sticker send policy.** `shared/sticker-pick.ts` scores candidates (exact tag > substring >
+  description; favourites up, over-used down, used-moments-ago penalised), then applies a
+  cooldown, a rolling 24 h ceiling, quiet tags and an optional probability gate. A refusal is a
+  useful answer: it carries the reason and the retry instant, so the model can say "give it a few
+  minutes" instead of inventing a sticker. Policy and counters live in
+  `Companion/Stickers/policy.json`, deliberately outside `catalog.json` — that file is shared
+  byte-for-byte with the QQ plugin.
+- **Persona evolution, review-gated.** `host/companion/evolution.ts` proposes small changes to
+  the *variable* layer only (address, catchphrases, avoid, tone) from the user's own memories
+  with deterministic rules — no model call, every proposal traceable to memory ids and labelled
+  with a confidence. Suggestions queue in `Companion/Evolution/suggestions.json`; the persona
+  pane grows an "进化建议" card where each row is accepted or dismissed, and accepting writes
+  `Persona.md` through the normal validated path. The fixed core (name / identity / boundaries)
+  is never proposed, and nothing applies without a click: the research consensus (GLA, MeKB-Sim)
+  is that a persona may drift, but traceably and on purpose.
+- Four RPCs back the queue: `evolutionList` / `evolutionScan` / `evolutionApply` /
+  `evolutionDismiss` (54 host methods, 29 Life-page calls, all with branches).
 - **伙伴中心（Life Agent）.** An eighth first-level tab with eight panes — overview, persona,
   sharing, review, stickers, reminders, privacy, diagnostics — backed by Vault-owned stores
   (`companion@v1`, `sticker-library@v1`, `reminder-service@v1`). Stickers and reminders moved
@@ -47,6 +70,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   back from the left); disclosure indicators rotate one chevron 90° instead of swapping two
   icons; themed text selection, hairline scrollbars and a soft focus halo finish the chrome.
   Every new animation is covered by the existing `prefers-reduced-motion` rule.
+
+- **Sticker rhythm is now adjustable.** A "发送节奏" card in the sticker pane edits the gap,
+  the daily ceiling, the send probability and the quiet tags, with the live 24 h count and the
+  last-sent instant beside it. Backed by `stickerPolicy` / `stickerPolicyUpdate`; the file stays
+  `Companion/Stickers/policy.json` so `catalog.json` remains byte-compatible with the QQ plugin.
+- **Sticker provenance.** The catalogue records where a row came from (`import` / `incoming` /
+  `stolen` / `other`), imports from the page now carry `import`, and the tray shows a quiet tinted
+  chip. A "常用" filter joins the tray so the ones that actually get sent are one click away.
+- **Persona evolution is undoable.** Accepted suggestions stay listed and can be reverted:
+  address and tone restore the recorded value, phrase lists drop only the appended entry. New
+  `evolutionRevert` RPC, `reverted` status, and a regression test for the post-restart queue.
+- **Reminder delivery rhythm.** Quiet hours (22:00-08:00 by default), an exponential backoff
+  (15 min × 1.6 per unanswered nudge, five attempts), and a live "what is waiting" summary.
+  `reminderPolicy` / `reminderPolicyUpdate` back a card in the reminder pane, and
+  `reminder_list` now tells the model when a row may actually be sent, so it can answer
+  "not before 08:00" instead of implying it will speak at night. Delivery itself remains the
+  chat plugin's call; this side provides the decision.
+
+- **Automatic sticker capture from chats.** The chat plugin already downloads incoming images
+  and renders `Image: <path>` into the model's context, so capture needs no change on that side:
+  the standing prompt block now tells the model when a reusable reaction image is worth keeping,
+  which paths may not be saved (screenshots, documents, real photos, QR codes, duplicates), and
+  that at most three self-initiated captures happen per conversation. An explicit user request
+  can pass `source: import`, which is not capped. Toggle it in 设置 → 自动提取
+  (`enableStickerAutoCollect`), and the management preview shows exactly what the model receives.
+
+- **Interface pass: surfaces, rhythm, motion and touch targets.** Measured on a live host rather
+  than eyeballed — page, cards and nav were all `rgb(255,255,255)` in light mode, so hierarchy came
+  from a 4% border and nothing else. Surfaces are now mixed *relative to the label colour*
+  (`--lmv-tray`, `--lmv-border`, `--lmv-lift`), which darkens them in light mode and lightens them
+  in dark mode from one rule. Form rows that used `auto-fit` (three columns plus an orphan on a
+  1044px card) now use purpose-built 4- and 3-column grids that collapse at 1180px and 560px.
+  Titles balance their line breaks; numeric columns stay tabular.
+- **Motion follows the doctrine it claims to follow.** Three `linear` animations became `ease-out`
+  (the stylesheet says "no linear motion" and then used it). Buttons gain anticipation on hover,
+  squash on press and follow-through on release, with the icon trailing by a beat — and dense icon
+  buttons explicitly opt out, because a row of jumping buttons reads as jitter. Empty-state float
+  now runs once instead of forever.
+- **Loading looks like the arriving content.** A new `Skeleton` (rows / grid / card) replaces the
+  spinner in the sticker library, the reminder list, the inbox, shared memory and search results, so
+  nothing jumps when data lands. Toasts cap at three, and the stack no longer intercepts clicks
+  meant for the page underneath.
+- **Reachability and restraint.** Coarse pointers get 34px hit targets; `hover:none` keeps
+  hover-revealed row actions visible; narrow navs fade at the edges to signal scrollability; scroll
+  containers reserve their gutter and stop scroll chaining; `:focus-visible` is a single ring
+  instead of an outline plus a 4px halo; nav items carry `aria-current`. Under
+  `prefers-reduced-motion` the collapse panel keeps its delayed-visibility timing (the blanket 1ms
+  rule broke it) and skeletons drop their shimmer.
+- **Less first-screen noise.** The sticker drop zone collapses to one row once the library has
+  content, the twelve emotion chips scroll in a single row instead of wrapping, the inner list is
+  renamed 全部表情 to stop duplicating 表情包图库, and context badges like 今晚 lost their border so
+  they stop competing with counts.
+
+### Fixed
+
+- `ReminderStore.readPolicy` normalised the `{ schemaVersion, policy }` wrapper instead of the
+  policy itself, so every read returned defaults and a user's quiet hours silently vanished on
+  the next restart. Reading back what was written now has its own test, including the `0` hour
+  that a truthiness check would have dropped.
+- **Sticker import no longer trusts the declared extension.** QQ/OneBot saves incoming images
+  as `1712345678_ab12cd34.image`, and the old whitelist rejected every one of them with
+  "unsupported extension: image" — auto-collection could not work on a real chat. The magic
+  bytes decide the format (a renamed executable is still refused), and the stored file is always
+  `<sha256>.<sniffed>`.
+- `EvolutionService` listed from an in-memory cache that was never loaded on boot: after a
+  restart the suggestion queue appeared empty, and a scan would then rewrite the file from that
+  empty cache and erase every applied/dismissed decision. The service now loads once per process
+  before list/scan/apply/revert.
 
 ### Fixed
 

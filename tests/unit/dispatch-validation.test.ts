@@ -78,6 +78,14 @@ describe('dispatch rejects malformed write payloads before the service', () => {
     expect(calls.setSettings).toBe(0)
   })
 
+  it('rejects a non-boolean sticker capture flag instead of treating it as on', async () => {
+    // The prompt builder tests `!== false`, so `"no"` would silently mean "on".
+    const calls = emptyCalls()
+    await expect(dispatch(fakeService(calls), 'setSettings', { enableStickerAutoCollect: 'no' }))
+      .rejects.toMatchObject({ code: 'invalid-request' })
+    expect(calls.setSettings).toBe(0)
+  })
+
   it('accepts a well-formed save payload', async () => {
     const calls = emptyCalls()
     await dispatch(fakeService(calls), 'save', {

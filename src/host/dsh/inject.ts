@@ -39,6 +39,85 @@ export interface CordisLike {
 export const STANDING_SECTION_ORDER = 9500
 export const STANDING_SECTION_NAME = 'longterm-memory:standing'
 
+/**
+ * The sticker-capture instruction appended to the standing block.
+ *
+ * The chat plugin already downloads incoming images and renders `Image: <path>`
+ * into the model's context, so no plugin change is needed to *reach* the bytes —
+ * what was missing is permission and restraint. Hence the shape of this hint: it
+ * names the positive case (a reusable reaction image), then the negatives that
+ * make auto-collection annoying (screenshots, documents, real photos, QR codes),
+ * then a hard cap. A model told only "you may save images" will save everything.
+ *
+ * Kept short on purpose: this rides along on every turn.
+ */
+export function stickerCollectHint(language: 'zh' | 'en'): string {
+  if (language === 'en') {
+    return [
+      '',
+      '## Sticker capture',
+      'When a chat image is clearly a reusable reaction image or meme, you may call `sticker_ingest` once',
+      'with the local `path` from the `Image: <path>` line, a `description` of the mood it expresses,',
+      'and emotion `tags` (e.g. happy, speechless, goodnight).',
+      'Do not capture: screenshots, document or web-page captures, photos of real people, QR codes,',
+      'or an image already in the library. At most three per day in one conversation — when unsure, do not capture.',
+    ].join('\n')
+  }
+  return [
+    '',
+    '## 表情收录',
+    '聊天里收到图片时，只有当它明显是一张可复用的反应图或表情包，才调用 `sticker_ingest` 收录一次：',
+    '`path` 用上下文里 `Image: <路径>` 给出的本地文件，`description` 写它表达的情绪或用途，',
+    '`tags` 用情绪词（如 开心 / 无语 / 晚安），便于以后按情绪挑选。',
+    '不要收录：截图、文档或网页截图、真人照片、二维码，以及库里已有的同一张图。',
+    '同一次对话里每天最多收录 3 张；拿不准就不收。',
+  ].join('\n')
+}
+
+/**
+ * Read the live settings, or null when the service cannot supply them.
+ *
+ * The sticker hint is decoration; the memory text is the payload. A service that
+ * cannot answer `getSettings` (a test double, or a future refactor) must not cost
+ * the user their memories, so this fails soft and the hint is simply skipped.
+ */
+function readLiveSettings(service: MemoryService): ReturnType<MemoryService['getSettings']> | null {
+  try {
+    return typeof service.getSettings === 'function' ? service.getSettings() : null
+  } catch {
+    return null
+  }
+}
+
+/** Decoration decision from a settings object, defaulting to "no hint". */
+function stickerHintOptions(live: ReturnType<MemoryService['getSettings']> | null): { stickerCollect: boolean; language: 'zh' | 'en' } {
+  if (live === null) return { stickerCollect: false, language: 'zh' }
+  return {
+    stickerCollect: live.enableStickerAutoCollect !== false && live.enableTools !== false,
+    language: live.language,
+  }
+}
+
+/**
+ * Assemble the block that is actually injected.
+ *
+ * Shared by the live path and the management preview on purpose: a preview that
+ * renders something different from what the model receives is worse than no
+ * preview. The hint is appended after the memory text, so the memory budget is
+ * never charged for it.
+ */
+export function composeStandingBlock(
+  memoryText: string,
+  options: { stickerCollect: boolean; language: 'zh' | 'en' },
+): string {
+  // Empty memory means "no block", and that invariant belongs to the host: an
+  // empty section that exists only to carry a tool hint reads to the model as
+  // "there are memories" and costs tokens on every turn for nothing.
+  if (memoryText.trim().length === 0) return memoryText
+  if (!options.stickerCollect) return memoryText
+  return memoryText + stickerCollectHint(options.language)
+}
+
 export interface InjectionResult {
   systemPrompt: boolean
   perStepRecall: boolean
@@ -122,8 +201,11 @@ export function installStandingSection(
 
         // A call without context (e.g. the management page preview) only checks
         // what the block looks like; it is not a session and must not be counted
-        // as a gate decision. It also browses the whole vault by design.
-        if (!hasAgent) return service.standing().text
+        // as a gate decision. It also browses the whole vault by design. It still
+        // shows the capture hint, so the preview matches the injected block.
+        if (!hasAgent) {
+          return composeStandingBlock(service.standing().text, stickerHintOptions(readLiveSettings(service)))
+        }
 
         if (linkage !== undefined) {
           linkage.markStandingContextSeen()
@@ -142,7 +224,11 @@ export function installStandingSection(
         }
 
         // 身份已判定；这里只把结果翻译成可见范围，检索层不参与授权判断。
-        return service.standing({ visibilities: visibilitiesFor(ownerDecision) }).text
+        const memory = service.standing({ visibilities: visibilitiesFor(ownerDecision) }).text
+        // Read live settings: turning capture off must take effect on the next turn,
+        // not on the next host restart. Appended *after* the gate, so a denied
+        // session still gets an empty block rather than a half instruction.
+        return composeStandingBlock(memory, stickerHintOptions(readLiveSettings(service)))
       } catch (error) {
         ctx.logger?.warn('dsh-longterm-memory: standing section failed: %o', error)
         return ''

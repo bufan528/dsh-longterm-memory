@@ -24,6 +24,7 @@ import type { MemoryService } from '../../src/host/core/service.js'
 import { installStandingSection, STANDING_SECTION_NAME, type CordisLike } from '../../src/host/dsh/inject.js'
 import type { IndexRecord, MemoryIndex } from '../../src/shared/search.js'
 import { standingFacts } from '../../src/host/core/retrieval.js'
+import { DEFAULT_SETTINGS } from '../../src/shared/protocol.js'
 
 const NOW = new Date('2026-11-08T12:00:00Z')
 const OWNER_ID = 'owner-8f2c'
@@ -141,6 +142,9 @@ function harness(identity: ReturnType<typeof identityService> | undefined, stand
     isReady: () => true,
     standing: () => standing,
     setStandingSectionProbe: () => undefined,
+    // The section reads settings to decide whether to append the sticker hint;
+    // a double without it would silently exercise only the degraded path.
+    getSettings: () => ({ ...DEFAULT_SETTINGS }),
   } as unknown as MemoryService
 
   installStandingSection(ctx, service, {}, undefined)

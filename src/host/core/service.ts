@@ -2242,6 +2242,9 @@ function queryIndexCompat(
 const BOOLEAN_SETTINGS = [
   'enableTools', 'enablePromptSection', 'enablePerStepRecall', 'enableAutoExtraction',
   'enableLlmExtraction', 'redactSecrets', 'sensitiveNeedsConfirmation',
+  // Typed so a stray `"no"` cannot be read as "on" by the prompt builder, which
+  // tests `!== false`.
+  'enableStickerAutoCollect',
 ] as const
 
 const NUMERIC_SETTINGS = [
