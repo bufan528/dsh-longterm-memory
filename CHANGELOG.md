@@ -57,6 +57,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   from 6 to 7 first-level tabs (`伙伴中心` inserted before `设置`), `RPC_METHODS` grew to 59, and
   the model now has 9 tools instead of 4. Settings, vault layout and stored files stay backward
   compatible; the JSON RPC names did not change, only grew. Version bumped 0.1.8 → **0.2.0**.
+- **Distribution.** `0.2.0` is on npm (`latest` → 0.2.0) and on the GitHub Release
+  (versioned tgz + versionless alias + SHA-256 sidecars). The in-app market resolves this
+  plugin from the **npm `latest` tag**: the catalog entry has an `npm` field, so dshmarket
+  skips the GitHub-tarball update path entirely. The catalog itself rebuilds daily at
+  02:23 UTC, so the version string shown on the card can lag the registry by up to a day —
+  the tarball alias is the immediate route.
 - **The entire management UI was rebuilt** against two explicit references: the Apple HIG
   (one primary action per view, content before chrome, depth through surfaces rather than
   outlines) and Disney's animation principles (press-scale as anticipation, a blurred backdrop
