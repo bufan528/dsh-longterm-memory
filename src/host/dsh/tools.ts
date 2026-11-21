@@ -33,6 +33,7 @@ import {
 import { visibilitiesFor, type OwnerAccessDecision } from '../../shared/owner-access.js'
 import { buildLifeTools, type LifeToolExtras } from './life-tools.js'
 import { scanSecrets } from '../core/engine.js'
+import { installNativeToolCards } from '../dshgo/bridge.js'
 
 /** Minimal JSON value type used by tool render output. */
 export interface ToolTextBlock {
@@ -682,6 +683,10 @@ export function installTools(
   }
   const registered: string[] = []
   const definitions = buildToolDefinitions(service, linkage, ownerGate, extras)
+  // DSH Go renders tool results as native cards via `output.presentationMeta`.
+  // Desktop hosts ignore the field, so this is safe for both; the builder is
+  // defensive and returns no card rather than ever failing the tool call.
+  try { installNativeToolCards(definitions as unknown as { name: string; output: Record<string, unknown> }[]) } catch { /* optional enhancement */ }
   ctx.effect(
     () => {
       const disposers: unknown[] = []

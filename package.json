@@ -1,6 +1,6 @@
 {
   "name": "dsh-longterm-memory",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "DSH Memory Vault (长期记忆) — durable local long-term memory for DeepSeek Harness, stored as an Obsidian-compatible Markdown vault with a rebuildable index, an in-sidebar management page, and real per-turn recall.",
   "private": false,
   "type": "module",
@@ -8,7 +8,7 @@
   "author": "DSH Memory Vault contributors",
   "engines": {
     "node": ">=20",
-    "dsh": ">=0.2.1-rc.3 <0.2.2"
+    "dsh": ">=0.2.1-rc.3 <0.3.0-0"
   },
   "icon": "./icon.svg",
   "meta": {
@@ -39,10 +39,33 @@
       ]
     },
     "manifestVersion": 1,
+    "dshGo": {
+      "v": 1,
+      "title": { "zh": "长期记忆", "en": "Memory" },
+      "icon": "book",
+      "contributes": {
+        "panels": [
+          { "id": "overview", "title": { "zh": "记忆总览", "en": "Memory" }, "icon": "book", "placement": ["session.tab", "features"] },
+          { "id": "inbox", "title": { "zh": "待确认", "en": "Inbox" }, "icon": "notification", "placement": ["features"] },
+          { "id": "reminders", "title": { "zh": "提醒", "en": "Reminders" }, "icon": "reminder", "placement": ["features"] }
+        ],
+        "composer.strip": [
+          { "id": "memory", "icon": "book", "panel": "overview" }
+        ],
+        "composer.actions": [
+          { "id": "memory-save", "label": { "zh": "记下来", "en": "Remember" }, "icon": "note", "wants": ["draft"] },
+          { "id": "memory-search", "label": { "zh": "查记忆", "en": "Recall" }, "icon": "search", "wants": ["draft"] }
+        ],
+        "message.actions": [
+          { "id": "message-save", "label": { "zh": "存入记忆", "en": "Remember" }, "icon": "book", "wants": ["message"] }
+        ]
+      }
+    },
     "compatibility": {
       "dshReleases": {
         "0.2.1-rc.2": "compatible",
-        "0.2.1-rc.3": "compatible"
+        "0.2.1-rc.3": "compatible",
+        "0.2.2-rc.1": "compatible"
       }
     }
   },

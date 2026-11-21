@@ -524,14 +524,26 @@ button.lmv-chip.lmv-chip-warn:hover{background:color-mix(in srgb, var(--dsw-alia
 @keyframes lmv-spin{to{transform:rotate(360deg)}}
 @keyframes lmv-grow{from{transform:scaleX(.02)}to{transform:scaleX(1)}}
 
-/* Coarse pointers get real hit targets. Desktop keeps its density. */
+/* Coarse pointers get real hit targets. Desktop keeps its density.
+   DSH Go's WebView applies a 44px floor to native buttons; match it here so our
+   custom controls are no smaller than the host's own touch targets. */
 @media (pointer:coarse){
-  .lmv-btn,.lmv-btn-sm{min-height:34px;padding:6px 12px}
-  .lmv-icon-btn{width:34px;min-height:34px}
-  .lmv-nav-btn{padding:8px 13px}
-  .lmv-sticker-actions .lmv-btn{min-height:32px;padding:4px 8px}
-  .lmv-seg-btn{padding:6px 11px}
+  .lmv-btn,.lmv-btn-sm{min-height:44px;padding:9px 14px}
+  .lmv-icon-btn{width:44px;min-height:44px}
+  .lmv-nav-btn{min-height:40px;padding:9px 14px}
+  .lmv-sticker-actions .lmv-btn{min-height:44px;padding:8px 12px}
+  .lmv-seg-btn{min-height:40px;padding:9px 14px}
   .lmv-reminder-actions{opacity:1}
+  /* Give text controls room to be tapped without the on-screen keyboard
+     covering them; the host owns the keyboard, we only reserve the space. */
+  .lmv-input,.lmv-textarea,.lmv-search-input{min-height:44px}
+}
+/* Respect display cut-outs and gesture bars on DSH Go's edge-to-edge WebView.
+   Fall back to the plain padding used above when env() is unavailable. */
+@supports(padding:env(safe-area-inset-left)){
+  .lmv-page{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+  .lmv-head{padding-top:calc(14px + env(safe-area-inset-top))}
+  .lmv-main{padding-bottom:calc(32px + env(safe-area-inset-bottom))}
 }
 /* No hover: hover-revealed actions must simply be visible. */
 @media (hover:none){

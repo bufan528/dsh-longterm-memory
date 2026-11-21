@@ -5,7 +5,7 @@
 | 项 | 值 | 证据 |
 |---|---|---|
 | 已验证的 DSH 版本 | **`0.2.1-rc.3`** | `app.asar` 内 `/dsh/package.json` 的 `version`；`D:\dsh\resources\runtime\primary-runtime\runtime.json` 的 `desktopVersion`（2026-10-27 实测，见 §12） |
-| 本包 `engines.dsh` 声明 | `>=0.2.1-rc.3 <0.2.2`（只声明 DSH **0.2.1 线**；0.1.5 起下限随重新核验上移到 rc.3） | 宿主自带 `semver@7.8.5`：`>=0.2.1-rc.3 <0.2.2` 对 `0.2.1-rc.3`→true；`0.2.2`/`0.3.0`/`0.2.0-rc.2`→false |
+| 本包 `engines.dsh` 声明 | `>=0.2.1-rc.3 <0.3.0-0`（0.2.1 线为实测支持；0.2.2 线为 DSH Go 手机端内置版本，做静态兼容声明——见 §13） | 宿主自带 `semver@7.8.5`：`>=0.2.1-rc.3 <0.3.0-0` 对 `0.2.1-rc.3` 与 `0.2.2-rc.1`→true；`0.3.0`/`0.2.0-rc.2`→false |
 | 安装器接受结果 | **exit 0，无 `pluginCompatibilityWarning`，无需版本豁免** | 隔离 profile `r9a` 真实安装 + 启动日志扫描（0 条警告；0.2.1-rc.2 时实测） |
 | 官方包清单 | 236 个 `@deepseek-ai/*` 包 | `app.asar` 内 `node_modules/@deepseek-ai/` |
 | 客户端 bundle 契约 | `window.__ModuleLoader__.load({id, factory})` | 87 个官方 `lib/client.js` 首行 |
@@ -31,22 +31,24 @@
 
 不匹配的后果：path/registry 安装被拒绝；tarball 安装回滚；已安装的在启动时跳过该 bundle。
 
-**本包只声明 `engines.dsh` 为「DSH 0.2.1 线」**（当前字面量
-`>=0.2.1-rc.3 <0.2.2`：下限锁在 0.2.1 的预发布号，上界 `<0.2.2`），不声明任何
+**本包声明 `engines.dsh` 覆盖两条线**（当前字面量
+`>=0.2.1-rc.3 <0.3.0-0`：下限锁在 0.2.1 的预发布号，上界 `<0.3.0-0`），不声明任何
 `@deepseek-ai/*` peerDependency（`scripts/lint.mjs` 作为硬规则检查后者）。选择该范围的理由：
 
 - 宿主实际版本 `0.2.1-rc.3` 必须满足（已用宿主自带 `semver@7.8.5` 验证为 `true`，见 §12）；
+- DSH Go 手机端内置 `0.2.2-rc.1`，也需要能装上（其 Cordis/工具/提示词分段 API 与 0.2.1 线
+  **静态一致**，但**未在真机验证**，见 §13）；这是把上界从 `<0.2.2` 放宽到 `<0.3.0-0` 的唯一原因；
 - 预发布范围的 SemVer 行为：只有当比较器带同样的 `major.minor.patch` 元组及预发布号时才匹配
   预发布版本，因此显式写 `>=0.2.1-rc.<n>` 而不是 `^0.2.0`（后者对 0.2.1 预发布版本为 `false`）；
-- 上界 `<0.2.2` 表示**只声明 0.2.1 这一条已实测的线**，不把 0.2.2 / 0.3.x 纳入未验证的支持范围。
+- 上界 `<0.3.0-0` 表示**不把 0.3.x 纳入支持范围**；0.3 可能有破坏性改动，需在那个版本上实测后再放宽。
 
 > **版本一致性检查的硬要求**：`scripts/check-version-consistency.mjs` 用**字符串子串**
 > 校验「README 与本文的已验证版本一致、且出现在 `engines.dsh` 字面量里、且列在
 > `dsh.compatibility.dshReleases` 中」。因此 `engines.dsh` 的字面量必须包含
-> `0.2.1-rc.3`（例如 `>=0.2.1-rc.3 <0.2.2`），否则 `npm run lint` 会失败。
+> `0.2.1-rc.3`（例如 `>=0.2.1-rc.3 <0.3.0-0`），否则 `npm run lint` 会失败。
 
-> 不要为了"能装上"而放宽这个范围：真实安装器（隔离 profile `r9a`）在 0.2.1 线范围内
-> exit 0、无警告、无需豁免，已实测。
+> 放宽上界只是为了兼容声明，**不改变实测结论**：桌面宿主仍在 `0.2.1-rc.3` 上实测通过
+> （隔离 profile `r9a`，exit 0、无警告、无需豁免）。0.2.2 线的兼容是静态推断，见 §13。
 
 ## 3. `package.json` 字段契约
 
@@ -359,3 +361,24 @@ profile 的 `cordis.patch.yml` 里预设。预设与页面保存的优先级与�
 - `qqLinkage` 只影响四个执行点（常驻注入 / 每步检索 / 写回 / 工具），**不改变任何记忆
   文件**；`mode: 'off'` 时行为与未接入 QQ 时完全一致。语义细节见
   [`docs/qq-integration.md`](qq-integration.md) §5。
+
+## 13. DSH Go（手机端）兼容声明（2026-11-21）
+
+DSH Go 的 Android 版在 App 内跑 Ubuntu + Node + DSH 引擎，iOS 版跑 NodeMobile；两者
+加载的都是标准 DSH 引擎并通过 `dsh web` 起本地 Web 服务。因此本插件的存储、59 个 RPC、
+9 个工具、提示词分段与事件提取在手机端**不需要改代码路径**（引擎内 API 与桌面一致）。
+
+| 项 | 值 | 证据 / 边界 |
+|---|---|---|
+| DSH Go 内置引擎版本 | `0.2.2-rc.1`（App 当前发布版，随版本可能变化） | dsh-Go 仓库 `runtime/locks/`、`docs/plugins/from-zero.md` |
+| 本包对其判定 | `engines.dsh: >=0.2.1-rc.3 <0.3.0-0` → **满足** | 静态 API 比对：`ctx.get/inject/on/effect`、`webServer.register`、`systemPrompt.section`、`tools.register` 在 0.2.2 线仍然存在 |
+| 真机验证 | **未做** | 无 Android/iOS 真机运行记录；App 原生视图同样只经本地单测与 JSON 预算校验 |
+| 原生前端 | `package.json` 的 `dsh.dshGo` 清单 + `src/host/dshgo/` 桥接 | App 不执行插件 JS，只读声明式 JSON 视图；无桥接的桌面端该回调不触发 |
+| 桌面实测结论 | 不变，仍为 `0.2.1-rc.3` | 本文 §12；放宽上界不改变已验证版本 |
+
+**为什么放宽上界**：`0.2.2-rc.1` 高于旧上界 `<0.2.2`，不放宽会被 dsh-Go 安装器拒绝；
+放宽到 `<0.3.0-0` 只覆盖 0.2.2 线，**明确排除 0.3.x**。这是一次"允许安装"的兼容声明，
+不是一次新的实测认证——两者在本项目里严格区分。
+
+**真机验收**：按 [`docs/dsh-go.md`](dsh-go.md) §5 的 7 项清单逐条核对。任何不符先查
+引擎日志，不要把静态兼容声明当成已验证结论对外传播。

@@ -61,7 +61,7 @@ export const OFFICIAL_VERIFIED_RELEASES = ['0.1.0-rc.8', '0.2.0-rc.2'] as const
 export const REPO_HOST_COMPAT = '0.2.1-rc.3'
 
 /** 本插件仓库声明的宿主兼容范围（与 package.json engines.dsh 保持一致）。 */
-export const REPO_HOST_ENGINE_RANGE = '>=0.2.1-rc.3 <0.2.2'
+export const REPO_HOST_ENGINE_RANGE = '>=0.2.1-rc.3 <0.3.0-0'
 
 /** 探测超时（毫秒）。 */
 export const PROBE_TIMEOUT_MS = 4000

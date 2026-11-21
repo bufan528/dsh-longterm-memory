@@ -4,6 +4,24 @@ All notable changes to **DSH Memory Vault (`dsh-longterm-memory`)** are document
 here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-11-21
+
+### Added
+
+- **DSH Go (Android/iOS) native adaptation.** A new `src/host/dshgo/` bridge renders
+  three native panels (overview / inbox / reminders), a composer strip, two capsules and
+  a message action through the app's `ctx.dshGo` JSON-view protocol; nine model tools now
+  carry `presentationMeta` result cards. The web management page gets 44px touch targets
+  and safe-area insets for the phone WebView. See `docs/dsh-go.md`.
+- **Contract tests** for the native manifest/view budgets (`tests/unit/dshgo-native.test.ts`).
+
+### Changed
+
+- `engines.dsh` widened from `>=0.2.1-rc.3 <0.2.2` to `>=0.2.1-rc.3 <0.3.0-0` so the
+  plugin installs on DSH Go's bundled `0.2.2-rc.1`. The verified-version claim stays at
+  `0.2.1-rc.3` (desktop); the 0.2.2 line is a **static compatibility claim, not
+  device-tested**. All three compatibility documents updated in lockstep.
+
 ## [0.2.0] - 2026-11-14
 
 ### Added

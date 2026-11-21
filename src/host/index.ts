@@ -31,6 +31,7 @@ import { ReminderService } from './tasks/reminder-service.js'
 import { installRoutes } from './dsh/routes.js'
 import { installTools } from './dsh/tools.js'
 import { createDshLlmAdapter } from './dsh/llm.js'
+import { installDshGoBridge } from './dshgo/bridge.js'
 import { DEFAULT_SETTINGS, type PluginSettings } from '../shared/protocol.js'
 
 /** Cordis plugin name. */
@@ -254,6 +255,16 @@ export function apply(ctx: CordisContextLike, config?: unknown): void {
     service.linkage.setEnforcement({ tools: false })
     service.setCapabilities({ tools: false })
   }
+
+  // ------------------------------------------------- DSH Go native surfaces
+  // Opt-in: the inject callback only fires on a DSH Go host that exposes the
+  // bridge. Native panels, the composer strip and the result cards all read
+  // the same in-process service the web RPC uses. On desktop this is a no-op.
+  installDshGoBridge(ctx, {
+    service,
+    getReminders: () => reminderService,
+    logger: ctx.logger === undefined ? undefined : { info: ctx.logger.info.bind(ctx.logger), warn: ctx.logger.warn.bind(ctx.logger) },
+  })
 
   // ------------------------------------------------- turn extraction trigger
   const extractionSettings: PluginSettings = { ...DEFAULT_SETTINGS, ...settings }
