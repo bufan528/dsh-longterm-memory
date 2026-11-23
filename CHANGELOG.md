@@ -4,6 +4,15 @@ All notable changes to **DSH Memory Vault (`dsh-longterm-memory`)** are document
 here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.1] - 2026-11-23
+
+### Fixed
+
+- Path exploration no longer loses its result when the user taps a memory in the path list: detail-rail
+  clicks now inspect the memory without resetting the start/end nodes.
+- Added a **路径详情 / Path details** action to the path bar so the path list can be opened on phones
+  without leaving path mode.
+
 ## [0.4.0] - 2026-11-23
 
 ### Added

@@ -262,6 +262,12 @@ export function LinksView(props: { focus: string | null }): ReactElement {
     [runView],
   )
 
+  /** Inspect a memory from the detail rail without changing path endpoints. */
+  const handleInspect = useCallback((id: string): void => {
+    setPicked(id)
+    setDetailOpen(true)
+  }, [])
+
   const runRelink = async (): Promise<void> => {
     try {
       const result = await relink.run()
@@ -437,6 +443,7 @@ export function LinksView(props: { focus: string | null }): ReactElement {
           onOpen={page.openMemory}
           onCluster={pickCluster}
           onClearPath={exitPath}
+          onPathDetails={() => setDetailOpen(true)}
           onZeroRelink={() => void runRelink()}
           relinkBusy={relink.busy}
           compat={compat}
@@ -446,13 +453,12 @@ export function LinksView(props: { focus: string | null }): ReactElement {
         <DetailRail
           data={data}
           node={focusNode}
-          analysis={analysis}
           compat={compat}
           pathMode={pathMode}
           pathStart={pathStart}
           pathEnd={pathEnd}
           path={path}
-          onSelect={handleSelect}
+          onInspect={handleInspect}
           onOpen={page.openMemory}
           onExplore={(id) => {
             setPicked(id)
@@ -461,6 +467,9 @@ export function LinksView(props: { focus: string | null }): ReactElement {
             setCluster(null)
             setSpecial('none')
             setDetailOpen(true)
+            setPathMode(false)
+            setPathStart(null)
+            setPathEnd(null)
             window.setTimeout(() => runView('fit'), 30)
           }}
           onLocate={() => runView('center')}
@@ -937,6 +946,7 @@ interface StageProps {
   onOpen: (id: string) => void
   onCluster: (key: number | null) => void
   onClearPath: () => void
+  onPathDetails: () => void
   onZeroRelink: () => void
   relinkBusy: boolean
   compat: boolean
@@ -1506,6 +1516,11 @@ function GraphStage(props: StageProps): ReactElement {
                   ? translate('links.pathNone')
                   : translate('links.pathFound', { count: Math.max(0, props.path.length - 1) })}
           </span>
+          {props.path !== null ? (
+            <button type="button" className="lmv-wb-pathbar-clear" onClick={props.onPathDetails}>
+              {translate('links.pathDetails')}
+            </button>
+          ) : null}
           <button type="button" className="lmv-wb-pathbar-clear" onClick={props.onClearPath}>
             {translate('links.pathClear')}
           </button>
@@ -1591,13 +1606,12 @@ function GraphStage(props: StageProps): ReactElement {
 interface DetailProps {
   data: LinkGraphResponse
   node: LinkGraphNode | null
-  analysis: LinkGraphAnalysis
   compat: boolean
   pathMode: boolean
   pathStart: string | null
   pathEnd: string | null
   path: readonly string[] | null
-  onSelect: (id: string | null) => void
+  onInspect: (id: string) => void
   onOpen: (id: string) => void
   onExplore: (id: string) => void
   onLocate: () => void
@@ -1669,7 +1683,7 @@ function DetailRail(props: DetailProps): ReactElement {
                 <span className="lmv-wb-path-count">{translate('links.pathFound', { count: Math.max(0, props.path.length - 1) })}</span>
                 <div className="lmv-wb-path-list">
                   {props.path.map((id, index) => (
-                    <button key={`${id}-${String(index)}`} type="button" className="lmv-wb-path-node" onClick={() => props.onSelect(id)}>
+                    <button key={`${id}-${String(index)}`} type="button" className="lmv-wb-path-node" onClick={() => props.onInspect(id)}>
                       <span className="lmv-wb-path-index">{index + 1}</span>
                       <span>{nodeMap.get(id)?.title ?? id}</span>
                     </button>
@@ -1752,7 +1766,7 @@ function DetailRail(props: DetailProps): ReactElement {
                 peer: nodeMap.get(edge.target),
                 detail: edge.context.trim().length === 0 ? translate('links.noContext') : edge.context,
                 kind: 'manual',
-                onClick: () => props.onSelect(edge.target),
+                onClick: () => props.onInspect(edge.target),
               }))}
             />
             {related.auto.length === 0 ? null : (
@@ -1768,7 +1782,7 @@ function DetailRail(props: DetailProps): ReactElement {
                     peer: nodeMap.get(peerId),
                     detail: edge.reason ?? translate('links.noContext'),
                     kind: 'auto',
-                    onClick: () => props.onSelect(peerId),
+                    onClick: () => props.onInspect(peerId),
                   }
                 })}
               />
@@ -1782,7 +1796,7 @@ function DetailRail(props: DetailProps): ReactElement {
                 peer: nodeMap.get(edge.source),
                 detail: edge.context.trim().length === 0 ? translate('links.noContext') : edge.context,
                 kind: 'manual',
-                onClick: () => props.onSelect(edge.source),
+                onClick: () => props.onInspect(edge.source),
               }))}
             />
             {related.shared.length === 0 ? null : (
@@ -1795,7 +1809,7 @@ function DetailRail(props: DetailProps): ReactElement {
                   peer: entry.peer,
                   detail: `#${entry.tag}`,
                   kind: 'derived',
-                  onClick: () => props.onSelect(entry.peer.id),
+                  onClick: () => props.onInspect(entry.peer.id),
                 }))}
               />
             )}
