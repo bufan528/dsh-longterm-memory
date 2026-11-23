@@ -80,10 +80,16 @@ export const memoryMetaSchema = z.object({
   schemaVersion: z.number().int().min(1).max(1000),
 })
 
+export const autoLinkSchema = z.object({
+  target: z.string().min(1).max(300),
+  reason: z.string().max(300),
+})
+
 export const memorySchema = memoryMetaSchema.extend({
   summary: z.string().max(20000),
   sections: z.array(z.object({ heading: z.string().min(1).max(200), body: z.string().max(20000) })).max(32),
   related: z.array(z.string().min(1).max(300)).max(64),
+  relatedAuto: z.array(autoLinkSchema).max(16).optional(),
   extraFrontmatter: z.record(z.string(), z.unknown()).optional(),
   preservedBody: z.string().max(200000).optional(),
 })
@@ -179,6 +185,7 @@ export function normalizeMemory(input: unknown): NormalizeResult {
     summary: typeof record['summary'] === 'string' ? record['summary'].slice(0, 20000) : '',
     sections: normalizeSections(record['sections']),
     related: normalizeStringArray(record['related'], 64),
+    relatedAuto: normalizeAutoLinks(record['relatedAuto']),
     ...(isPlainRecord(record['extraFrontmatter']) ? { extraFrontmatter: record['extraFrontmatter'] } : {}),
     ...(typeof record['preservedBody'] === 'string' ? { preservedBody: record['preservedBody'] } : {}),
   }
@@ -196,8 +203,34 @@ export function normalizeMemory(input: unknown): NormalizeResult {
 export function normalizeMeta(input: unknown): { ok: true; meta: MemoryMeta; repairs: string[] } | { ok: false; reason: string } {
   const result = normalizeMemory({ summary: '', sections: [], related: [], ...asRecord(input) })
   if (!result.ok) return result
-  const { summary: _summary, sections: _sections, related: _related, ...meta } = result.memory
+  const { summary: _summary, sections: _sections, related: _related, relatedAuto: _relatedAuto, ...meta } = result.memory
   return { ok: true, meta, repairs: result.repairs }
+}
+
+/**
+ * Read inferred links leniently.
+ *
+ * They are derived data: one malformed row is dropped instead of quarantining a
+ * perfectly good note, and the link list is bounded so a bad generator cannot
+ * bloat a file.
+ */
+function normalizeAutoLinks(value: unknown): { target: string; reason: string }[] {
+  if (!Array.isArray(value)) return []
+  const out: { target: string; reason: string }[] = []
+  const seen = new Set<string>()
+  for (const entry of value) {
+    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) continue
+    const row = entry as Record<string, unknown>
+    const target = typeof row['target'] === 'string' ? row['target'].trim() : ''
+    if (target.length === 0 || target.length > 300 || seen.has(target)) continue
+    seen.add(target)
+    out.push({
+      target,
+      reason: typeof row['reason'] === 'string' ? row['reason'].slice(0, 300) : '',
+    })
+    if (out.length >= 16) break
+  }
+  return out
 }
 
 /** Normalise a single instant to `YYYY-MM-DDTHH:MM:SS.sssZ`, or `null`. */

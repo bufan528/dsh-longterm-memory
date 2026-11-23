@@ -17,12 +17,21 @@ import {
   splitFrontmatterSource,
   type FrontmatterUpdates,
 } from './frontmatter-edit.js'
-import type { Memory, MemoryMeta, MemorySection } from './types.js'
+import type { AutoLink, Memory, MemoryMeta, MemorySection } from './types.js'
 
 /** Section headings the plugin owns; other sections are preserved verbatim. */
 export const SECTION_SUMMARY = '核心内容'
 export const SECTION_EVIDENCE = '来源与依据'
 export const SECTION_RELATED = '相关记忆'
+
+/**
+ * Markers that fence plugin-inferred links inside `## 相关记忆`.
+ *
+ * The block is regenerated on every write, so manual links stay above it and a
+ * user can delete the block to opt out without losing their own links.
+ */
+export const AUTO_LINK_START = '<!-- dsh-auto-links:start -->'
+export const AUTO_LINK_END = '<!-- dsh-auto-links:end -->'
 
 const FRONTMATTER_FENCE = '---'
 
@@ -179,20 +188,71 @@ export function frontmatterToMetaRaw(frontmatter: Record<string, unknown>): Reco
   }
 }
 
-/** Extract `[[wikilink]]` targets from a body. */
-export function extractWikilinks(body: string): string[] {
-  const found: string[] = []
+/** One `[[wikilink]]` and the line it appeared on, for the backlink list. */
+export interface WikilinkRef {
+  target: string
+  /** Whitespace-collapsed, marker-free text of the line, windowed to ~96 chars. */
+  context: string
+}
+
+const WIKILINK = /\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g
+/** Longest snippet a backlink row shows before it is clipped. */
+const CONTEXT_WIDTH = 96
+
+/**
+ * Extract `[[wikilink]]` targets with the line they came from.
+ *
+ * Targets are de-duplicated by first appearance, so a note that repeats a link
+ * contributes one edge. Fenced code blocks are skipped: a link inside sample
+ * code is documentation, not a relation.
+ */
+export function extractWikilinkRefs(body: string): WikilinkRef[] {
+  const found: WikilinkRef[] = []
   const seen = new Set<string>()
-  const re = /\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g
-  let match: RegExpExecArray | null
-  while ((match = re.exec(body)) !== null) {
-    const target = (match[1] ?? '').trim()
-    if (target.length === 0) continue
-    if (seen.has(target)) continue
-    seen.add(target)
-    found.push(target)
+  let fence: string | null = null
+  for (const line of body.split(/\r?\n/)) {
+    if (fence !== null) {
+      if (isFenceClose(line, fence)) fence = null
+      continue
+    }
+    const marker = fenceMarker(line)
+    if (marker !== null) {
+      fence = marker
+      continue
+    }
+    const re = new RegExp(WIKILINK.source, 'g')
+    let match: RegExpExecArray | null
+    while ((match = re.exec(line)) !== null) {
+      const target = (match[1] ?? '').trim()
+      if (target.length === 0 || seen.has(target)) continue
+      seen.add(target)
+      found.push({ target, context: lineContext(line, match.index) })
+    }
   }
   return found
+}
+
+/** Extract `[[wikilink]]` targets from a body. */
+export function extractWikilinks(body: string): string[] {
+  return extractWikilinkRefs(body).map((ref) => ref.target)
+}
+
+/**
+ * The line a link sits on, with link brackets and list markers removed.
+ *
+ * A context that starts mid-sentence is worse than no context, so long lines are
+ * windowed around the link and both cut ends are marked with an ellipsis.
+ */
+function lineContext(line: string, at: number): string {
+  const cleaned = line
+    .replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '')
+    .replace(WIKILINK, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (cleaned.length <= CONTEXT_WIDTH) return cleaned
+  const start = Math.max(0, Math.min(at - Math.floor(CONTEXT_WIDTH / 3), cleaned.length - CONTEXT_WIDTH))
+  const body = cleaned.slice(start, start + CONTEXT_WIDTH).trim()
+  return `${start > 0 ? '…' : ''}${body}${start + CONTEXT_WIDTH < cleaned.length ? '…' : ''}`
 }
 
 /**
@@ -234,7 +294,13 @@ export function firstHeadingOutsideFence(body: string): string | null {
   }
   return null
 }
-export function parseBody(body: string): { summary: string; sections: MemorySection[]; related: string[]; evidence: string } {
+export function parseBody(body: string): {
+  summary: string
+  sections: MemorySection[]
+  related: string[]
+  relatedAuto: AutoLink[]
+  evidence: string
+} {
   const lines = body.replace(/\r\n/g, '\n').split('\n')
   const sections: MemorySection[] = []
   let current: { heading: string; lines: string[] } | null = null
@@ -276,17 +342,57 @@ export function parseBody(body: string): { summary: string; sections: MemorySect
   )
   const evidenceSection = sections.find((section) => section.heading === SECTION_EVIDENCE)
   const relatedSection = sections.find((section) => section.heading === SECTION_RELATED)
+  const split = splitAutoBlock(relatedSection?.body ?? '')
   const related =
     relatedSection !== undefined
-      ? extractWikilinks(relatedSection.body)
+      ? extractWikilinks(split.manual)
       : extractWikilinks(body)
   return {
     summary,
     // Evidence is rendered from `memory.evidence`; keep it out of the generic sections.
     sections: extra.filter((section) => section.heading !== SECTION_EVIDENCE),
     related,
+    relatedAuto: parseAutoLinks(split.auto),
     evidence: evidenceSection !== undefined ? evidenceSection.body : '',
   }
+}
+
+/** Split the related section into user-authored and plugin-generated halves. */
+function splitAutoBlock(text: string): { manual: string; auto: string } {
+  const start = text.indexOf(AUTO_LINK_START)
+  const end = text.indexOf(AUTO_LINK_END)
+  if (start === -1 || end === -1 || end <= start) return { manual: text, auto: '' }
+  return {
+    manual: `${text.slice(0, start)}\n${text.slice(end + AUTO_LINK_END.length)}`,
+    auto: text.slice(start + AUTO_LINK_START.length, end),
+  }
+}
+
+/** Read `- [[Target]] — reason` lines from the generated block. */
+function parseAutoLinks(text: string): AutoLink[] {
+  if (text.trim().length === 0) return []
+  const reasons = new Map<string, string>()
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^\s*[-*+]\s*\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]\s*(?:—|–)\s*(.*)$/.exec(line)
+    if (match === null) continue
+    const target = (match[1] ?? '').trim()
+    if (target.length === 0) continue
+    reasons.set(target, (match[2] ?? '').trim().slice(0, 300))
+  }
+  return extractWikilinks(text).map((target) => ({ target, reason: reasons.get(target) ?? '' }))
+}
+
+/** The lines that make up the `## 相关记忆` section. */
+function relatedBodyLines(memory: Memory): string[] {
+  const lines = memory.related.length === 0 ? ['（暂无）'] : memory.related.map((target) => `- [[${target}]]`)
+  const auto = memory.relatedAuto ?? []
+  if (auto.length === 0) return lines
+  lines.push('', AUTO_LINK_START)
+  for (const link of auto) {
+    lines.push(link.reason.length > 0 ? `- [[${link.target}]] — ${link.reason}` : `- [[${link.target}]]`)
+  }
+  lines.push(AUTO_LINK_END)
+  return lines
 }
 
 /**
@@ -343,8 +449,7 @@ export function spliceBody(preserved: string, memory: Memory): string {
   let sawEvidence = false
   let sawRelated = false
   let fence: string | null = null
-  const relatedLines =
-    memory.related.length === 0 ? ['（暂无）'] : memory.related.map((target) => `- [[${target}]]`)
+  const relatedLines = relatedBodyLines(memory)
 
   let index = 0
   while (index < lines.length) {
@@ -494,10 +599,7 @@ export function renderMemory(memory: Memory): string {
 
   bodyParts.push(`## ${SECTION_EVIDENCE}`, '', memory.evidence.trim().length > 0 ? memory.evidence.trim() : '（暂无可追溯来源）', '')
 
-  bodyParts.push(`## ${SECTION_RELATED}`, '')
-  if (memory.related.length === 0) bodyParts.push('（暂无）')
-  else for (const target of memory.related) bodyParts.push(`- [[${target}]]`)
-  bodyParts.push('')
+  bodyParts.push(`## ${SECTION_RELATED}`, '', ...relatedBodyLines(memory), '')
 
   const frontmatter = withExtraFrontmatter(metaToFrontmatter(memory), memory)
   const body = memory.preservedBody === undefined ? bodyParts.join('\n') : spliceBody(memory.preservedBody, memory)
@@ -540,6 +642,7 @@ export function parseMemoryDocument(source: string): ParsedMemory {
       summary: parsed.summary,
       sections: parsed.sections,
       related: parsed.related,
+      relatedAuto: parsed.relatedAuto,
       evidence: parsed.evidence,
     },
     title,

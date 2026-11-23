@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   FrontmatterError,
+  extractWikilinkRefs,
   extractWikilinks,
   joinFrontmatter,
   metaToFrontmatter,
@@ -133,9 +134,42 @@ describe('wikilinks', () => {
     expect(extractWikilinks('[[a]] [[a]]')).toEqual(['a'])
   })
 
+  it('keeps the line a link came from as its context', () => {
+    expect(extractWikilinkRefs('- 参考 [[甲|别名]] 的结论\n普通段落')).toEqual([
+      { target: '甲', context: '参考 甲 的结论' },
+    ])
+  })
+
+  it('ignores links inside fenced code blocks', () => {
+    expect(extractWikilinks('正文 [[真链接]]\n```\n[[示例链接]]\n```')).toEqual(['真链接'])
+  })
+
+  it('windows a long context around the link', () => {
+    const line = `${'前面的内容'.repeat(20)} [[目标]] ${'后面的内容'.repeat(20)}`
+    const ref = extractWikilinkRefs(line)[0]
+    expect(ref?.target).toBe('目标')
+    expect(ref?.context).toContain('目标')
+    expect(ref?.context.startsWith('…')).toBe(true)
+    expect(ref?.context.endsWith('…')).toBe(true)
+  })
+
   it('parses the related section into the related list', () => {
     const text = renderMemory(sampleMemory({ related: ['甲', '乙'] }))
     expect(parseMemoryDocument(text).raw['related']).toEqual(['甲', '乙'])
+  })
+
+  it('round-trips inferred links in their own generated block', () => {
+    const text = renderMemory(
+      sampleMemory({
+        related: ['手动链接'],
+        relatedAuto: [{ target: '自动链接', reason: '共享标签：架构' }],
+      }),
+    )
+    expect(text).toContain('<!-- dsh-auto-links:start -->')
+    expect(text).toContain('- [[自动链接]] — 共享标签：架构')
+    const parsed = parseMemoryDocument(text)
+    expect(parsed.raw['related']).toEqual(['手动链接'])
+    expect(parsed.raw['relatedAuto']).toEqual([{ target: '自动链接', reason: '共享标签：架构' }])
   })
 })
 

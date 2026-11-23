@@ -214,6 +214,19 @@ export interface MemoryMeta {
   schemaVersion: number
 }
 
+/**
+ * A link the plugin inferred, kept apart from user-authored links.
+ *
+ * The reason is stored next to the target so the UI can explain *why* two
+ * memories are connected; a suggestion nobody can justify is worse than none.
+ */
+export interface AutoLink {
+  /** Link target as written in the note (normally the other memory's title). */
+  target: string
+  /** One short human sentence: "共享标签：架构、索引". */
+  reason: string
+}
+
 /** A complete memory: metadata plus the natural-language body. */
 export interface Memory extends MemoryMeta {
   /**
@@ -238,7 +251,13 @@ export interface Memory extends MemoryMeta {
    * the source-text level, so YAML comments, key order and quoting survive.
    */
   preservedSource?: string
+  /** Links authored by the user (frontmatter/related section). */
   related: string[]
+  /**
+   * Links the plugin inferred at write time. Optional so notes and tests written
+   * before this field existed keep working; readers treat absence as `[]`.
+   */
+  relatedAuto?: AutoLink[]
 }
 
 export interface MemorySection {

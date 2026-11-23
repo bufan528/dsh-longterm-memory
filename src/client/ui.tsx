@@ -22,7 +22,8 @@ export type IconName =
   | 'overview' | 'search' | 'manage' | 'inbox' | 'qq' | 'life' | 'settings'
   | 'persona' | 'sharing' | 'review' | 'stickers' | 'reminders' | 'privacy' | 'diagnostics'
   | 'refresh' | 'plus' | 'trash' | 'star' | 'starOn' | 'check' | 'back' | 'close'
-  | 'spark' | 'clock' | 'image' | 'upload' | 'chevron' | 'shield' | 'bolt' | 'edit'
+  | 'spark' | 'clock' | 'image' | 'upload' | 'chevron' | 'shield' | 'bolt' | 'edit' | 'links'
+  | 'minus' | 'fit' | 'target' | 'route' | 'filter'
 
 /**
  * A 16px line icon.
@@ -105,6 +106,18 @@ export function Icon(props: { name: IconName; size?: number }): ReactElement {
       return <svg {...base}><path d="M13.5 3 5.5 13.5H11l-.5 7.5 8-10.5H13z" /></svg>
     case 'edit':
       return <svg {...base}><path d="M4.5 19.5h4l10-10a2.1 2.1 0 0 0-3-3l-10 10z" /><path d="m14.5 6.5 3 3" /></svg>
+    case 'links':
+      return <svg {...base}><path d="M10 13.5a3.6 3.6 0 0 0 5.1 0l2.8-2.8a3.6 3.6 0 0 0-5.1-5.1L11.5 7" /><path d="M14 10.5a3.6 3.6 0 0 0-5.1 0l-2.8 2.8a3.6 3.6 0 0 0 5.1 5.1L12.5 17" /></svg>
+    case 'minus':
+      return <svg {...base}><path d="M5 12h14" /></svg>
+    case 'fit':
+      return <svg {...base}><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" /></svg>
+    case 'target':
+      return <svg {...base}><circle cx="12" cy="12" r="7.5" /><circle cx="12" cy="12" r="2.4" /><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22" /></svg>
+    case 'route':
+      return <svg {...base}><circle cx="6" cy="18" r="2.2" /><circle cx="18" cy="6" r="2.2" /><path d="M8.2 17.5c3.4 0 3.2-6 5.4-8.3" strokeDasharray="2.5 3" /></svg>
+    case 'filter':
+      return <svg {...base}><path d="M4 5h16l-6 7.2V19l-4 1.8v-8.6z" /></svg>
   }
   // Unreachable for a well-typed caller; keeps the return type non-optional.
   return <svg {...base} />

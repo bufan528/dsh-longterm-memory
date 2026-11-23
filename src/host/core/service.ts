@@ -30,6 +30,8 @@ import {
   type VaultInfo,
 } from '../../shared/types.js'
 import { newMemoryId, nowIso } from '../../shared/validate.js'
+import { buildLinkGraph, type LinkGraphResponse } from '../../shared/links.js'
+import { refreshAutoLinks, suggestAutoLinks } from './autolink.js'
 import { normalizeQqLinkage, QQ_LINKAGE_MODES, QQ_WRITE_MODES, type QqLinkageConfig } from '../../shared/qq-linkage.js'
 import type { QqHostFacts, QqLinkageReport } from '../../shared/protocol.js'
 import { QqLinkageRuntime } from '../qq/linkage.js'
@@ -899,6 +901,47 @@ export class MemoryService {
     }
   }
 
+  /** The link graph for the current index. Derived on read; nothing is persisted. */
+  links(): LinkGraphResponse {
+    const { index } = this.requireIndex()
+    return buildLinkGraph(index)
+  }
+
+  /**
+   * Recompute inferred links for every memory.
+   *
+   * This is the backfill for a vault written before auto-linking existed. It only
+   * rewrites notes whose generated block actually changes, so a second run is a
+   * no-op and the journal stays readable.
+   */
+  async relink(): Promise<{ scanned: number; changed: number; links: number }> {
+    const { index } = this.requireIndex()
+    if (this.repository === null) throw new ServiceError(ERROR_CODES.internal, '仓库不可用。')
+    let changed = 0
+    let links = 0
+    for (const id of [...index.records.keys()]) {
+      const loaded = await this.repository.load(id)
+      if (loaded === null) continue
+      const next = refreshAutoLinks(loaded.memory, index)
+      const before = JSON.stringify(loaded.memory.relatedAuto ?? [])
+      const after = JSON.stringify(next.relatedAuto ?? [])
+      if (before === after) continue
+      await this.repository.save(next)
+      await this.repository.journal({
+        at: nowIso(),
+        op: 'update',
+        id,
+        before: summarize(loaded.memory),
+        after: summarize(next),
+        reason: '自动补全记忆关联链接',
+      })
+      changed += 1
+      links += next.relatedAuto?.length ?? 0
+    }
+    if (changed > 0) await this.refreshAfterWrite()
+    return { scanned: index.records.size, changed, links }
+  }
+
   async get(id: string): Promise<GetResponse> {
     const { index, root } = this.requireIndex()
     const record = index.records.get(id)
@@ -995,6 +1038,7 @@ export class MemoryService {
       summary: request.summary,
       sections: previousMemory?.sections ?? [],
       related: previousMemory?.related ?? [],
+      relatedAuto: previousMemory?.relatedAuto ?? [],
       // Preserve whatever the plugin does not own, so a field edit from the UI does
       // not re-serialize the note and drop the user's own metadata or paragraphs.
       ...(previousMemory?.extraFrontmatter === undefined ? {} : { extraFrontmatter: previousMemory.extraFrontmatter }),
@@ -1002,6 +1046,12 @@ export class MemoryService {
       ...(previousMemory?.preservedSource === undefined ? {} : { preservedSource: previousMemory.preservedSource }),
     }
     if (previousMemory?.supersededBy !== undefined) memory.supersededBy = previousMemory.supersededBy
+
+    // Links are inferred on create, and on later edits only while the note still
+    // carries the generated block — deleting that block is how a user opts out.
+    if (previousMemory === undefined || (previousMemory.relatedAuto?.length ?? 0) > 0) {
+      memory.relatedAuto = suggestAutoLinks(memory, index)
+    }
 
     // Commit boundary: stage the history event durably BEFORE the domain write. If the
     // event cannot be secured, abort with no memory written; if the write then fails,
@@ -1186,6 +1236,7 @@ export class MemoryService {
           visibility: visibility ?? before.visibility,
           updatedAt: nowIso(),
         }
+        if ((next.relatedAuto?.length ?? 0) > 0) next.relatedAuto = suggestAutoLinks(next, index)
         await this.repository.save(next)
         await this.repository.journal({
           at: nowIso(),
@@ -1203,6 +1254,7 @@ export class MemoryService {
 
     const memory = this.memoryFromCandidate(confirmed, 'active', scope)
     if (comparison.decision.action === 'conflict') memory.conflictsWith = [comparison.decision.targetId]
+    memory.relatedAuto = suggestAutoLinks(memory, index)
     await this.repository.save(memory)
     await this.repository.journal({
       at: nowIso(),
@@ -1401,7 +1453,7 @@ export class MemoryService {
   }
   async merge(request: MergeRequest, reason?: string): Promise<{ id: string; mergedIds: string[] }> {
     validateMergeRequest(request)
-    this.requireIndex()
+    const { index } = this.requireIndex()
     if (this.repository === null) throw new ServiceError(ERROR_CODES.internal, '仓库不可用。')
     const ids = [...new Set(request.ids)]
     if (ids.length < 2) throw new ServiceError(ERROR_CODES.invalid, '合并至少需要两条记忆。')
@@ -1448,6 +1500,7 @@ export class MemoryService {
       status: 'active',
       confidence: survivor.confidence === 'low' ? 'medium' : survivor.confidence,
     }
+    next.relatedAuto = suggestAutoLinks(next, index)
     // Persist the complete plan before the first domain write, then execute it
     // idempotently. Recovery replays the same plan from disk; it never recomputes a
     // different merge result.
@@ -1962,6 +2015,7 @@ export class MemoryService {
 
       if (candidate.decision.action === 'create') {
         const memory = this.memoryFromCandidate(candidate, 'active')
+        memory.relatedAuto = suggestAutoLinks(memory, index)
         await this.repository.save(memory)
         await this.repository.journal({
           at: nowIso(),
@@ -1989,6 +2043,7 @@ export class MemoryService {
           tags: [...new Set([...before.tags, ...candidate.tags])],
           updatedAt: nowIso(),
         }
+        if ((next.relatedAuto?.length ?? 0) > 0) next.relatedAuto = suggestAutoLinks(next, index)
         await this.repository.save(next)
         await this.repository.journal({
           at: nowIso(),
@@ -2156,6 +2211,7 @@ export class MemoryService {
       summary: candidate.summary,
       sections: [],
       related: [],
+      relatedAuto: [],
     }
   }
 

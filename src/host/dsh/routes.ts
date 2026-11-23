@@ -735,6 +735,10 @@ export async function dispatch(
       })
     case 'get':
       return service.get(requireString(payload['id'], 'id'))
+    case 'links':
+      return service.links()
+    case 'relink':
+      return service.relink()
     case 'readRaw':
       return service.readRaw(requireString(payload['id'], 'id'))
     case 'writeRaw':

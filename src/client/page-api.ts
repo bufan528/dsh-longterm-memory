@@ -22,6 +22,8 @@ export interface PageApi {
   searchTag: (tag: string) => void
   /** Jump to the Inbox section (used by the QQ page's pending-memory link). */
   openInbox: () => void
+  /** Jump to the Links section, optionally focused on one memory. */
+  openLinks: (id: string | null) => void
   /** Re-read the `status` RPC (vault stats, index state, settings). */
   refreshStatus: () => void
   /** Ids currently ticked for bulk actions and merging. */
@@ -37,6 +39,7 @@ const FALLBACK: PageApi = {
   openMemory: () => undefined,
   searchTag: () => undefined,
   openInbox: () => undefined,
+  openLinks: () => undefined,
   refreshStatus: () => undefined,
   selection: [],
   toggleSelect: () => undefined,

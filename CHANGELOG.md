@@ -4,6 +4,43 @@ All notable changes to **DSH Memory Vault (`dsh-longterm-memory`)** are document
 here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-11-23
+
+### Added
+
+- **Memory Graph (记忆图谱) workbench.** A full-height three-column page over the real memory
+  index: a filter rail, an SVG canvas, and a memory detail rail. It supports type / tag / time /
+  relation filters, global and 1–3 hop local exploration, isolated / hub / bridge / connected-
+  component / label-propagation community analysis, shortest-path search, zoom, pan, node drag,
+  fit / centre / reset, hover spotlight and double-click to open the original memory.
+- **Truthful relation layers.** Solid edges are recorded `[[wikilinks]]` or the plugin's generated
+  automatic block; shared-tag suggestions are a separate dotted layer, off by default, and never
+  merged into recorded edges. The index moves to **v7** and stores `autoLinkReasons`, so the detail
+  rail can explain why an automatic link was inferred.
+- **DSH Go Memory Graph panel.** A fourth native panel reports real node/relation/isolated/
+  component/community counts and hub memories, explains that the visual canvas lives in the
+  WebView, and offers one-tap access to the web management page.
+- **Phone WebView adaptation for the graph.** At narrow widths the filter rail and detail rail
+  become drawers instead of squeezing the canvas; coarse pointers get 40–44 px targets; safe-area
+  insets are respected; labels are collision-aware and the 0-relation banner no longer covers
+  nodes.
+
+### Changed
+
+- The first-level navigation is now **记忆总览 → 记忆图谱 → 记忆检索 → 记忆管理 → 收件箱 →
+  QQ 接入 → 伙伴中心 → 设置**; the old "双向链接" label is replaced by "记忆图谱".
+- A graph with zero relations no longer shows a blocking empty state: all real memories render as
+  an isolated constellation, with a non-blocking "infer links" invitation.
+
+### Fixed
+
+- The old right-hand focus rail could be pushed outside the window on narrow layouts; the new
+  three-column grid uses `minmax(0,1fr)` and CSS drawers, with no horizontal overflow.
+- Node labels no longer pile up: the canvas hides low-priority labels that would overlap a node or
+  a higher-priority label, and keeps selected / hovered / neighbour labels visible.
+- Path-selection taps no longer open the detail drawer on phones and cover the next node.
+- The compatibility chip no longer overlaps the zero-relation banner or the path bar.
+
 ## [0.3.0] - 2026-11-21
 
 ### Added

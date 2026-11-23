@@ -365,7 +365,7 @@ profile 的 `cordis.patch.yml` 里预设。预设与页面保存的优先级与�
 ## 13. DSH Go（手机端）兼容声明（2026-11-21）
 
 DSH Go 的 Android 版在 App 内跑 Ubuntu + Node + DSH 引擎，iOS 版跑 NodeMobile；两者
-加载的都是标准 DSH 引擎并通过 `dsh web` 起本地 Web 服务。因此本插件的存储、59 个 RPC、
+加载的都是标准 DSH 引擎并通过 `dsh web` 起本地 Web 服务。因此本插件的存储、61 个 RPC、
 9 个工具、提示词分段与事件提取在手机端**不需要改代码路径**（引擎内 API 与桌面一致）。
 
 | 项 | 值 | 证据 / 边界 |

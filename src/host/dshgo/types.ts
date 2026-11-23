@@ -80,6 +80,17 @@ export interface DshGoContextLike {
   logger?: { info: (message: string, ...rest: unknown[]) => void; warn: (message: string, ...rest: unknown[]) => void }
 }
 
+/** A compact graph summary for the native panel (the visual graph is WebView-only). */
+export interface NativeGraphSummary {
+  nodes: number
+  edges: number
+  auto: number
+  isolated: number
+  components: number
+  communities: number
+  hubs: { id: string; title: string; degree: number }[]
+}
+
 /** Snapshot used by every native view; built off-engine, stored in memory. */
 export interface NativeSnapshot {
   ready: boolean
@@ -92,6 +103,7 @@ export interface NativeSnapshot {
   inbox: { id: string; title: string; type: string; confidence: string; importance: number; decision: string; refused?: string }[]
   reminders: { id: string; title: string; dueAt: string | null; done: boolean }[]
   tags: { tag: string; count: number }[]
+  graph: NativeGraphSummary
   capabilities: { tools: boolean; systemPrompt: boolean; webServer: boolean; sessionEvents: boolean }
 }
 
@@ -106,5 +118,6 @@ export const EMPTY_SNAPSHOT: NativeSnapshot = {
   inbox: [],
   reminders: [],
   tags: [],
+  graph: { nodes: 0, edges: 0, auto: 0, isolated: 0, components: 0, communities: 0, hubs: [] },
   capabilities: { tools: false, systemPrompt: false, webServer: false, sessionEvents: false },
 }

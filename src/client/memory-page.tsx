@@ -32,8 +32,9 @@ import { QqView } from './views/qq.js'
 import { SearchView } from './views/search.js'
 import { SettingsView } from './views/settings-view.js'
 import { LifeView } from './views/life.js'
+import { LinksView } from './views/links.js'
 
-type Section = 'overview' | 'search' | 'manage' | 'inbox' | 'qq' | 'life' | 'settings'
+type Section = 'overview' | 'search' | 'links' | 'manage' | 'inbox' | 'qq' | 'life' | 'settings'
 
 interface Toast {
   id: number
@@ -45,6 +46,7 @@ interface Toast {
 
 const SECTIONS: readonly { key: Section; labelKey: string; icon: IconName }[] = [
   { key: 'overview', labelKey: 'nav.overview', icon: 'overview' },
+  { key: 'links', labelKey: 'nav.links', icon: 'links' },
   { key: 'search', labelKey: 'nav.search', icon: 'search' },
   { key: 'manage', labelKey: 'nav.manage', icon: 'manage' },
   { key: 'inbox', labelKey: 'nav.inbox', icon: 'inbox' },
@@ -64,6 +66,7 @@ export function MemoryPage(_props: SlotProps): ReactElement {
   const status = useAsync(() => call('status', {}), [])
   const [section, setSection] = useState<Section>('overview')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [linkFocus, setLinkFocus] = useState<string | null>(null)
   const [tag, setTag] = useState('')
   const [selection, setSelection] = useState<readonly string[]>([])
   const [toasts, setToasts] = useState<readonly Toast[]>([])
@@ -120,6 +123,11 @@ export function MemoryPage(_props: SlotProps): ReactElement {
       openInbox: () => {
         setSelectedId(null)
         setSection('inbox')
+      },
+      openLinks: (id: string | null) => {
+        setSelectedId(null)
+        setLinkFocus(id)
+        setSection('links')
       },
       refreshStatus,
       selection,
@@ -184,6 +192,8 @@ export function MemoryPage(_props: SlotProps): ReactElement {
       <OverviewView vault={vault} capabilities={info.capabilities} />
     ) : section === 'search' ? (
       <SearchView tag={tag} onTagChange={setTag} />
+    ) : section === 'links' ? (
+      <LinksView key={linkFocus ?? 'all'} focus={linkFocus} />
     ) : section === 'manage' ? (
       <ManageView vault={vault} onVaultChanged={refreshStatus} />
     ) : section === 'inbox' ? (
@@ -254,6 +264,7 @@ export function MemoryPage(_props: SlotProps): ReactElement {
                 aria-current={active ? 'page' : undefined}
                 onClick={() => {
                   setSelectedId(null)
+                  setLinkFocus(null)
                   setSection(entry.key)
                 }}
               >

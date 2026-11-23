@@ -25,6 +25,7 @@ import {
   withNativeCard,
 } from '../../src/host/dshgo/bridge.js'
 import {
+  graphPanelView,
   inboxPanelView,
   memoryGetView,
   memorySaveView,
@@ -136,13 +137,48 @@ describe('native views', () => {
       recent: Array.from({ length: 12 }, (_, i) => ({ id: `m${i}`, title: `Memory ${i}`, type: 'profile', status: 'active', updatedAt: '2026-01-01' })),
       inbox: Array.from({ length: 12 }, (_, i) => ({ id: `c${i}`, title: `Cand ${i}`, type: 'task', confidence: 'low', importance: 50, decision: 'inbox' })),
       reminders: Array.from({ length: 12 }, (_, i) => ({ id: `r${i}`, title: `Rem ${i}`, dueAt: null, done: false })),
+      graph: {
+        nodes: 12,
+        edges: 9,
+        auto: 4,
+        isolated: 3,
+        components: 4,
+        communities: 2,
+        hubs: Array.from({ length: 6 }, (_, i) => ({ id: `m${i}`, title: `Hub ${i}`, degree: 6 - i })),
+      },
     }
-    for (const view of [overviewPanelView(s, { locale: 'zh' }), inboxPanelView(s, { locale: 'zh' }), remindersPanelView(s, { locale: 'zh' })]) {
+    for (const view of [
+      overviewPanelView(s, { locale: 'zh' }),
+      inboxPanelView(s, { locale: 'zh' }),
+      remindersPanelView(s, { locale: 'zh' }),
+      graphPanelView(s, { locale: 'zh' }),
+    ]) {
       const json = JSON.stringify(view)
       expect(Buffer.byteLength(json, 'utf8')).toBeLessThanOrEqual(32 * 1024)
       expect(nodeCount(view)).toBeLessThanOrEqual(120)
       expect(json).not.toContain('undefined')
     }
+  })
+
+  it('graph panel reports real counts and points at the WebView visualization', () => {
+    const s = {
+      ...EMPTY_SNAPSHOT,
+      ready: true,
+      graph: {
+        nodes: 17,
+        edges: 0,
+        auto: 0,
+        isolated: 17,
+        components: 17,
+        communities: 0,
+        hubs: [],
+      },
+    }
+    const json = JSON.stringify(graphPanelView(s, { locale: 'zh' }))
+    expect(json).toContain('记忆图谱')
+    expect(json).toContain('17')
+    expect(json).toContain('自动补全')
+    expect(json).toContain('网页版')
   })
 
   it('strip text is short and reflects pending count', () => {

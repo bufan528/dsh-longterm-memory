@@ -172,11 +172,11 @@ DSH 有两条通道：
 ctx.effect(() => webServer.register({ kind: 'prefix', path: '/dsh-longterm-memory/api', handler }), '…')
 ```
 
-`RPC_METHODS` 共 **59** 个方法（下表的数字之和就是 59，逐个方法名核对过）：
+`RPC_METHODS` 共 **61** 个方法（下表的数字之和就是 61，逐个方法名核对过）：
 
 | 组 | 数量 | 方法 |
 |---|---|---|
-| 记忆与索引 | 23 | `status` `discover` `initialize` `chooseVault` `overview` `search` `get` `readRaw` `writeRaw` `save` `confirm` `reject` `setStatus` `setPinned` `delete` `merge` `resolveConflict` `rebuildIndex` `syncIndex` `history` `candidates` `addCandidate` `openVault` |
+| 记忆与索引 | 25 | `status` `discover` `initialize` `chooseVault` `overview` `search` `get` `links` `relink` `readRaw` `writeRaw` `save` `confirm` `reject` `setStatus` `setPinned` `delete` `merge` `resolveConflict` `rebuildIndex` `syncIndex` `history` `candidates` `addCandidate` `openVault` |
 | 设置与预览 | 4 | `getSettings` `setSettings` `previewRecall` `previewStanding` |
 | 身份与可见性 | 7 | `qqLinkage` `setQqLinkage` `ownerBindingStatus` `ownerBindingCreatePairCode` `ownerBindingUnbind` `visibilityReview` `setVisibility` |
 | 伙伴中心（0.2.0） | 16 | `companionStatus` `updateCompanion` `companionPresets` `companionApplyPreset` `companionFillAnchors` `personaTry` `stickerLibrary` `stickerThumb` `stickerImport` `stickerUpdate` `stickerDelete` `reminderList` `reminderCreate` `reminderCancel` `reminderComplete` `reminderReschedule` |

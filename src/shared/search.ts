@@ -18,8 +18,19 @@ import { DEFAULT_VISIBILITY } from './types.js'
  * has no visibility, so every record would be treated as the restrictive
  * default — including memories the user had marked `shared`. Rebuilding once is
  * cheaper than explaining that mismatch, so the version bump forces it.
+ *
+ * v5 adds `linkContexts`, the line each `[[wikilink]]` came from. An older index
+ * would otherwise keep rendering backlinks without their surrounding sentence
+ * until every linked note was edited, so it is rebuilt once.
+ *
+ * v6 adds `autoLinks`, the targets the plugin inferred. Without it the page
+ * cannot tell an inferred relation from a user-authored one.
+ *
+ * v7 adds `autoLinkReasons`, the human sentence the extractor wrote next to each
+ * inferred link. The graph page shows it in the relation list, and an index
+ * without it would keep explaining automatic edges as "no reason recorded".
  */
-export const INDEX_FORMAT_VERSION = 4
+export const INDEX_FORMAT_VERSION = 7
 
 const CJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/
 const WORD = /[a-z0-9][a-z0-9_]*/g
@@ -163,6 +174,18 @@ export interface IndexRecord {
   terms: Record<string, number>
   /** `[[wikilink]]` targets as written (may be titles or ids). */
   links: string[]
+  /**
+   * Link target → the line(s) it appeared on. Optional so an index built before
+   * v5 still loads; the v5 rebuild fills it in.
+   */
+  linkContexts?: Record<string, string[]>
+  /** Targets that came from the plugin's generated block, never from the user. */
+  autoLinks?: string[]
+  /**
+   * Inferred target → the sentence explaining why the plugin linked it. Keyed by
+   * the target as written in the note, matching `links` entries.
+   */
+  autoLinkReasons?: Record<string, string>
   /** Byte length and mtime of the source file, for external-change detection. */
   size: number
   mtimeMs: number
@@ -207,35 +230,58 @@ export function deriveIndex(index: MemoryIndex): void {
   index.resolvedLinks = resolveLinks(index)
 }
 
+/** Case/width-folded link key; `.md` is dropped so both spellings resolve. */
+export function normalizeLinkTarget(target: string): string {
+  return target.trim().replace(/\.md$/i, '').normalize('NFKC').toLowerCase()
+}
+
+/**
+ * Build the link resolver for one index.
+ *
+ * A target may be a memory id, a title, an alias, a vault-relative path, or a
+ * file stem, tried in that order. Titles and aliases are first-wins so a
+ * duplicated name cannot make resolution depend on Map iteration order.
+ */
+export function createLinkResolver(index: MemoryIndex): (target: string) => string | undefined {
+  const byId = new Map<string, string>()
+  const byTitle = new Map<string, string>()
+  const byAlias = new Map<string, string>()
+  const byPath = new Map<string, string>()
+  const byStem = new Map<string, string>()
+  const keepFirst = (map: Map<string, string>, key: string, id: string): void => {
+    if (key.length > 0 && !map.has(key)) map.set(key, id)
+  }
+
+  for (const record of index.records.values()) {
+    byId.set(normalizeLinkTarget(record.id), record.id)
+    keepFirst(byTitle, normalizeLinkTarget(record.title), record.id)
+    for (const alias of record.aliases) keepFirst(byAlias, normalizeLinkTarget(alias), record.id)
+    const path = record.path.replace(/\.md$/i, '')
+    keepFirst(byPath, normalizeLinkTarget(path), record.id)
+    keepFirst(byStem, normalizeLinkTarget(path.replace(/^.*\//, '')), record.id)
+  }
+
+  return (target: string): string | undefined => {
+    const key = normalizeLinkTarget(target)
+    if (key.length === 0) return undefined
+    return byId.get(key) ?? byTitle.get(key) ?? byAlias.get(key) ?? byPath.get(key) ?? byStem.get(key)
+  }
+}
+
 /**
  * Resolve `[[wikilink]]` targets to record ids.
  *
- * A target may be a memory id, a memory title, or a file stem. Unresolvable
- * targets are kept out of `resolvedLinks` so dangling links never look like
- * real relations.
+ * Unresolvable targets are kept out of `resolvedLinks` so dangling links never
+ * look like real relations; `buildLinkGraph` reports them separately.
  */
 export function resolveLinks(index: MemoryIndex): Map<string, string[]> {
-  const byTitle = new Map<string, string[]>()
-  const byStem = new Map<string, string>()
-  for (const record of index.records.values()) {
-    const key = record.title.trim().toLowerCase()
-    const bucket = byTitle.get(key)
-    if (bucket === undefined) byTitle.set(key, [record.id])
-    else bucket.push(record.id)
-    const stem = record.path.replace(/^.*\//, '').replace(/\.md$/i, '')
-    byStem.set(stem.toLowerCase(), record.id)
-  }
-
+  const resolve = createLinkResolver(index)
   const resolved = new Map<string, string[]>()
   for (const record of index.records.values()) {
     const targets: string[] = []
     const seen = new Set<string>()
     for (const link of record.links) {
-      const normalized = link.trim().toLowerCase()
-      let targetId: string | undefined
-      if (index.records.has(link.trim())) targetId = link.trim()
-      else if (byTitle.has(normalized)) targetId = byTitle.get(normalized)?.[0]
-      else if (byStem.has(normalized)) targetId = byStem.get(normalized)
+      const targetId = resolve(link)
       if (targetId === undefined || targetId === record.id || seen.has(targetId)) continue
       seen.add(targetId)
       targets.push(targetId)

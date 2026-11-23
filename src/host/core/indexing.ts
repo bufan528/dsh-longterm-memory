@@ -20,7 +20,7 @@ import {
   isMemoryVisibility,
   type JournalEntry,
 } from '../../shared/types.js'
-import { extractWikilinks } from '../../shared/markdown.js'
+import { extractWikilinkRefs } from '../../shared/markdown.js'
 import {
   INDEX_FORMAT_VERSION,
   type IndexRecord,
@@ -29,6 +29,7 @@ import {
   deriveIndex,
   emptyIndex,
   fieldTokens,
+  normalizeLinkTarget,
   termWeights,
 } from '../../shared/search.js'
 import { FsError, ensureDir, readTextIfExists, statOrNull, writeFileAtomic } from './fsx.js'
@@ -56,6 +57,27 @@ export interface BuildIndexResult {
 /** Turn one parsed note into an index record. */
 export function recordFromDocument(document: LoadedDocument): IndexRecord {
   const memory = document.memory
+  const refs = extractWikilinkRefs(document.raw)
+  // A target the user also linked by hand is a manual edge; keeping it out of
+  // `autoLinks` makes the provenance badge truthful.
+  const manualTargets = new Set(memory.related.map(normalizeLinkTarget))
+  const autoLinks = (memory.relatedAuto ?? [])
+    .filter((link) => !manualTargets.has(normalizeLinkTarget(link.target)))
+    .map((link) => link.target)
+  const autoLinkReasons: Record<string, string> = {}
+  for (const link of memory.relatedAuto ?? []) {
+    if (manualTargets.has(normalizeLinkTarget(link.target))) continue
+    const target = link.target.trim()
+    const reason = link.reason.trim().slice(0, 300)
+    if (target.length === 0 || reason.length === 0) continue
+    autoLinkReasons[target] = reason
+  }
+  const linkContexts: Record<string, string[]> = {}
+  for (const ref of refs) {
+    const bucket = linkContexts[ref.target]
+    if (bucket === undefined) linkContexts[ref.target] = [ref.context]
+    else if (!bucket.includes(ref.context)) bucket.push(ref.context)
+  }
   const tokens = fieldTokens({
     title: memory.title,
     aliases: memory.aliases,
@@ -82,7 +104,10 @@ export function recordFromDocument(document: LoadedDocument): IndexRecord {
     updatedAt: memory.updatedAt,
     preview: memory.summary.replace(/\s+/g, ' ').trim().slice(0, 320),
     terms: termWeights(tokens),
-    links: [...new Set([...memory.related, ...extractWikilinks(document.raw)])],
+    links: [...new Set([...memory.related, ...autoLinks, ...refs.map((ref) => ref.target)])],
+    ...(autoLinks.length === 0 ? {} : { autoLinks: [...new Set(autoLinks)] }),
+    ...(Object.keys(autoLinkReasons).length === 0 ? {} : { autoLinkReasons }),
+    ...(Object.keys(linkContexts).length === 0 ? {} : { linkContexts }),
     size: document.size,
     mtimeMs: document.mtimeMs,
     checksum: document.checksum,
@@ -259,6 +284,8 @@ function validateRecord(value: unknown): IndexRecord | null {
     if (typeof weight !== 'number' || !Number.isFinite(weight)) return null
     terms[term] = weight
   }
+  const linkContexts = parseLinkContexts(record.linkContexts)
+  const autoLinkReasons = parseAutoLinkReasons(record.autoLinkReasons)
   return {
     id: record.id,
     path: record.path,
@@ -281,10 +308,49 @@ function validateRecord(value: unknown): IndexRecord | null {
     preview: typeof record.preview === 'string' ? record.preview : '',
     terms,
     links: record.links.filter((link): link is string => typeof link === 'string'),
+    ...(Array.isArray(record.autoLinks)
+      ? { autoLinks: record.autoLinks.filter((link): link is string => typeof link === 'string') }
+      : {}),
+    ...(autoLinkReasons === undefined ? {} : { autoLinkReasons }),
+    ...(linkContexts === undefined ? {} : { linkContexts }),
     size: typeof record.size === 'number' ? record.size : 0,
     mtimeMs: typeof record.mtimeMs === 'number' ? record.mtimeMs : 0,
     checksum: record.checksum,
   }
+}
+
+/**
+ * Read `linkContexts` leniently.
+ *
+ * It is presentation data: a malformed entry is dropped rather than rejecting
+ * the whole record (and forcing a rebuild of a perfectly good index).
+ */
+function parseLinkContexts(value: unknown): Record<string, string[]> | undefined {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const out: Record<string, string[]> = {}
+  for (const [target, contexts] of Object.entries(value as Record<string, unknown>)) {
+    if (target.length === 0 || !Array.isArray(contexts)) continue
+    const lines = contexts.filter((line): line is string => typeof line === 'string' && line.length > 0)
+    if (lines.length > 0) out[target] = lines.slice(0, 4)
+  }
+  return Object.keys(out).length === 0 ? undefined : out
+}
+
+/**
+ * Read `autoLinkReasons` leniently.
+ *
+ * Like `linkContexts` this is presentation data: a malformed entry is dropped
+ * rather than rejecting a record and forcing a full rebuild.
+ */
+function parseAutoLinkReasons(value: unknown): Record<string, string> | undefined {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const out: Record<string, string> = {}
+  for (const [target, reason] of Object.entries(value as Record<string, unknown>).slice(0, 32)) {
+    if (target.length === 0 || typeof reason !== 'string') continue
+    const trimmed = reason.trim().slice(0, 300)
+    if (trimmed.length > 0) out[target] = trimmed
+  }
+  return Object.keys(out).length === 0 ? undefined : out
 }
 
 /** Record a rebuild in the journal so the human can see when it happened and why. */

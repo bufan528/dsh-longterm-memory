@@ -1,6 +1,6 @@
 {
   "name": "dsh-longterm-memory",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "DSH Memory Vault (长期记忆) — durable local long-term memory for DeepSeek Harness, stored as an Obsidian-compatible Markdown vault with a rebuildable index, an in-sidebar management page, and real per-turn recall.",
   "private": false,
   "type": "module",
@@ -47,7 +47,8 @@
         "panels": [
           { "id": "overview", "title": { "zh": "记忆总览", "en": "Memory" }, "icon": "book", "placement": ["session.tab", "features"] },
           { "id": "inbox", "title": { "zh": "待确认", "en": "Inbox" }, "icon": "notification", "placement": ["features"] },
-          { "id": "reminders", "title": { "zh": "提醒", "en": "Reminders" }, "icon": "reminder", "placement": ["features"] }
+          { "id": "reminders", "title": { "zh": "提醒", "en": "Reminders" }, "icon": "reminder", "placement": ["features"] },
+          { "id": "graph", "title": { "zh": "记忆图谱", "en": "Memory Graph" }, "icon": "panel", "placement": ["features"] }
         ],
         "composer.strip": [
           { "id": "memory", "icon": "book", "panel": "overview" }

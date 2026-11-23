@@ -15,7 +15,8 @@
 
 import type { NativeSnapshot, NativeView, DshGoBridgeLike, DshGoContextLike, NativeCaps, NativeEffect } from './types.js'
 import { EMPTY_SNAPSHOT } from './types.js'
-import { inboxPanelView, overviewPanelView, remindersPanelView, stripData, toolCard, toolResultView } from './views.js'
+import { graphPanelView, inboxPanelView, overviewPanelView, remindersPanelView, stripData, toolCard, toolResultView } from './views.js'
+import { analyseLinkGraph } from '../../shared/links.js'
 import type { MemoryService } from '../core/service.js'
 
 /** A reminder row as read from any of the vault/plugin reminder surfaces. */
@@ -42,7 +43,7 @@ export interface DshGoBridgeDeps {
 }
 
 /** Panel ids — must match the `dshGo.contributes.panels` ids in package.json. */
-export const NATIVE_PANELS = ['overview', 'inbox', 'reminders'] as const
+export const NATIVE_PANELS = ['overview', 'inbox', 'reminders', 'graph'] as const
 export type NativePanelId = (typeof NATIVE_PANELS)[number]
 
 /** Composer capsule ids — must match `dshGo.contributes.composer.actions`. */
@@ -110,6 +111,20 @@ export async function buildSnapshot(deps: DshGoBridgeDeps): Promise<NativeSnapsh
     }))
     snapshot.problemMemories = overview.problems.length
     snapshot.tags = overview.tags.slice(0, 8)
+    const graph = service.links()
+    const analysis = analyseLinkGraph(graph)
+    snapshot.graph = {
+      nodes: graph.stats.nodes,
+      edges: graph.stats.edges,
+      auto: graph.stats.auto,
+      isolated: analysis.isolated.length,
+      components: analysis.components.length,
+      communities: analysis.clusters.length,
+      hubs: analysis.hubs.slice(0, 6).map((id) => {
+        const node = graph.nodes.find((candidate) => candidate.id === id)
+        return { id, title: node?.title ?? id, degree: analysis.degree[id] ?? 0 }
+      }),
+    }
     snapshot.inbox = overview.pending.slice(0, 12).map((hit) => ({
       id: hit.record.id, title: hit.record.title, type: hit.record.type,
       confidence: String(hit.record.confidence ?? ''), importance: hit.record.importance ?? 0,
@@ -163,6 +178,7 @@ export function installDshGoBridge(ctx: DshGoContextLike, deps: DshGoBridgeDeps)
       bridge?.refresh?.('overview')
       bridge?.refresh?.('inbox')
       bridge?.refresh?.('reminders')
+      bridge?.refresh?.('graph')
     } catch {
       /* refresh is best-effort */
     }
@@ -210,6 +226,13 @@ export function installDshGoBridge(ctx: DshGoContextLike, deps: DshGoBridgeDeps)
           'new-reminder': () => ({ insert: '请用 reminder_create 为我创建一个提醒：' }),
         },
       })
+      bridge.panel('graph', {
+        view: view(graphPanelView),
+        actions: {
+          refresh: () => { void refresh(); return { refresh: 'graph' } },
+          manage: () => ({ open: 'panel:longterm-memory' }),
+        },
+      })
       result.panels = [...NATIVE_PANELS]
 
       bridge.strip?.('memory', (_scope, emit, caps) => {
@@ -249,7 +272,7 @@ export function installDshGoBridge(ctx: DshGoContextLike, deps: DshGoBridgeDeps)
       timer = setInterval(() => { void refresh() }, Math.max(5000, deps.refreshMs ?? 15000))
       timer.unref?.()
       scoped.effect(() => () => { if (timer !== undefined) clearInterval(timer) }, 'dsh-longterm-memory: native bridge')
-      deps.logger?.info('dsh-longterm-memory: DSH Go native bridge installed (3 panels, 1 strip)')
+      deps.logger?.info('dsh-longterm-memory: DSH Go native bridge installed (4 panels, 1 strip)')
     })
   } catch {
     /* no bridge service on this host — desktop path, nothing to do */
@@ -267,6 +290,7 @@ export function installNativeToolCards(definitions: { name: string; output: Reco
 export function nativeSnapshotForView(s: NativeSnapshot, panel: NativePanelId, caps?: NativeCaps): NativeView {
   if (panel === 'inbox') return inboxPanelView(s, caps)
   if (panel === 'reminders') return remindersPanelView(s, caps)
+  if (panel === 'graph') return graphPanelView(s, caps)
   return overviewPanelView(s, caps)
 }
 

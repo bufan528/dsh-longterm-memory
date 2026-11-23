@@ -709,6 +709,53 @@ describe('overview', () => {
   })
 })
 
+describe('links', () => {
+  it('derives the graph from saved Markdown, with the line each link came from', async () => {
+    const source = await service.save(saveRequest({ title: '甲', summary: '见 [[乙]] 的约定。' }))
+    const target = await service.save(saveRequest({ title: '乙', summary: '乙的内容。' }))
+
+    const graph = service.links()
+    // The user-written wikilink is one edge; the reverse inference adds another,
+    // so assert on the authored edge instead of the whole edge list.
+    expect(graph.edges.filter((edge) => !edge.auto)).toEqual([
+      { source: source.id, target: target.id, context: '见 乙 的约定。', auto: false },
+    ])
+    expect(graph.nodes.find((node) => node.id === target.id)?.inDegree).toBeGreaterThanOrEqual(1)
+    expect(graph.stats).toMatchObject({ dangling: 0 })
+  })
+
+  it('reports a wikilink whose target does not exist yet', async () => {
+    await service.save(saveRequest({ title: '甲', summary: '准备写 [[以后的主题]]。' }))
+    const graph = service.links()
+    expect(graph.edges).toEqual([])
+    expect(graph.dangling.map((item) => item.target)).toEqual(['以后的主题'])
+  })
+
+  it('infers a link on create and backfills the rest idempotently', async () => {
+    await service.save(
+      saveRequest({ title: 'Markdown 是唯一事实源', summary: '长期记忆以 Markdown 文件为核心。', tags: ['architecture'] }),
+    )
+    const second = await service.save(
+      saveRequest({ title: '索引策略', summary: '沿用 Markdown 是唯一事实源 的结论。', tags: ['architecture'] }),
+    )
+
+    const detail = await service.get(second.id)
+    expect(detail.memory.relatedAuto?.map((link) => link.target)).toContain('Markdown 是唯一事实源')
+    expect(detail.raw).toContain('<!-- dsh-auto-links:start -->')
+
+    const firstPass = await service.relink()
+    expect(firstPass.scanned).toBe(2)
+    expect(firstPass.changed).toBe(1)
+    expect(firstPass.links).toBeGreaterThanOrEqual(1)
+
+    const secondPass = await service.relink()
+    expect(secondPass.changed).toBe(0)
+
+    const graph = service.links()
+    expect(graph.edges.some((edge) => edge.auto)).toBe(true)
+  })
+})
+
 describe('settings', () => {
   it('persists settings into the vault marker and reloads them', async () => {
     await service.setSettings({ language: 'en', recallMaxItems: 5, enablePerStepRecall: true })

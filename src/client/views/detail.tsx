@@ -445,7 +445,15 @@ export function DetailView(props: { id: string; onBack: () => void; onChanged: (
             {translate('detail.related')}
           </>
         }
-        actions={related.length === 0 ? null : <Badge kind="plain">{String(related.length)}</Badge>}
+        actions={
+          <>
+            <Button variant="ghost" onClick={() => page.openLinks(memory.id)}>
+              <Icon name="links" size={13} />
+              {translate('nav.links')}
+            </Button>
+            {related.length === 0 ? null : <Badge kind="plain">{String(related.length)}</Badge>}
+          </>
+        }
       >
         {related.length === 0 ? (
           <Empty />

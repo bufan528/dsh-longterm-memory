@@ -426,6 +426,78 @@ export function remindersPanelView(s: NativeSnapshot, caps: NativeCaps | undefin
   }
 }
 
+/** `graph` panel: real graph counts + a bridge to the WebView visualization. */
+export function graphPanelView(s: NativeSnapshot, caps: NativeCaps | undefined): NativeView {
+  const graph = s.graph
+  return {
+    type: 'stack',
+    v: 2,
+    title: strings(caps, '记忆图谱', 'Memory Graph'),
+    children: [
+      ...panelHeader(caps, s.ready),
+      {
+        type: 'row',
+        children: [
+          { type: 'metric', label: strings(caps, '记忆', 'Memories'), value: graph.nodes },
+          { type: 'metric', label: strings(caps, '关系', 'Relations'), value: graph.edges },
+          {
+            type: 'metric',
+            label: strings(caps, '孤立', 'Isolated'),
+            value: graph.isolated,
+            tone: graph.isolated > 0 ? 'warn' : undefined,
+          },
+        ],
+      },
+      {
+        type: 'row',
+        children: [
+          { type: 'metric', label: strings(caps, '自动关联', 'Inferred'), value: graph.auto },
+          { type: 'metric', label: strings(caps, '连通分量', 'Components'), value: graph.components },
+          { type: 'metric', label: strings(caps, '算法社区', 'Communities'), value: graph.communities },
+        ],
+      },
+      ...(graph.edges === 0
+        ? [{
+            type: 'callout',
+            tone: 'info',
+            text: strings(
+              caps,
+              '还没有记录关系。打开网页版后可在「记忆图谱」里点「自动补全」。',
+              'No relations recorded yet. Open the web page and use “Infer links” on the Memory Graph.',
+            ),
+          }]
+        : []),
+      ...(graph.hubs.length > 0
+        ? [{
+            type: 'list',
+            title: strings(caps, '枢纽记忆', 'Hub memories'),
+            items: graph.hubs.slice(0, 6).map((hub) => ({
+              title: clip(hub.title, 60),
+              subtitle: strings(caps, `${String(hub.degree)} 条关系`, `${String(hub.degree)} relations`),
+              icon: 'book',
+            })),
+          }]
+        : []),
+      {
+        type: 'callout',
+        tone: 'info',
+        text: strings(
+          caps,
+          '图谱可视化在网页版：打开管理页 → 记忆图谱，可缩放、筛选、查看关系与路径。',
+          'The visual graph is in the web page: Manage → Memory Graph for zoom, filters, relations and paths.',
+        ),
+      },
+      {
+        type: 'actions',
+        items: [
+          { label: strings(caps, '打开网页版', 'Open web'), action: 'manage', icon: 'panel', style: 'primary' },
+          { label: strings(caps, '刷新', 'Refresh'), action: 'refresh', icon: 'refresh' },
+        ],
+      },
+    ],
+  }
+}
+
 /** `composer.strip`: one short line, ≤ 24 chars. */
 export function stripData(s: NativeSnapshot, caps: NativeCaps | undefined): { text: string; icon: string; tone?: 'warn' } {
   const count = s.totalMemories

@@ -21,6 +21,7 @@ import type {
   VaultInfo,
 } from './types.js'
 import type { IndexRecord, QueryFilters, SearchHit } from './search.js'
+import type { LinkGraphResponse } from './links.js'
 import { DEFAULT_QQ_LINKAGE, type LinkageRuntimeStatus, type QqLinkageConfig } from './qq-linkage.js'
 
 /** Route prefix owned by this plugin. */
@@ -35,6 +36,10 @@ export const RPC_METHODS = [
   'overview',
   'search',
   'get',
+  /** The link graph: nodes, directed edges, dangling targets. */
+  'links',
+  /** Backfill inferred links across the vault. */
+  'relink',
   'readRaw',
   'writeRaw',
   'save',
@@ -179,6 +184,12 @@ export interface SearchResponse {
   tookMs: number
   /** True when the index had to be rebuilt or synced to answer. */
   indexRefreshed: boolean
+}
+
+export interface RelinkResponse {
+  scanned: number
+  changed: number
+  links: number
 }
 
 export interface GetResponse {
@@ -429,6 +440,8 @@ export interface RpcRequestMap {
   overview: Record<string, never>
   search: SearchRequest
   get: { id: string }
+  links: Record<string, never>
+  relink: Record<string, never>
   readRaw: { id: string }
   writeRaw: WriteRawRequest
   save: SaveRequest
@@ -503,6 +516,8 @@ export interface RpcResultMap {
   overview: OverviewResponse
   search: SearchResponse
   get: GetResponse
+  links: LinkGraphResponse
+  relink: RelinkResponse
   readRaw: RawDocument
   writeRaw: WriteRawResponse
   save: SaveResponse
